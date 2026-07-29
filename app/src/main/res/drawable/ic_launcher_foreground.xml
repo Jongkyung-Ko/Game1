@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 성벽 본체 -->
+    <path
+        android:fillColor="#D9C7A3"
+        android:pathData="M34,50h40v28h-40z" />
+    <!-- 좌측 탑 -->
+    <path
+        android:fillColor="#EADCBB"
+        android:pathData="M26,42h14v36h-14z" />
+    <!-- 우측 탑 -->
+    <path
+        android:fillColor="#EADCBB"
+        android:pathData="M68,42h14v36h-14z" />
+    <!-- 지붕 -->
+    <path
+        android:fillColor="#A3392F"
+        android:pathData="M24,42L33,30L42,42z" />
+    <path
+        android:fillColor="#A3392F"
+        android:pathData="M66,42L75,30L84,42z" />
+    <path
+        android:fillColor="#C4483C"
+        android:pathData="M30,50L54,34L78,50z" />
+    <!-- 성문 -->
+    <path
+        android:fillColor="#5A3A22"
+        android:pathData="M48,60h12v18h-12z" />
+</vector>
