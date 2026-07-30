@@ -36,6 +36,7 @@ fun DrawScope.drawPlace(p: Place) {
         BuildingStyle.FORGE -> drawForge(p)
         BuildingStyle.STORE -> drawHouse(p, awning = true)
         BuildingStyle.INN -> drawHouse(p, twoFloor = true)
+        BuildingStyle.PUB -> drawHouse(p, twoFloor = true)
         BuildingStyle.CLINIC -> drawHouse(p, stoneWall = true)
         else -> drawHouse(p)
     }
@@ -402,6 +403,19 @@ private fun DrawScope.drawEmblem(p: Place) {
         PlaceId.INN -> {
             drawRect(Color(0xFF8A5A2B), Offset(cx - r * 0.5f, cy - r * 0.1f), Size(r * 1.0f, r * 0.5f))
             drawRect(Color(0xFFF2E4C6), Offset(cx - r * 0.5f, cy - r * 0.35f), Size(r * 0.45f, r * 0.3f))
+        }
+        PlaceId.PUB -> {
+            drawRect(Color(0xFF7A5230), Offset(cx - r * 0.46f, cy - r * 0.18f), Size(r * 0.76f, r * 0.55f))
+            drawArc(
+                Color(0xFFE5C878),
+                0f,
+                180f,
+                false,
+                Offset(cx + r * 0.14f, cy - r * 0.12f),
+                Size(r * 0.38f, r * 0.46f),
+                style = Stroke(width = 2.5f)
+            )
+            drawCircle(Color(0xFFF2E4C6), r * 0.10f, Offset(cx - r * 0.20f, cy - r * 0.28f))
         }
         PlaceId.BLACKSMITH -> {
             drawRect(Color(0xFF5A3A22), Offset(cx - r * 0.1f, cy - r * 0.1f), Size(r * 0.2f, r * 0.7f))

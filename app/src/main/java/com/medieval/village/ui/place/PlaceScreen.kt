@@ -46,6 +46,10 @@ import com.medieval.village.ui.theme.Palette
 
 @Composable
 fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
+    if (id == PlaceId.PUB) {
+        PubScreen(vm = vm, modifier = modifier)
+        return
+    }
     val place = Village.of(id)
 
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
@@ -59,7 +63,7 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
                 .clip(RoundedCornerShape(12.dp))
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                drawInterior(id, size.width, size.height)
+                drawInterior(id, size.width, size.height, vm.activeParty)
             }
             Box(
                 modifier = Modifier
@@ -90,6 +94,7 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
                 PlaceId.HOSPITAL -> HospitalActions(vm)
                 PlaceId.CHURCH -> ChurchActions(vm)
                 PlaceId.INN -> InnActions(vm)
+                PlaceId.PUB -> Unit
                 PlaceId.ARENA -> ArenaActions(vm)
                 PlaceId.DUNGEON -> DungeonActions(vm)
                 PlaceId.BLACKSMITH -> BlacksmithActions(vm)
@@ -256,7 +261,7 @@ private fun ColumnScope.DungeonActions(vm: GameViewModel) {
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Chip("최고 기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
-        Chip("동료 ${vm.party.size}명", Palette.Moss)
+        Chip("활성 동료 ${vm.activeParty.size}명", Palette.Moss)
     }
     Spacer(Modifier.height(10.dp))
     ListRow(
@@ -329,13 +334,14 @@ private fun ColumnScope.MagicSchoolActions(vm: GameViewModel) {
 @Composable
 private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
     SectionTitle("떠돌이 칼잡이")
-    Text("최대 2명까지 동행할 수 있다. 동료는 던전 전투에 힘을 보탠다.", color = Palette.ParchmentDim, fontSize = 12.sp)
+    Text("용병은 여러 명 고용할 수 있고, Status에서 최대 2명을 원정대로 선택한다.", color = Palette.ParchmentDim, fontSize = 12.sp)
     Spacer(Modifier.height(8.dp))
 
     if (vm.party.isNotEmpty()) {
         SectionTitle("현재 동료")
         vm.party.toList().forEach { m ->
-            ListRow("${m.name} (${m.role})", "전투 기여 +${m.power}") {
+            val active = m.id in vm.activeMercenaryIds
+            ListRow("${m.name} (${m.role})", "전투 기여 +${m.power} · ${if (active) "원정대" else "대기 중"}") {
                 WoodButton("해고") { vm.dismiss(m) }
             }
         }
@@ -351,8 +357,8 @@ private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
             subtitle = "${m.desc}\n전투 기여 +${m.power}"
         ) {
             WoodButton(
-                text = if (hired) "동행 중" else "${m.cost}G",
-                enabled = !hired && vm.player.gold >= m.cost && vm.party.size < 2,
+                text = if (hired) "고용함" else "${m.cost}G",
+                enabled = !hired && vm.player.gold >= m.cost,
                 highlight = !hired
             ) { vm.hire(m) }
         }

@@ -85,6 +85,17 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawRoads()
                 drawScenery()
                 Village.places.sortedBy { it.bottom }.forEach { drawPlace(it) }
+                vm.activeParty.forEachIndexed { index, mercenary ->
+                    val side = if (index == 0) -1f else 1f
+                    drawMercenary(
+                        mercenary = mercenary,
+                        x = vm.heroX + side * 54f,
+                        y = vm.heroY + 52f + index * 12f,
+                        facing = vm.facing,
+                        walking = vm.walking,
+                        phase = vm.walkPhase + index * 1.3f
+                    )
+                }
                 drawHero(vm.heroX, vm.heroY, vm.facing, vm.walking, vm.walkPhase)
             }
         }

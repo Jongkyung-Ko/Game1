@@ -17,6 +17,8 @@ import com.medieval.village.model.Mercenary
 import com.medieval.village.model.Place
 import com.medieval.village.model.PlaceId
 import com.medieval.village.model.Player
+import com.medieval.village.model.PubNpc
+import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.model.Skill
 import com.medieval.village.model.Village
 import kotlin.math.abs
@@ -35,7 +37,7 @@ class GameViewModel : ViewModel() {
 
     companion object {
         private const val WALK_SPEED = 360f
-        private const val MAX_MERCENARY = 2
+        const val MAX_ACTIVE_MERCENARY = 2
     }
 
     var player by mutableStateOf(Player())
@@ -44,7 +46,10 @@ class GameViewModel : ViewModel() {
     val inventory = mutableStateListOf<InventoryEntry>()
     val equipment = mutableStateMapOf<ItemType, EquippedItem>()
     val skills = mutableStateListOf<Skill>()
+    /** 고용한 전체 용병 명단 */
     val party = mutableStateListOf<Mercenary>()
+    /** Status에서 원정대로 선택한 용병 id (최대 2명) */
+    val activeMercenaryIds = mutableStateListOf<String>()
 
     /** 현재 화면에서 보여줄 대사/결과 로그 */
     val log = mutableStateListOf<String>()
@@ -66,6 +71,17 @@ class GameViewModel : ViewModel() {
     var walkPhase by mutableFloatStateOf(0f)
         private set
 
+    var pubHeroX by mutableFloatStateOf(500f)
+        private set
+    var pubHeroY by mutableFloatStateOf(610f)
+        private set
+    var pubWalking by mutableStateOf(false)
+        private set
+    var pubDialogue by mutableStateOf<String?>(null)
+        private set
+    var pubSpeakerId by mutableStateOf<String?>(null)
+        private set
+
     /** 대련소 전적 */
     var arenaWins by mutableStateOf(0)
         private set
@@ -74,6 +90,8 @@ class GameViewModel : ViewModel() {
 
     private val path = ArrayDeque<Waypoint>()
     private var pendingEnter: PlaceId? = null
+    private var pubTarget: Waypoint? = null
+    private var pendingPubNpc: PubNpc? = null
 
     init {
         newGame()
@@ -87,9 +105,12 @@ class GameViewModel : ViewModel() {
         equipment.clear()
         skills.clear()
         party.clear()
+        activeMercenaryIds.clear()
         log.clear()
         path.clear()
         pendingEnter = null
+        pubTarget = null
+        pendingPubNpc = null
         arenaWins = 0
         arenaLosses = 0
 
@@ -103,6 +124,11 @@ class GameViewModel : ViewModel() {
         heroY = home.doorY
         facing = Facing.DOWN
         walking = false
+        pubHeroX = 500f
+        pubHeroY = 610f
+        pubWalking = false
+        pubDialogue = null
+        pubSpeakerId = null
         scene = Scene.INTERIOR
         currentPlace = PlaceId.HOME
         menuTab = MenuTab.NONE
@@ -115,7 +141,9 @@ class GameViewModel : ViewModel() {
     val equipAtk: Int get() = equipment.values.sumOf { it.atk }
     val equipDef: Int get() = equipment.values.sumOf { it.def }
     val skillPower: Int get() = skills.sumOf { it.power } / 2
-    val partyPower: Int get() = party.sumOf { it.power }
+    val activeParty: List<Mercenary>
+        get() = activeMercenaryIds.mapNotNull { id -> party.firstOrNull { it.id == id } }
+    val partyPower: Int get() = activeParty.sumOf { it.power }
 
     val totalAtk: Int get() = player.baseAtk + equipAtk + player.str / 2 + skillPower
     val totalDef: Int get() = player.baseDef + equipDef + player.agi / 3
@@ -123,6 +151,10 @@ class GameViewModel : ViewModel() {
     // ---------------------------------------------------------------- 이동
 
     fun tick(dt: Float) {
+        if (scene == Scene.INTERIOR && currentPlace == PlaceId.PUB) {
+            tickPub(dt)
+            return
+        }
         if (scene != Scene.VILLAGE) return
 
         val target = path.firstOrNull()
@@ -157,6 +189,62 @@ class GameViewModel : ViewModel() {
                 if (dy > 0) Facing.DOWN else Facing.UP
             }
         }
+    }
+
+    private fun tickPub(dt: Float) {
+        val target = pubTarget
+        if (target == null) {
+            pubWalking = false
+            return
+        }
+        val dx = target.x - pubHeroX
+        val dy = target.y - pubHeroY
+        val dist = hypot(dx, dy)
+        val step = WALK_SPEED * dt
+        if (dist <= step || dist < 0.01f) {
+            pubHeroX = target.x
+            pubHeroY = target.y
+            pubTarget = null
+            pubWalking = false
+            pendingPubNpc?.let { speakTo(it) }
+            pendingPubNpc = null
+        } else {
+            pubHeroX += dx / dist * step
+            pubHeroY += dy / dist * step
+            pubWalking = true
+            walkPhase += dt * 10f
+            facing = if (abs(dx) > abs(dy)) {
+                if (dx > 0) Facing.RIGHT else Facing.LEFT
+            } else {
+                if (dy > 0) Facing.DOWN else Facing.UP
+            }
+        }
+    }
+
+    fun walkInPub(x: Float, y: Float) {
+        pubDialogue = null
+        pubSpeakerId = null
+        pendingPubNpc = null
+        pubTarget = Waypoint(
+            x.coerceIn(90f, PubNpcCatalog.WORLD_W - 90f),
+            y.coerceIn(180f, PubNpcCatalog.WORLD_H - 45f)
+        )
+    }
+
+    fun approachPubNpc(npc: PubNpc) {
+        pubDialogue = null
+        pubSpeakerId = null
+        pendingPubNpc = npc
+        pubTarget = Waypoint(
+            npc.x,
+            (npc.y + 95f).coerceAtMost(PubNpcCatalog.WORLD_H - 40f)
+        )
+    }
+
+    private fun speakTo(npc: PubNpc) {
+        pubSpeakerId = npc.id
+        pubDialogue = npc.lines.random()
+        say("${npc.name}: ${pubDialogue}")
     }
 
     /** 빈 땅을 눌렀을 때: 길을 따라 그 지점까지 걸어간다. */
@@ -198,6 +286,15 @@ class GameViewModel : ViewModel() {
         scene = Scene.INTERIOR
         menuTab = MenuTab.NONE
         log.clear()
+        if (id == PlaceId.PUB) {
+            pubHeroX = 500f
+            pubHeroY = 610f
+            pubTarget = null
+            pendingPubNpc = null
+            pubWalking = false
+            pubDialogue = null
+            pubSpeakerId = null
+        }
         say(greetingOf(id))
     }
 
@@ -209,7 +306,10 @@ class GameViewModel : ViewModel() {
         facing = Facing.DOWN
         path.clear()
         pendingEnter = null
+        pubTarget = null
+        pendingPubNpc = null
         walking = false
+        pubWalking = false
         scene = Scene.VILLAGE
         currentPlace = null
         menuTab = MenuTab.NONE
@@ -222,6 +322,7 @@ class GameViewModel : ViewModel() {
         PlaceId.HOSPITAL -> "\"어디가 아파서 오셨습니까?\""
         PlaceId.CHURCH -> "\"빛의 가호가 그대와 함께하기를.\""
         PlaceId.INN -> "\"방 하나 잡으시겠어요?\""
+        PlaceId.PUB -> "따뜻한 불빛과 왁자지껄한 이야기 소리가 반긴다."
         PlaceId.ARENA -> "\"몸 좀 풀러 왔나, 애송이?\""
         PlaceId.DUNGEON -> "차가운 바람이 지하에서 올라온다."
         PlaceId.BLACKSMITH -> "\"쇠는 두들길수록 강해지지.\""
@@ -461,11 +562,7 @@ class GameViewModel : ViewModel() {
 
     fun hire(merc: Mercenary) {
         if (party.any { it.id == merc.id }) {
-            say("이미 함께하고 있다.")
-            return
-        }
-        if (party.size >= MAX_MERCENARY) {
-            say("더 이상 데리고 다닐 수 없다. (최대 ${MAX_MERCENARY}명)")
+            say("이미 고용한 용병이다.")
             return
         }
         if (player.gold < merc.cost) {
@@ -474,12 +571,32 @@ class GameViewModel : ViewModel() {
         }
         player = player.copy(gold = player.gold - merc.cost)
         party.add(merc)
-        say("${merc.name}이(가) 동료가 되었다! (-${merc.cost}G)")
+        if (activeMercenaryIds.size < MAX_ACTIVE_MERCENARY) {
+            activeMercenaryIds.add(merc.id)
+            say("${merc.name}이(가) 동료가 되어 원정대에 합류했다! (-${merc.cost}G)")
+        } else {
+            say("${merc.name}을(를) 고용했다. Status에서 원정대를 편성할 수 있다. (-${merc.cost}G)")
+        }
     }
 
     fun dismiss(merc: Mercenary) {
         party.removeAll { it.id == merc.id }
+        activeMercenaryIds.remove(merc.id)
         say("${merc.name}과(와) 작별했다.")
+    }
+
+    fun toggleMercenaryActive(merc: Mercenary) {
+        if (merc.id in activeMercenaryIds) {
+            activeMercenaryIds.remove(merc.id)
+            say("${merc.name}을(를) 원정대에서 대기시켰다.")
+            return
+        }
+        if (activeMercenaryIds.size >= MAX_ACTIVE_MERCENARY) {
+            say("원정대는 최대 ${MAX_ACTIVE_MERCENARY}명까지 선택할 수 있다.")
+            return
+        }
+        activeMercenaryIds.add(merc.id)
+        say("${merc.name}이(가) 원정대에 합류했다.")
     }
 
     // ---------------------------------------------------------------- 대련소

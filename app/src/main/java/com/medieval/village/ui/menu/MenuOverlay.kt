@@ -159,13 +159,31 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     }
 
     Spacer(Modifier.height(10.dp))
-    SectionTitle("동료")
+    SectionTitle("용병 원정대 (${vm.activeParty.size}/${GameViewModel.MAX_ACTIVE_MERCENARY})")
     if (vm.party.isEmpty()) {
-        Text("혼자 다니는 중. 용병고용소를 찾아가자.", color = Palette.ParchmentDim, fontSize = 12.sp)
+        Text("고용한 용병이 없다. 용병고용소를 찾아가자.", color = Palette.ParchmentDim, fontSize = 12.sp)
     } else {
         vm.party.forEach { m ->
-            ListRow("${m.name} (${m.role})", "전투 기여 +${m.power}")
+            val active = m.id in vm.activeMercenaryIds
+            ListRow(
+                "${m.name} (${m.role})",
+                "전투 기여 +${m.power} · ${if (active) "동행 중" else "대기 중"}"
+            ) {
+                WoodButton(
+                    text = if (active) "선택 해제" else "선택",
+                    enabled = active || vm.activeParty.size < GameViewModel.MAX_ACTIVE_MERCENARY,
+                    highlight = active
+                ) {
+                    vm.toggleMercenaryActive(m)
+                }
+            }
         }
+        Text(
+            "선택한 최대 2명만 마을·장소 화면에 함께 나오고 던전 전투에 참여합니다.",
+            color = Palette.ParchmentDim,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 5.dp)
+        )
     }
 }
 

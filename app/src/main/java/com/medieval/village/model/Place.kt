@@ -2,12 +2,12 @@ package com.medieval.village.model
 
 enum class PlaceId {
     HOME, SHOP, WEAPON_SHOP, HOSPITAL, CHURCH, INN,
-    ARENA, DUNGEON, BLACKSMITH, MAGIC_SCHOOL, MERCENARY
+    PUB, ARENA, DUNGEON, BLACKSMITH, MAGIC_SCHOOL, MERCENARY
 }
 
 /** 건물 외형 종류 (Canvas 렌더링 분기용) */
 enum class BuildingStyle {
-    HOUSE, STORE, ARMORY, CLINIC, CHURCH, INN, ARENA, CAVE, FORGE, TOWER, CAMP
+    HOUSE, STORE, ARMORY, CLINIC, CHURCH, INN, PUB, ARENA, CAVE, FORGE, TOWER, CAMP
 }
 
 data class Place(
@@ -105,6 +105,10 @@ object Village {
         Place(
             PlaceId.HOME, "주인공 집", "나의 오두막",
             700f, 1430f, 250f, 180f, BuildingStyle.HOUSE, 0xFF9C4A34, 0xFFE8D4AC
+        ),
+        Place(
+            PlaceId.PUB, "PUB", "황금 수사슴 선술집",
+            625f, 390f, 140f, 120f, BuildingStyle.PUB, 0xFF713B2A, 0xFFD0A66E
         )
     )
 
@@ -112,7 +116,7 @@ object Village {
 
     /** 나무 (x, y, 크기) */
     val trees = listOf(
-        Triple(360f, 480f, 46f), Triple(645f, 470f, 40f), Triple(370f, 900f, 42f),
+        Triple(360f, 480f, 46f), Triple(370f, 900f, 42f),
         Triple(345f, 1180f, 38f), Triple(660f, 250f, 36f),
         Triple(105f, 1360f, 44f), Triple(915f, 1400f, 46f),
         Triple(150f, 1615f, 38f), Triple(870f, 1600f, 42f)

@@ -7,10 +7,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.medieval.village.audio.GameAudioEngine
+import com.medieval.village.audio.MusicMood
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
 import com.medieval.village.game.Scene
@@ -23,6 +30,37 @@ import com.medieval.village.ui.village.VillageScene
 @Composable
 fun GameRoot(modifier: Modifier = Modifier) {
     val vm: GameViewModel = viewModel()
+    val audio = remember { GameAudioEngine() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> audio.resume()
+                Lifecycle.Event.ON_PAUSE -> audio.pause()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            audio.release()
+        }
+    }
+
+    LaunchedEffect(vm.scene, vm.currentPlace) {
+        val mood = when {
+            vm.scene == Scene.VILLAGE -> MusicMood.VILLAGE
+            vm.currentPlace in setOf(PlaceId.HOME, PlaceId.INN, PlaceId.PUB) -> MusicMood.COZY
+            vm.currentPlace in setOf(PlaceId.DUNGEON, PlaceId.ARENA) -> MusicMood.TENSE
+            else -> MusicMood.VILLAGE
+        }
+        audio.playMusic(mood)
+    }
+
+    LaunchedEffect(vm.walking, vm.pubWalking) {
+        audio.setWalking(vm.walking || vm.pubWalking)
+    }
 
     // 프레임 루프 - 주인공 이동 처리
     LaunchedEffect(Unit) {

@@ -8,17 +8,29 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import com.medieval.village.game.Facing
+import com.medieval.village.model.Mercenary
 import com.medieval.village.model.PlaceId
 import com.medieval.village.ui.village.drawHero
+import com.medieval.village.ui.village.drawMercenary
 import com.medieval.village.ui.village.drawStar
 
 /** 장소별 실내(혹은 입구) 배경. w, h 는 캔버스 픽셀 크기. */
-fun DrawScope.drawInterior(id: PlaceId, w: Float, h: Float) {
+fun DrawScope.drawInterior(id: PlaceId, w: Float, h: Float, companions: List<Mercenary> = emptyList()) {
     when (id) {
         PlaceId.DUNGEON -> dungeonMouth(w, h)
         PlaceId.ARENA -> arenaYard(w, h)
         PlaceId.MERCENARY -> campInterior(w, h)
         else -> roomBase(id, w, h)
+    }
+
+    companions.forEachIndexed { index, mercenary ->
+        val k = h * 0.39f / 88f
+        withTransform({
+            translate(w * (0.30f + index * 0.11f), h * (0.93f - index * 0.02f))
+            scale(k, k, Offset.Zero)
+        }) {
+            drawMercenary(mercenary, 0f, 0f, Facing.RIGHT, false, index.toFloat())
+        }
     }
 
     // 주인공
@@ -63,6 +75,7 @@ private fun DrawScope.roomBase(id: PlaceId, w: Float, h: Float) {
         PlaceId.HOSPITAL -> hospitalProps(w, h, floorY)
         PlaceId.CHURCH -> churchProps(w, h, floorY)
         PlaceId.INN -> innProps(w, h, floorY)
+        PlaceId.PUB -> innProps(w, h, floorY)
         PlaceId.BLACKSMITH -> forgeProps(w, h, floorY)
         PlaceId.MAGIC_SCHOOL -> magicProps(w, h, floorY)
         else -> Unit
