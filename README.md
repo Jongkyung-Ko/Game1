@@ -41,20 +41,34 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 
 주인공은 게임 시작 시 **자기 집 안에서** 출발하며, `마을로 나가기`를 눌러 마을로 나옵니다.
 
-## 실행 방법
+## 모바일에서 바로 실행 (APK)
 
-1. [Android Studio](https://developer.android.com/studio) (Ladybug 이상 권장) 설치
-2. `File > Open` 으로 이 폴더를 엽니다
-3. Gradle Sync가 끝나면 (SDK·Gradle 자동 다운로드) 상단 `Run ▶` 실행
+Android 폰에 디버그 APK를 설치하면 바로 플레이할 수 있습니다.
 
-명령줄에서 빌드하려면 JDK 17과 Android SDK 34가 필요합니다.
+1. 아래 APK를 폰으로 다운로드합니다  
+   - 이 Cloud Agent 실행 결과물: `MedievalVillage-debug.apk`  
+   - 또는 GitHub Actions → 최신 워크플로 → Artifacts → `MedievalVillage-debug`
+2. 폰에서 파일 앱으로 APK를 엽니다
+3. **알 수 없는 앱 설치** / **이 소스 허용** 을 켠 뒤 설치합니다
+4. 홈 화면의 **중세마을 이야기** 아이콘으로 실행합니다
+
+> 디버그 APK라 Play 스토어 서명이 아닙니다. 설치 경고가 뜨는 것이 정상입니다.
+
+### 명령줄로 APK 만들기
+
+JDK 17과 Android SDK 34가 있으면:
 
 ```bash
 ./gradlew assembleDebug
 ```
 
-> `gradle/wrapper/gradle-wrapper.jar` 는 저장소에 포함되어 있지 않습니다.
-> Android Studio가 첫 Sync 때 생성하며, 직접 만들려면 `gradle wrapper` 를 한 번 실행하세요.
+결과물: `app/build/outputs/apk/debug/app-debug.apk`
+
+### Android Studio로 실행
+
+1. [Android Studio](https://developer.android.com/studio) (Ladybug 이상 권장) 설치
+2. `File > Open` 으로 이 폴더를 엽니다
+3. Gradle Sync가 끝나면 상단 `Run ▶` 로 에뮬레이터/실기기 실행
 
 ## 프로젝트 구조
 
