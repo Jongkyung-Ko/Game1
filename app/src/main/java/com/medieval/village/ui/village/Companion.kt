@@ -5,7 +5,6 @@ import com.medieval.village.game.Facing
 import com.medieval.village.model.Mercenary
 import kotlin.math.sin
 
-/** Kenney Tiny Dungeon 용병 스프라이트. */
 fun DrawScope.drawMercenary(
     atlas: KenneyAtlas,
     mercenary: Mercenary,
@@ -15,19 +14,18 @@ fun DrawScope.drawMercenary(
     walking: Boolean,
     animTime: Float
 ) {
-    val tile = when (mercenary.role) {
-        "검사" -> DungeonTiles.KNIGHT_BLUE
-        "궁수" -> DungeonTiles.KNIGHT_GOLD
-        "방패병" -> DungeonTiles.KNIGHT_RED
-        else -> DungeonTiles.MAGE
+    val name = when (mercenary.role) {
+        "검사" -> "knight_b"
+        "궁수" -> "knight_g"
+        "방패병" -> "knight_r"
+        else -> "mage"
     }
-    val bob = if (walking) sin(animTime * 13f) * 3.5f else sin(animTime * 2.2f + 1f) * 1.8f
-    drawKenneySprite(
-        sheet = atlas.dungeon,
-        tileId = tile,
+    val bob = if (walking) sin(animTime * 13f) * 4f else sin(animTime * 2.2f + 1f) * 2f
+    drawKenneySpriteAsset(
+        image = atlas.sprite(name),
         cx = x,
         footY = y,
-        size = WORLD_TILE * 1.9f,
+        worldHeight = WORLD_TILE * 2.35f,
         bob = bob,
         mirrorX = facing == Facing.LEFT,
     )
