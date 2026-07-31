@@ -36,7 +36,6 @@ import kotlin.math.roundToInt
 
 @Composable
 fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
-    val kenney = rememberKenneyAtlas()
     val art = rememberCustomArt()
     BoxWithConstraints(modifier.background(Color(0xFF1A140E))) {
         val density = LocalDensity.current
@@ -88,16 +87,13 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 party.forEachIndexed { index, mercenary ->
                     val side = if (index == 0) -1f else 1f
                     drawMercenary(
-                        atlas = kenney,
+                        art = art,
                         mercenary = mercenary,
                         x = heroX + side * 28f,
                         y = heroY + 18f + index * 8f,
                         facing = facing,
-                        walking = false,
-                        animTime = 0f
                     )
                 }
-                // 걷기 프레임 없이 방향별 정지 스프라이트만
                 drawCustomHero(art, heroX, heroY, facing, worldHeight = 78f)
             }
         }
@@ -132,7 +128,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = "Style B · Custom v6",
+            text = "Style B · Roster v7",
             color = Color(0xFFFFE29A),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,

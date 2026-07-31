@@ -43,17 +43,17 @@ import com.medieval.village.ui.Chip
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.drawCustomHero
+import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawMercenary
 import com.medieval.village.ui.village.rememberCustomArt
-import com.medieval.village.ui.village.rememberKenneyAtlas
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
 @Composable
 fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
-    val atlas = rememberKenneyAtlas()
     val art = rememberCustomArt()
     val floor = vm.dungeonFloor
     Column(modifier = modifier.fillMaxSize().background(Color(0xFF14100C))) {
@@ -93,8 +93,6 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val density = LocalDensity.current
             val widthPx = with(density) { maxWidth.toPx() }
             val heightPx = with(density) { maxHeight.toPx() }
-            val animTime = vm.animTime
-            val dungeonWalking = vm.dungeonWalking
             val facing = vm.facing
 
             Canvas(
@@ -124,16 +122,14 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     translate(-camX, -camY)
                 }) {
                     drawDungeonFloor(map)
-                    map.monsters.filter { it.alive }.forEach { drawZombie(it) }
+                    map.monsters.filter { it.alive }.forEach { drawZombie(art, it) }
                     vm.activeParty.forEachIndexed { index, mercenary ->
                         drawMercenary(
-                            atlas,
+                            art,
                             mercenary,
                             vm.dungeonHeroX + if (index == 0) -40f else 40f,
                             vm.dungeonHeroY + 28f + index * 6f,
                             facing,
-                            dungeonWalking,
-                            animTime + index * 0.35f
                         )
                     }
                     drawCustomHero(art, vm.dungeonHeroX, vm.dungeonHeroY, facing, worldHeight = 70f)
@@ -258,18 +254,17 @@ private fun DrawScope.drawDungeonFloor(map: DungeonFloor) {
     }
 }
 
-private fun DrawScope.drawZombie(monster: DungeonMonster) {
+private fun DrawScope.drawZombie(art: CustomArt, monster: DungeonMonster) {
     val x = monster.x
     val y = monster.y
     drawOval(Color(0x55000000), Offset(x - 22f, y - 4f), Size(44f, 14f))
-    drawRect(Color(0xFF4A5A3A), Offset(x - 14f, y - 48f), Size(28f, 40f))
-    drawCircle(Color(0xFF7A8A5A), 14f, Offset(x, y - 58f))
-    drawCircle(Color(0xFFC0392B), 3f, Offset(x - 5f, y - 60f))
-    drawCircle(Color(0xFFC0392B), 3f, Offset(x + 5f, y - 60f))
-    // 찢어진 옷
-    drawRect(Color(0xFF6B3A2E), Offset(x - 16f, y - 40f), Size(10f, 18f))
-    drawRect(Color(0xFF6B3A2E), Offset(x + 6f, y - 36f), Size(10f, 14f))
-    drawLabel(monster.name, x - 42f, y + 18f, 14f, Color(0xFFE8B4B4))
+    drawCustomSprite(
+        image = art.zombieSprite(monster.kind),
+        cx = x,
+        footY = y,
+        worldHeight = 64f,
+    )
+    drawLabel(monster.name, x - 48f, y + 14f, 13f, Color(0xFFE8B4B4))
 }
 
 private fun DrawScope.drawMinimap(

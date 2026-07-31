@@ -120,7 +120,7 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
             )
             Spacer(modifier.width(6.dp))
             Text(
-                "B·v6",
+                "B·v7",
                 color = Color(0xFFFFE29A),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold

@@ -8,7 +8,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
 import com.medieval.village.game.Facing
 import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
@@ -20,7 +19,7 @@ import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.TownTiles
 import com.medieval.village.ui.village.drawCustomHero
-import com.medieval.village.ui.village.drawKenneySpriteAsset
+import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.drawMercenary
 import kotlin.math.sin
@@ -39,14 +38,12 @@ fun DrawScope.drawInterior(
     drawInteriorBackground(atlas, id, w, h)
 
     InteriorNpcCatalog.forPlace(id).forEachIndexed { index, npc ->
-        val bob = sin(animTime * 2.6f + index) * 3f
-        val wave = sin(animTime * 3.2f + index * 0.8f)
-        drawKenneySpriteAsset(
-            image = atlas.sprite(npcSprite(npc)),
+        val bob = sin(animTime * 2.6f + index) * 2f
+        drawCustomSprite(
+            image = art.npcSprite(npcSpriteKey(npc)),
             cx = w * npc.fx,
-            footY = h * npc.fy,
-            worldHeight = h * 0.52f,
-            bob = bob + if (wave > 0.65f) -3f else 0f,
+            footY = h * npc.fy + bob,
+            worldHeight = h * 0.55f,
         )
         if (speechNpcId == npc.id && !speechText.isNullOrBlank()) {
             drawSpeechBubble(w * npc.fx, h * npc.fy - h * 0.34f, speechText, w)
@@ -55,91 +52,95 @@ fun DrawScope.drawInterior(
 
     companions.forEachIndexed { index, mercenary ->
         drawMercenary(
-            atlas, mercenary,
-            w * (0.30f + index * 0.12f), h * 0.90f,
-            Facing.RIGHT, false, animTime + index * 0.35f
+            art,
+            mercenary,
+            w * (0.30f + index * 0.12f),
+            h * 0.90f,
+            Facing.RIGHT,
+            false,
+            animTime + index * 0.35f
         )
     }
-    drawCustomHero(art, w * 0.18f, h * 0.90f, Facing.RIGHT, worldHeight = h * 0.55f)
+    drawCustomHero(art, w * 0.18f, h * 0.90f, Facing.RIGHT, worldHeight = h * 0.58f)
 }
 
-private fun npcSprite(npc: InteriorNpc): String = when (npc.kind) {
-    InteriorNpcKind.KEEPER -> when (npc.placeId) {
-        PlaceId.SHOP, PlaceId.INN, PlaceId.PUB -> "villager"
-        PlaceId.WEAPON_SHOP, PlaceId.BLACKSMITH -> "elder"
-        PlaceId.HOSPITAL -> "woman"
-        PlaceId.CHURCH -> "elder"
-        PlaceId.MAGIC_SCHOOL -> "mage"
-        PlaceId.ARENA, PlaceId.MERCENARY -> "knight_g"
-        else -> "villager"
-    }
-    InteriorNpcKind.HELPER -> when (npc.placeId) {
-        PlaceId.CHURCH, PlaceId.HOSPITAL -> "woman"
-        PlaceId.HOME -> "youth"
-        else -> "villager"
-    }
-    InteriorNpcKind.VISITOR -> "knight_b"
+private fun npcSpriteKey(npc: InteriorNpc): String = when (npc.placeId) {
+    PlaceId.SHOP -> if (npc.kind == InteriorNpcKind.KEEPER) "shopkeeper" else "merchant"
+    PlaceId.WEAPON_SHOP -> "blacksmith"
+    PlaceId.HOSPITAL -> if (npc.kind == InteriorNpcKind.KEEPER) "doctor" else "teacher"
+    PlaceId.CHURCH -> if (npc.kind == InteriorNpcKind.KEEPER) "mage" else "paladin"
+    PlaceId.INN -> if (npc.kind == InteriorNpcKind.KEEPER) "merchant" else "chef"
+    PlaceId.ARENA -> "warrior"
+    PlaceId.BLACKSMITH -> "blacksmith"
+    PlaceId.MAGIC_SCHOOL -> if (npc.kind == InteriorNpcKind.KEEPER) "mage" else "teacher"
+    PlaceId.MERCENARY -> if (npc.kind == InteriorNpcKind.KEEPER) "warrior" else "rogue"
+    PlaceId.HOME -> "farmer"
+    PlaceId.PUB -> "merchant"
+    PlaceId.DUNGEON -> "warrior"
 }
 
 private fun DrawScope.drawInteriorBackground(atlas: KenneyAtlas, id: PlaceId, w: Float, h: Float) {
-    val tile = (h / 5f).coerceIn(28f, 56f)
-    val cols = (w / tile).toInt() + 2
-    val rows = (h / tile).toInt() + 2
-    val floorY = (h * 0.58f / tile).toInt()
-    for (r in 0 until rows) {
-        for (c in 0 until cols) {
-            if (r < floorY) {
-                val sheet = if (id == PlaceId.MAGIC_SCHOOL || id == PlaceId.DUNGEON) atlas.dungeon else atlas.town
-                val tid = if (id == PlaceId.MAGIC_SCHOOL || id == PlaceId.DUNGEON) DungeonTiles.WALL else 73
-                drawKenneyTile(sheet, tid, c * tile, r * tile, tile)
-            } else {
-                drawKenneyTile(atlas.town, TownTiles.PATH, c * tile, r * tile, tile)
-            }
+    val tile = minOf(w, h) / 8f
+    drawRect(Color(0xFF2B1C12), Offset.Zero, Size(w, h))
+    drawRect(Color(0xFF3E2A1C), Offset(0f, 0f), Size(w, h * 0.36f))
+    for (c in 0 until 12) {
+        drawKenneyTile(atlas.dungeon, DungeonTiles.WALL, c * tile - tile * 0.2f, h * 0.30f, tile)
+    }
+    for (r in 0 until 6) {
+        for (c in 0 until 12) {
+            drawKenneyTile(
+                atlas.town,
+                TownTiles.PATH,
+                c * tile - tile * 0.1f,
+                h * 0.42f + r * tile * 0.85f,
+                tile
+            )
         }
     }
-    // props
-    when (id) {
-        PlaceId.SHOP, PlaceId.WEAPON_SHOP -> {
-            drawKenneySpriteAsset(atlas.sprite("crate"), w * 0.62f, h * 0.70f, tile * 1.2f)
-            drawKenneySpriteAsset(atlas.sprite("basket"), w * 0.78f, h * 0.70f, tile * 1.2f)
-        }
-        PlaceId.HOSPITAL, PlaceId.HOME, PlaceId.INN -> {
-            drawKenneyTile(atlas.dungeon, DungeonTiles.TABLE, w * 0.60f, h * 0.45f, tile)
-        }
-        PlaceId.ARENA -> drawKenneySpriteAsset(atlas.sprite("target"), w * 0.68f, h * 0.65f, tile * 1.4f)
-        PlaceId.BLACKSMITH -> drawKenneySpriteAsset(atlas.sprite("crate"), w * 0.65f, h * 0.70f, tile * 1.2f)
-        else -> Unit
+    val accent = when (id) {
+        PlaceId.HOSPITAL -> Color(0x446090B0)
+        PlaceId.CHURCH -> Color(0x44C9B27A)
+        PlaceId.BLACKSMITH, PlaceId.WEAPON_SHOP -> Color(0x44A05030)
+        PlaceId.MAGIC_SCHOOL -> Color(0x445060A0)
+        else -> Color(0x33FFFFFF)
     }
+    drawRect(accent, Offset(0f, h * 0.36f), Size(w, 8f))
 }
 
-private fun DrawScope.drawSpeechBubble(cx: Float, cy: Float, text: String, canvasW: Float) {
+private fun DrawScope.drawSpeechBubble(cx: Float, top: Float, text: String, roomW: Float) {
     val paint = android.graphics.Paint().apply {
-        color = Color(0xFF1B120A).toArgb()
-        textSize = 20f
+        color = android.graphics.Color.WHITE
+        textSize = (roomW * 0.045f).coerceIn(22f, 34f)
         isAntiAlias = true
         textAlign = android.graphics.Paint.Align.CENTER
     }
-    val width = (paint.measureText(text) + 24f).coerceIn(70f, canvasW * 0.55f)
-    val left = (cx - width / 2f).coerceIn(6f, canvasW - width - 6f)
+    val width = (paint.measureText(text) + 28f).coerceAtMost(roomW * 0.7f)
+    val height = paint.textSize + 22f
+    val left = (cx - width / 2f).coerceIn(8f, roomW - width - 8f)
     drawRoundRect(
-        color = Color(0xFFF7EFD8),
-        topLeft = Offset(left, cy - 26f),
-        size = Size(width, 34f),
-        cornerRadius = CornerRadius(8f, 8f)
+        Color(0xF0FFF8E7),
+        Offset(left, top - height),
+        Size(width, height),
+        CornerRadius(12f, 12f)
     )
     drawRoundRect(
-        color = Color(0xFF2B2118),
-        topLeft = Offset(left, cy - 26f),
-        size = Size(width, 34f),
-        cornerRadius = CornerRadius(8f, 8f),
-        style = Stroke(2.5f)
+        Color(0xFF5A4030),
+        Offset(left, top - height),
+        Size(width, height),
+        CornerRadius(12f, 12f),
+        style = Stroke(width = 2f)
     )
-    val tip = Path().apply {
-        moveTo(cx - 7f, cy + 6f)
-        lineTo(cx, cy + 14f)
-        lineTo(cx + 7f, cy + 6f)
+    val path = Path().apply {
+        moveTo(cx - 8f, top)
+        lineTo(cx, top + 10f)
+        lineTo(cx + 8f, top)
         close()
     }
-    drawPath(tip, Color(0xFFF7EFD8))
-    drawContext.canvas.nativeCanvas.drawText(text, left + width / 2f, cy - 4f, paint)
+    drawPath(path, Color(0xF0FFF8E7))
+    drawContext.canvas.nativeCanvas.drawText(
+        text,
+        left + width / 2f,
+        top - 12f,
+        paint.apply { color = android.graphics.Color.parseColor("#2A1A10") }
+    )
 }

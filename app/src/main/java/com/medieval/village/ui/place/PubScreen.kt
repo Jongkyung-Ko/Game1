@@ -42,13 +42,11 @@ import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.drawCustomHero
 import com.medieval.village.ui.village.drawMercenary
 import com.medieval.village.ui.village.rememberCustomArt
-import com.medieval.village.ui.village.rememberKenneyAtlas
 import kotlin.math.hypot
 import kotlin.math.min
 
 @Composable
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
-    val atlas = rememberKenneyAtlas()
     val art = rememberCustomArt()
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
         Text(
@@ -72,8 +70,6 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val scale = min(widthPx / PubNpcCatalog.WORLD_W, heightPx / PubNpcCatalog.WORLD_H)
             val offsetX = (widthPx - PubNpcCatalog.WORLD_W * scale) / 2f
             val offsetY = (heightPx - PubNpcCatalog.WORLD_H * scale) / 2f
-            val animTime = vm.animTime
-            val pubWalking = vm.pubWalking
             val facing = vm.facing
 
             Canvas(
@@ -100,13 +96,11 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                     vm.activeParty.forEachIndexed { index, mercenary ->
                         drawMercenary(
-                            atlas,
+                            art,
                             mercenary,
                             vm.pubHeroX + if (index == 0) -58f else 58f,
                             vm.pubHeroY + 45f + index * 8f,
                             facing,
-                            pubWalking,
-                            animTime + index * 0.35f
                         )
                     }
                     drawCustomHero(art, vm.pubHeroX, vm.pubHeroY, facing, worldHeight = 90f)

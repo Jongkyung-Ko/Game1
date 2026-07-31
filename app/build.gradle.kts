@@ -12,8 +12,8 @@ android {
         applicationId = "com.medieval.village"
         minSdk = 24
         targetSdk = 34
-        versionCode = 6
-        versionName = "0.6.0-styleB"
+        versionCode = 7
+        versionName = "0.7.0-roster"
     }
 
     buildTypes {

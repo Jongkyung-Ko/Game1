@@ -15,6 +15,8 @@ enum class DungeonTile {
 data class DungeonMonster(
     val id: String,
     val name: String,
+    /** shambler / runner / bloater / armored / blacksmith / farmer / golem */
+    val kind: String,
     var x: Float,
     var y: Float,
     val power: Int,
@@ -67,9 +69,14 @@ object DungeonFactory {
     const val COLS = 28
     const val ROWS = 22
 
-    private val zombieNames = listOf(
-        "굶주린 좀비", "부패한 주민", "검은 눈의 시체",
-        "하수구 좀비", "오염된 광부", "뇌 없는 경비"
+    private val zombieKinds = listOf(
+        "shambler" to "심블러 좀비",
+        "runner" to "러너 좀비",
+        "bloater" to "블로터 좀비",
+        "armored" to "갑옷 좀비",
+        "blacksmith" to "빙의된 대장장이",
+        "farmer" to "감염된 농부",
+        "golem" to "저주받은 선생님",
     )
 
     fun generate(floor: Int, seed: Int = floor * 7919 + 42): DungeonFloor {
@@ -150,12 +157,20 @@ object DungeonFactory {
             val y = r * TILE + TILE / 2f
             if (hypot(x - spawnX, y - spawnY) < TILE * 2.5f) continue
             if (monsters.any { hypot(it.x - x, it.y - y) < TILE * 1.4f }) continue
+            val (kind, name) = zombieKinds.random(rng)
+            val kindBonus = when (kind) {
+                "bloater", "armored", "blacksmith" -> 6
+                "runner" -> 3
+                "golem" -> 4
+                else -> 0
+            }
             monsters += DungeonMonster(
                 id = "z${floor}_${monsters.size}",
-                name = zombieNames.random(rng),
+                name = name,
+                kind = kind,
                 x = x,
                 y = y,
-                power = 10 + floor * 8 + rng.nextInt(0, 8)
+                power = 10 + floor * 8 + kindBonus + rng.nextInt(0, 8)
             )
         }
 
