@@ -128,43 +128,35 @@ fun DrawScope.drawVillageTilemap(atlas: KenneyAtlas) {
     }
 }
 
-/** 미리 합쳐 둔 집 스프라이트를 문 앞에 통째로 그린다. */
+/** Tiny Town Sample처럼 지붕+벽 타일을 그리드 비율 그대로 그린다 (늘리기 금지). */
 fun DrawScope.drawKenneyPlace(atlas: KenneyAtlas, p: Place) {
-    val name = KenneyAtlas.buildingSprite(p.style, p.id)
-    val img = atlas.sprite(name)
-    // 집은 장소 폭의 ~70%, 너무 크지 않게
-    val targetW = (p.w * 0.72f).coerceIn(120f, 220f)
-    val aspect = img.height.toFloat() / img.width.toFloat()
-    val targetH = targetW * aspect
-    drawKenneySpriteAsset(
-        image = img,
-        cx = p.cx,
-        footY = p.bottom,
-        worldHeight = targetH,
-    )
-    // 상점 소품
-    if (name == "shop") {
-        drawKenneySpriteAsset(atlas.sprite("crate"), p.left + 20f, p.bottom, WORLD_TILE * 1.1f)
-        drawKenneySpriteAsset(atlas.sprite("basket"), p.right - 20f, p.bottom, WORLD_TILE * 1.1f)
-        drawKenneySpriteAsset(atlas.sprite("sign"), p.cx + targetW * 0.4f, p.bottom - targetH * 0.35f, WORLD_TILE)
-    }
+    drawBuildingRecipe(atlas, p)
 }
 
 fun DrawScope.drawKenneyScenery(atlas: KenneyAtlas) {
     Village.trees.forEachIndexed { i, (x, y, _) ->
-        val name = when (i % 3) {
+        val name = when (i % 4) {
             0 -> "tree_g"
             1 -> "tree_o"
-            else -> "bush"
+            2 -> "bush"
+            else -> "mushroom"
         }
-        drawKenneySpriteAsset(atlas.sprite(name), x, y, WORLD_TILE * 2.0f)
+        val h = when (name) {
+            "bush", "mushroom" -> WORLD_TILE * 1.05f
+            else -> WORLD_TILE * 1.35f
+        }
+        drawKenneySpriteAsset(atlas.sprite(name), x, y, h)
     }
-    drawKenneySpriteAsset(atlas.sprite("well"), Village.WELL_X, Village.WELL_Y, WORLD_TILE * 1.8f)
+    drawKenneySpriteAsset(atlas.sprite("well"), Village.WELL_X, Village.WELL_Y, WORLD_TILE * 1.25f)
+    drawKenneySpriteAsset(atlas.sprite("hive"), Village.WELL_X + 70f, Village.WELL_Y + 10f, WORLD_TILE)
     Village.lamps.forEach { (x, y) ->
-        drawKenneySpriteAsset(atlas.sprite("sign"), x, y, WORLD_TILE * 1.3f)
+        drawKenneySpriteAsset(atlas.sprite("sign"), x, y, WORLD_TILE)
     }
     Village.stalls.forEach { (x, y, _) ->
-        drawKenneySpriteAsset(atlas.sprite("crate"), x - 18f, y, WORLD_TILE * 1.2f)
-        drawKenneySpriteAsset(atlas.sprite("basket"), x + 18f, y, WORLD_TILE * 1.2f)
+        drawKenneySpriteAsset(atlas.sprite("crate"), x - 18f, y, WORLD_TILE)
+        drawKenneySpriteAsset(atlas.sprite("basket"), x + 18f, y, WORLD_TILE)
+    }
+    Village.fences.forEach { (x, y) ->
+        drawKenneySpriteAsset(atlas.sprite("fence"), x, y, WORLD_TILE * 0.95f)
     }
 }

@@ -94,16 +94,18 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         }
 
         Village.places.forEach { p ->
-            val labelWorldY = p.bottom - WORLD_TILE * 4.2f
+            val hTiles = BuildingRecipes.heightTiles(p.style, p.id)
+            val labelWorldY = p.bottom - WORLD_TILE * (hTiles + 0.35f)
+            val labelW = BuildingRecipes.widthTiles(p.style, p.id) * WORLD_TILE
             Box(
                 modifier = Modifier
                     .offset {
                         IntOffset(
-                            (ox + p.left * s).roundToInt(),
+                            (ox + (p.cx - labelW / 2f) * s).roundToInt(),
                             (oy + labelWorldY * s).roundToInt()
                         )
                     }
-                    .width(with(density) { (p.w * s).toDp() }),
+                    .width(with(density) { (labelW * s).toDp() }),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -122,6 +124,19 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 }
             }
         }
+
+        // 설치 확인용 — 구 APK와 구분
+        Text(
+            text = "Style A · Kenney v5",
+            color = Color(0xFFE8F5C8),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(8.dp)
+                .background(Color(0x99000000), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        )
 
         val near = Village.places.firstOrNull {
             hypot(vm.heroX - it.doorX, vm.heroY - it.doorY) < 42f

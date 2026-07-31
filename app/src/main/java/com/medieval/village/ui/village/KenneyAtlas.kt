@@ -39,6 +39,7 @@ class KenneyAtlas(
             "house_blue", "clinic", "forge", "tower", "church", "armory",
             "cave", "camp", "arena",
             "tree_g", "tree_o", "bush", "well", "mushroom", "sign", "crate", "basket", "target",
+            "fence", "hive",
             "hero", "knight_b", "knight_g", "knight_r", "mage", "villager", "woman", "elder", "youth",
             "critter_a", "critter_b", "critter_c",
         )

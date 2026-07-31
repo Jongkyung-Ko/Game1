@@ -118,6 +118,13 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
                 color = Palette.ParchmentDim,
                 fontSize = 11.sp
             )
+            Spacer(modifier.width(6.dp))
+            Text(
+                "A·v5",
+                color = Color(0xFFB8F070),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

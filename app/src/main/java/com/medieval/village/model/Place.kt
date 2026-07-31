@@ -114,17 +114,37 @@ object Village {
 
     fun of(id: PlaceId): Place = places.first { it.id == id }
 
-    /** 나무 (x, y, 크기) */
+    /** 나무/덤불 (x, y, 크기) — Sample처럼 건물 사이·길가를 채운다 */
     val trees = listOf(
         Triple(360f, 480f, 46f), Triple(370f, 900f, 42f),
         Triple(345f, 1180f, 38f), Triple(660f, 250f, 36f),
         Triple(105f, 1360f, 44f), Triple(915f, 1400f, 46f),
-        Triple(150f, 1615f, 38f), Triple(870f, 1600f, 42f)
+        Triple(150f, 1615f, 38f), Triple(870f, 1600f, 42f),
+        Triple(90f, 300f, 40f), Triple(90f, 480f, 36f),
+        Triple(90f, 720f, 42f), Triple(90f, 980f, 38f),
+        Triple(910f, 300f, 40f), Triple(910f, 480f, 36f),
+        Triple(910f, 720f, 42f), Triple(910f, 980f, 38f),
+        Triple(300f, 160f, 34f), Triple(700f, 160f, 34f),
+        Triple(430f, 640f, 32f), Triple(570f, 640f, 32f),
+        Triple(430f, 980f, 32f), Triple(570f, 980f, 32f),
+        Triple(500f, 1200f, 36f), Triple(500f, 1500f, 40f),
+        Triple(250f, 1320f, 34f), Triple(780f, 1320f, 34f),
+        Triple(120f, 1100f, 30f), Triple(880f, 1100f, 30f),
     )
 
-    /** 가로등 (x, y) */
+    /** 가로등/표지판 (x, y) */
     val lamps = listOf(
-        420f to 500f, 580f to 500f, 420f to 1120f, 580f to 1120f, 420f to 860f, 580f to 860f
+        420f to 500f, 580f to 500f, 420f to 1120f, 580f to 1120f, 420f to 860f, 580f to 860f,
+        360f to 345f, 640f to 345f, 360f to 1285f, 640f to 1285f,
+    )
+
+    /** 울타리 구간 (x, y) */
+    val fences = listOf(
+        300f to 400f, 340f to 400f, 380f to 400f,
+        620f to 400f, 660f to 400f, 700f to 400f,
+        300f to 760f, 340f to 760f,
+        660f to 760f, 700f to 760f,
+        240f to 1520f, 280f to 1520f, 720f to 1520f, 760f to 1520f,
     )
 
     /** 광장 우물 위치 */
@@ -132,5 +152,8 @@ object Village {
     const val WELL_Y = 830f
 
     /** 장터 좌판 (x, y, 천막 색 인덱스) */
-    val stalls = listOf(Triple(352f, 620f, 0), Triple(628f, 1190f, 1))
+    val stalls = listOf(
+        Triple(352f, 620f, 0), Triple(628f, 1190f, 1),
+        Triple(480f, 720f, 0), Triple(520f, 1100f, 1),
+    )
 }
