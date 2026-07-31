@@ -66,7 +66,6 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         val heroY = vm.heroY
         val facing = vm.facing
         val walking = vm.walking
-        val walkPhase = vm.walkPhase
         val party = vm.activeParty
 
         Canvas(
@@ -104,10 +103,10 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         y = heroY + 52f + index * 12f,
                         facing = facing,
                         walking = walking,
-                        phase = walkPhase + index * 1.3f
+                        animTime = animTime + index * 0.4f
                     )
                 }
-                drawHero(heroX, heroY, facing, walking, walkPhase)
+                drawHero(heroX, heroY, facing, walking, animTime)
             }
         }
 
@@ -167,20 +166,12 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
 // ------------------------------------------------------------------ 지면
 
 private fun DrawScope.drawGround() {
-    // 부드러운 그라데이션 느낌의 잔디 지대
-    drawRect(Palette.Grass, Offset(0f, 0f), Size(Village.W, Village.H))
+    // Kenney식 타일 느낌의 잔디 지대
+    drawRect(Kenney.Grass, Offset(0f, 0f), Size(Village.W, Village.H))
     drawOval(Palette.SkyGlow, Offset(-80f, -120f), Size(Village.W * 0.7f, 280f))
     grassBlobs.forEach { (x, y, r) ->
-        drawOval(
-            Palette.GrassDark.copy(alpha = 0.45f),
-            topLeft = Offset(x - r, y - r * 0.5f),
-            size = Size(r * 2f, r * 1.0f)
-        )
-        drawOval(
-            Palette.GrassLight.copy(alpha = 0.22f),
-            topLeft = Offset(x - r * 0.55f, y - r * 0.35f),
-            size = Size(r * 1.1f, r * 0.55f)
-        )
+        kOval(Kenney.GrassDark.copy(alpha = 0.55f), x - r, y - r * 0.5f, r * 2f, r, outline = false)
+        kOval(Kenney.GrassLight.copy(alpha = 0.28f), x - r * 0.55f, y - r * 0.35f, r * 1.1f, r * 0.55f, outline = false)
     }
     flowers.forEach { (x, y, kind) ->
         val c = when (kind) {
@@ -189,8 +180,7 @@ private fun DrawScope.drawGround() {
             else -> Color(0xFFD98BB0)
         }
         drawCircle(Color(0xFF4E6B3A), 1.6f, Offset(x, y + 2f))
-        drawCircle(c, 3.4f, Offset(x, y))
-        drawCircle(Color(0x66FFFFFF), 1.2f, Offset(x - 0.8f, y - 0.8f))
+        kCircle(c, 3.4f, Offset(x, y), stroke = 1.5f)
     }
 }
 
@@ -241,38 +231,11 @@ private fun DrawScope.drawRoads() {
 }
 
 private fun DrawScope.roadSegment(x: Float, y: Float, w: Float, h: Float) {
-    drawRoundRect(
-        Palette.DirtDark,
-        topLeft = Offset(x - 5f, y - 5f),
-        size = Size(w + 10f, h + 10f),
-        cornerRadius = CornerRadius(18f, 18f)
-    )
-    drawRoundRect(
-        Palette.Dirt,
-        topLeft = Offset(x, y),
-        size = Size(w, h),
-        cornerRadius = CornerRadius(16f, 16f)
-    )
-    // 길 가장자리 하이라이트
-    drawRoundRect(
-        Palette.DirtLight.copy(alpha = 0.35f),
-        topLeft = Offset(x + 4f, y + 3f),
-        size = Size(w - 8f, 5f),
-        cornerRadius = CornerRadius(8f, 8f)
-    )
+    kRound(Kenney.DirtDark, x - 5f, y - 5f, w + 10f, h + 10f, 18f, stroke = 4f)
+    kRound(Kenney.Dirt, x, y, w, h, 16f, stroke = 3.5f)
+    kRound(Kenney.DirtLight.copy(alpha = 0.45f), x + 4f, y + 3f, w - 8f, 5f, 8f, outline = false)
     pebbles.forEach { (fx, fy, r) ->
-        drawCircle(
-            Palette.DirtDark.copy(alpha = 0.55f),
-            r,
-            Offset(x + fx * w, y + fy * h)
-        )
-        if (r > 2.5f) {
-            drawCircle(
-                Palette.StoneLight.copy(alpha = 0.35f),
-                r * 0.35f,
-                Offset(x + fx * w - 0.5f, y + fy * h - 0.5f)
-            )
-        }
+        drawCircle(Kenney.DirtDark.copy(alpha = 0.55f), r, Offset(x + fx * w, y + fy * h))
     }
 }
 
@@ -286,14 +249,11 @@ private fun DrawScope.drawScenery() {
 }
 
 private fun DrawScope.drawTree(x: Float, y: Float, r: Float) {
-    drawOval(Color(0x33000000), Offset(x - r * 0.8f, y - r * 0.16f), Size(r * 1.6f, r * 0.5f))
-    drawRect(Color(0xFF6B4B2E), Offset(x - r * 0.14f, y - r * 1.05f), Size(r * 0.28f, r * 1.05f))
-    drawRect(Color(0xFF5A3A22), Offset(x - r * 0.08f, y - r * 1.05f), Size(r * 0.08f, r * 1.05f))
-    drawCircle(Color(0xFF3F6B34), r * 0.78f, Offset(x, y - r * 1.35f))
-    drawCircle(Color(0xFF4E8341), r * 0.62f, Offset(x - r * 0.34f, y - r * 1.55f))
-    drawCircle(Color(0xFF57904A), r * 0.55f, Offset(x + r * 0.36f, y - r * 1.48f))
-    drawCircle(Color(0xFF63A055), r * 0.42f, Offset(x, y - r * 1.85f))
-    drawCircle(Color(0x4463B068), r * 0.28f, Offset(x - r * 0.15f, y - r * 1.70f))
+    kOval(Kenney.Shadow, x - r * 0.8f, y - r * 0.16f, r * 1.6f, r * 0.5f, outline = false)
+    kRect(Kenney.Wood, x - r * 0.14f, y - r * 1.05f, r * 0.28f, r * 1.05f, stroke = 3f)
+    kCircle(Color(0xFF3F6B34), r * 0.78f, Offset(x, y - r * 1.35f))
+    kCircle(Color(0xFF4E8341), r * 0.62f, Offset(x - r * 0.34f, y - r * 1.55f))
+    kCircle(Kenney.GrassLight, r * 0.42f, Offset(x, y - r * 1.85f))
 }
 
 private fun DrawScope.drawLamp(x: Float, y: Float) {

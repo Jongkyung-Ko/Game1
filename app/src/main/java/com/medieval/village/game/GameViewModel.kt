@@ -13,6 +13,7 @@ import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.EquippedItem
+import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InventoryEntry
 import com.medieval.village.model.Item
 import com.medieval.village.model.ItemCatalog
@@ -90,6 +91,13 @@ class GameViewModel : ViewModel() {
         private set
     var pubSpeakerId by mutableStateOf<String?>(null)
         private set
+
+    /** 실내 NPC 말풍선 */
+    var interiorSpeakerId by mutableStateOf<String?>(null)
+        private set
+    var interiorSpeech by mutableStateOf<String?>(null)
+        private set
+    private var interiorSpeechUntil = 0f
 
     /** 대련소 전적 */
     var arenaWins by mutableStateOf(0)
@@ -186,6 +194,10 @@ class GameViewModel : ViewModel() {
 
     fun tick(dt: Float) {
         animTime += dt
+        if (interiorSpeech != null && animTime >= interiorSpeechUntil) {
+            interiorSpeech = null
+            interiorSpeakerId = null
+        }
         if (scene == Scene.INTERIOR && currentPlace == PlaceId.PUB) {
             tickPub(dt)
             return
@@ -325,6 +337,8 @@ class GameViewModel : ViewModel() {
         scene = Scene.INTERIOR
         menuTab = MenuTab.NONE
         log.clear()
+        interiorSpeech = null
+        interiorSpeakerId = null
         if (id == PlaceId.PUB) {
             pubHeroX = 500f
             pubHeroY = 610f
@@ -336,9 +350,9 @@ class GameViewModel : ViewModel() {
         }
         if (id == PlaceId.DUNGEON) {
             enterDungeonFloor(1)
-            emitSfx("door")
         }
-        say(greetingOf(id))
+        emitSfx("door")
+        greetInteriorNpcs(id)
     }
 
     fun leavePlace() {
@@ -353,10 +367,41 @@ class GameViewModel : ViewModel() {
         pendingPubNpc = null
         walking = false
         pubWalking = false
+        interiorSpeech = null
+        interiorSpeakerId = null
         if (id == PlaceId.DUNGEON) clearDungeonState()
         scene = Scene.VILLAGE
         currentPlace = null
         menuTab = MenuTab.NONE
+    }
+
+    /** 실내 입장 시 NPC들이 번갈아 인사한다. */
+    private fun greetInteriorNpcs(id: PlaceId) {
+        val npcs = InteriorNpcCatalog.forPlace(id)
+        if (npcs.isEmpty()) {
+            say(greetingOf(id))
+            return
+        }
+        val opener = npcs.first()
+        val line = opener.lines.random()
+        say("${opener.name}: $line")
+        interiorSpeakerId = opener.id
+        interiorSpeech = line
+        interiorSpeechUntil = animTime + 3.2f
+        if (npcs.size > 1) {
+            val other = npcs.drop(1).random()
+            say("${other.name}: ${other.lines.random()}")
+        }
+    }
+
+    fun talkToInteriorNpc(npcId: String) {
+        val npc = InteriorNpcCatalog.all.firstOrNull { it.id == npcId } ?: return
+        val line = npc.lines.random()
+        say("${npc.name}: $line")
+        interiorSpeakerId = npc.id
+        interiorSpeech = line
+        interiorSpeechUntil = animTime + 3.0f
+        emitSfx("click")
     }
 
     private fun greetingOf(id: PlaceId): String = when (id) {

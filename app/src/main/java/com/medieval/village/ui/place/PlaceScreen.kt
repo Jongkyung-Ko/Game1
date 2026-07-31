@@ -2,6 +2,7 @@ package com.medieval.village.ui.place
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,11 +26,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.EQUIP_SLOTS
+import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.Item
 import com.medieval.village.model.ItemCatalog
 import com.medieval.village.model.MercenaryCatalog
@@ -43,6 +46,7 @@ import com.medieval.village.ui.SectionTitle
 import com.medieval.village.ui.ThinDivider
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
+import kotlin.math.hypot
 
 @Composable
 fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
@@ -55,19 +59,50 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         return
     }
     val place = Village.of(id)
+    val animTime = vm.animTime
+    val speechId = vm.interiorSpeakerId
+    val speechText = vm.interiorSpeech
+    val npcs = remember(id) { InteriorNpcCatalog.forPlace(id) }
 
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
 
-        // 배경 일러스트
+        // 배경 일러스트 (주인공·용병·실내 NPC + 말풍선)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(168.dp)
+                .height(200.dp)
                 .padding(8.dp)
                 .clip(RoundedCornerShape(12.dp))
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawInterior(id, size.width, size.height, vm.activeParty)
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(npcs) {
+                        detectTapGestures { tap ->
+                            val hit = npcs.minByOrNull { npc ->
+                                hypot(tap.x - size.width * npc.fx, tap.y - size.height * npc.fy)
+                            }
+                            if (hit != null) {
+                                val dist = hypot(
+                                    tap.x - size.width * hit.fx,
+                                    tap.y - size.height * hit.fy
+                                )
+                                if (dist < minOf(size.width, size.height) * 0.18f) {
+                                    vm.talkToInteriorNpc(hit.id)
+                                }
+                            }
+                        }
+                    }
+            ) {
+                drawInterior(
+                    id = id,
+                    w = size.width,
+                    h = size.height,
+                    companions = vm.activeParty,
+                    animTime = animTime,
+                    speechNpcId = speechId,
+                    speechText = speechText,
+                )
             }
             Box(
                 modifier = Modifier
@@ -78,7 +113,11 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
             ) {
                 Column {
                     Text(place.name, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                    Text(place.subtitle, color = Palette.ParchmentDim, fontSize = 10.sp)
+                    Text(
+                        if (npcs.isEmpty()) place.subtitle else "NPC를 탭하면 인사한다 · ${place.subtitle}",
+                        color = Palette.ParchmentDim,
+                        fontSize = 10.sp
+                    )
                 }
             }
         }

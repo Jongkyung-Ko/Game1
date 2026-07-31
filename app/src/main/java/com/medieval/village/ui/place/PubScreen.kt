@@ -68,6 +68,9 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val scale = min(widthPx / PubNpcCatalog.WORLD_W, heightPx / PubNpcCatalog.WORLD_H)
             val offsetX = (widthPx - PubNpcCatalog.WORLD_W * scale) / 2f
             val offsetY = (heightPx - PubNpcCatalog.WORLD_H * scale) / 2f
+            val animTime = vm.animTime
+            val pubWalking = vm.pubWalking
+            val facing = vm.facing
 
             Canvas(
                 modifier = Modifier
@@ -96,12 +99,12 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             mercenary,
                             vm.pubHeroX + if (index == 0) -58f else 58f,
                             vm.pubHeroY + 45f + index * 8f,
-                            vm.facing,
-                            vm.pubWalking,
-                            vm.walkPhase + index
+                            facing,
+                            pubWalking,
+                            animTime + index * 0.35f
                         )
                     }
-                    drawHero(vm.pubHeroX, vm.pubHeroY, vm.facing, vm.pubWalking, vm.walkPhase)
+                    drawHero(vm.pubHeroX, vm.pubHeroY, facing, pubWalking, animTime)
                 }
             }
         }

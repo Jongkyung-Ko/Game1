@@ -89,6 +89,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val density = LocalDensity.current
             val widthPx = with(density) { maxWidth.toPx() }
             val heightPx = with(density) { maxHeight.toPx() }
+            val animTime = vm.animTime
+            val dungeonWalking = vm.dungeonWalking
+            val facing = vm.facing
 
             Canvas(
                 modifier = Modifier
@@ -123,12 +126,12 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             mercenary,
                             vm.dungeonHeroX + if (index == 0) -40f else 40f,
                             vm.dungeonHeroY + 28f + index * 6f,
-                            vm.facing,
-                            vm.dungeonWalking,
-                            vm.walkPhase + index
+                            facing,
+                            dungeonWalking,
+                            animTime + index * 0.35f
                         )
                     }
-                    drawHero(vm.dungeonHeroX, vm.dungeonHeroY, vm.facing, vm.dungeonWalking, vm.walkPhase)
+                    drawHero(vm.dungeonHeroX, vm.dungeonHeroY, facing, dungeonWalking, animTime)
                 }
                 drawMinimap(map, vm.dungeonHeroX, vm.dungeonHeroY, size.width, size.height)
             }
