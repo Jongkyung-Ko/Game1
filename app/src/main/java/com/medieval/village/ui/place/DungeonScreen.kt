@@ -45,12 +45,14 @@ import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.rememberKenneyAtlas
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
 @Composable
 fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
+    val atlas = rememberKenneyAtlas()
     val floor = vm.dungeonFloor
     Column(modifier = modifier.fillMaxSize().background(Color(0xFF14100C))) {
         Row(
@@ -123,6 +125,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     map.monsters.filter { it.alive }.forEach { drawZombie(it) }
                     vm.activeParty.forEachIndexed { index, mercenary ->
                         drawMercenary(
+                            atlas,
                             mercenary,
                             vm.dungeonHeroX + if (index == 0) -40f else 40f,
                             vm.dungeonHeroY + 28f + index * 6f,
@@ -131,7 +134,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             animTime + index * 0.35f
                         )
                     }
-                    drawHero(vm.dungeonHeroX, vm.dungeonHeroY, facing, dungeonWalking, animTime)
+                    drawHero(atlas, vm.dungeonHeroX, vm.dungeonHeroY, facing, dungeonWalking, animTime)
                 }
                 drawMinimap(map, vm.dungeonHeroX, vm.dungeonHeroY, size.width, size.height)
             }

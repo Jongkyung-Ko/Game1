@@ -2,25 +2,26 @@ package com.medieval.village.ui.village
 
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.medieval.village.game.Facing
+import kotlin.math.sin
 
-/**
- * Kenney A스타일 청크 모험가 스프라이트.
- * 갈색 튜닉 + 가죽 조끼 + 녹색 망토 + 허리 검.
- * @param animTime 초 단위 누적 시간 (걷기/대기 애니메이션 공용)
- */
+/** Kenney Tiny Dungeon 히어로 스프라이트 (실제 PNG 타일). */
 fun DrawScope.drawHero(
+    atlas: KenneyAtlas,
     x: Float,
     y: Float,
     facing: Facing,
     walking: Boolean,
     animTime: Float
 ) {
-    drawKenneyHero(
+    val bob = if (walking) sin(animTime * 14f) * 3f else sin(animTime * 2.4f) * 1.5f
+    val size = WORLD_TILE * 1.35f
+    drawKenneySprite(
+        sheet = atlas.dungeon,
+        tileId = DungeonTiles.HERO,
         cx = x,
-        cy = y - 18f,
-        walking = walking,
-        facingRight = facing != Facing.LEFT,
-        t = animTime,
-        scale = 1.55f,
+        footY = y,
+        size = size,
+        bob = bob,
+        mirrorX = facing == Facing.LEFT,
     )
 }

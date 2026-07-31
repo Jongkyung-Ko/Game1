@@ -41,11 +41,13 @@ import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.rememberKenneyAtlas
 import kotlin.math.hypot
 import kotlin.math.min
 
 @Composable
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
+    val atlas = rememberKenneyAtlas()
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
         Text(
             text = "PUB · 신성한 잔 선술집",
@@ -96,6 +98,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                     vm.activeParty.forEachIndexed { index, mercenary ->
                         drawMercenary(
+                            atlas,
                             mercenary,
                             vm.pubHeroX + if (index == 0) -58f else 58f,
                             vm.pubHeroY + 45f + index * 8f,
@@ -104,7 +107,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             animTime + index * 0.35f
                         )
                     }
-                    drawHero(vm.pubHeroX, vm.pubHeroY, facing, pubWalking, animTime)
+                    drawHero(atlas, vm.pubHeroX, vm.pubHeroY, facing, pubWalking, animTime)
                 }
             }
         }

@@ -1,12 +1,13 @@
 package com.medieval.village.ui.village
 
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.medieval.village.game.Facing
 import com.medieval.village.model.Mercenary
+import kotlin.math.sin
 
-/** Kenney A스타일 용병 스프라이트. 역할별 튜닉 색이 다르다. */
+/** Kenney Tiny Dungeon 용병 스프라이트. */
 fun DrawScope.drawMercenary(
+    atlas: KenneyAtlas,
     mercenary: Mercenary,
     x: Float,
     y: Float,
@@ -14,19 +15,20 @@ fun DrawScope.drawMercenary(
     walking: Boolean,
     animTime: Float
 ) {
-    val tunic = when (mercenary.role) {
-        "검사" -> Color(0xFF496A8A)
-        "궁수" -> Color(0xFF4E753F)
-        "방패병" -> Color(0xFF777D86)
-        else -> Color(0xFF684A8F)
+    val tile = when (mercenary.role) {
+        "검사" -> DungeonTiles.KNIGHT_BLUE
+        "궁수" -> DungeonTiles.KNIGHT_GOLD
+        "방패병" -> DungeonTiles.KNIGHT_RED
+        else -> DungeonTiles.MAGE
     }
-    drawKenneyMerc(
+    val bob = if (walking) sin(animTime * 13f) * 2.5f else sin(animTime * 2.2f + 1f) * 1.2f
+    drawKenneySprite(
+        sheet = atlas.dungeon,
+        tileId = tile,
         cx = x,
-        cy = y - 14f,
-        walking = walking,
-        facingRight = facing != Facing.LEFT,
-        t = animTime,
-        tunic = tunic,
-        scale = 1.35f,
+        footY = y,
+        size = WORLD_TILE * 1.2f,
+        bob = bob,
+        mirrorX = facing == Facing.LEFT,
     )
 }
