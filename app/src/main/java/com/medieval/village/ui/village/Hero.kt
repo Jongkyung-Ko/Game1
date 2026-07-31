@@ -12,19 +12,22 @@ import kotlin.math.sin
 private val Skin = Color(0xFFE7B98F)
 private val SkinShade = Color(0xFFC99870)
 private val Hair = Color(0xFF5A3A22)
-private val Tunic = Color(0xFF3E6B8A)
-private val TunicDark = Color(0xFF2E5069)
-private val Cloak = Color(0xFF8C2F28)
-private val CloakDark = Color(0xFF6E241F)
-private val Belt = Color(0xFF4A3524)
-private val Pants = Color(0xFF6B5B44)
-private val Boot = Color(0xFF3B2A1A)
+private val Tunic = Color(0xFF8B5A2B)
+private val TunicDark = Color(0xFF6E4520)
+private val Vest = Color(0xFF4A3524)
+private val VestLight = Color(0xFF6B5340)
+private val Cloak = Color(0xFF5E7A48)
+private val CloakDark = Color(0xFF4A6238)
+private val Belt = Color(0xFF3B2A1A)
+private val Pants = Color(0xFF5A4A38)
+private val Boot = Color(0xFF2E2116)
 private val Steel = Color(0xFFBFC5CC)
 private val SteelDark = Color(0xFF7E858C)
+private val Gold = Color(0xFFD9A441)
 
 /**
- * 중세 남자 주인공. (x, y)는 발이 닿는 지점.
- * 몸통·망토·검을 도형으로 직접 그린다.
+ * 업그레이드된 중세 모험가 스프라이트.
+ * 갈색 튜닉 + 가죽 조끼 + 짧은 녹빛 망토 + 허리 검.
  */
 fun DrawScope.drawHero(
     x: Float,
@@ -33,50 +36,62 @@ fun DrawScope.drawHero(
     walking: Boolean,
     phase: Float
 ) {
-    val h = 104f                 // 전체 키
+    val h = 108f
     val bob = if (walking) sin(phase) * 2.5f else 0f
     val swing = if (walking) sin(phase) * 7f else 0f
     val baseY = y + bob
 
-    // 그림자
     drawOval(
         color = Color(0x3A000000),
-        topLeft = Offset(x - 26f, y - 9f),
-        size = Size(52f, 18f)
+        topLeft = Offset(x - 28f, y - 9f),
+        size = Size(56f, 18f)
     )
 
     val headR = h * 0.155f
     val headCy = baseY - h + headR
     val bodyTop = headCy + headR * 0.75f
     val bodyBottom = baseY - h * 0.30f
-    val bodyW = h * 0.34f
+    val bodyW = h * 0.36f
 
-    // 망토 (뒤쪽)
+    // 짧은 녹빛 망토
     if (facing != Facing.UP) {
         val cloakPath = Path().apply {
-            moveTo(x - bodyW * 0.62f, bodyTop + 2f)
-            lineTo(x + bodyW * 0.62f, bodyTop + 2f)
-            lineTo(x + bodyW * 0.80f, bodyBottom + h * 0.17f)
-            lineTo(x - bodyW * 0.80f, bodyBottom + h * 0.17f)
+            moveTo(x - bodyW * 0.55f, bodyTop + 4f)
+            lineTo(x + bodyW * 0.55f, bodyTop + 4f)
+            quadraticBezierTo(
+                x + bodyW * 0.95f,
+                bodyBottom + h * 0.05f,
+                x + bodyW * 0.70f,
+                bodyBottom + h * 0.12f
+            )
+            lineTo(x - bodyW * 0.70f, bodyBottom + h * 0.12f)
+            quadraticBezierTo(
+                x - bodyW * 0.95f,
+                bodyBottom + h * 0.05f,
+                x - bodyW * 0.55f,
+                bodyTop + 4f
+            )
             close()
         }
         drawPath(cloakPath, if (facing == Facing.DOWN) CloakDark else Cloak)
+        drawPath(cloakPath, Color(0x22000000), style = Stroke(2f))
     }
 
-    // 등에 멘 검
-    if (facing == Facing.DOWN || facing == Facing.UP) {
-        drawLine(
-            color = SteelDark,
-            start = Offset(x + bodyW * 0.72f, bodyTop - 6f),
-            end = Offset(x - bodyW * 0.30f, bodyBottom + 6f),
-            strokeWidth = 5f
-        )
-        drawLine(
-            color = Belt,
-            start = Offset(x + bodyW * 0.78f, bodyTop - 10f),
-            end = Offset(x + bodyW * 0.55f, bodyTop + 2f),
-            strokeWidth = 7f
-        )
+    // 허리 검 (옆모습에서 더 잘 보임)
+    when (facing) {
+        Facing.LEFT -> {
+            drawLine(SteelDark, Offset(x + bodyW * 0.15f, bodyBottom - 4f), Offset(x + bodyW * 0.95f, bodyBottom + 18f), 4.5f)
+            drawRect(Belt, Offset(x + bodyW * 0.05f, bodyBottom - 8f), Size(10f, 8f))
+        }
+        Facing.RIGHT -> {
+            drawLine(SteelDark, Offset(x - bodyW * 0.15f, bodyBottom - 4f), Offset(x - bodyW * 0.95f, bodyBottom + 18f), 4.5f)
+            drawRect(Belt, Offset(x - bodyW * 0.15f, bodyBottom - 8f), Size(10f, 8f))
+        }
+        else -> {
+            drawLine(SteelDark, Offset(x + bodyW * 0.55f, bodyTop + 8f), Offset(x + bodyW * 0.75f, bodyBottom + 8f), 4f)
+            drawRect(Belt, Offset(x + bodyW * 0.48f, bodyTop + 4f), Size(9f, 8f))
+            drawLine(Gold, Offset(x + bodyW * 0.52f, bodyTop + 2f), Offset(x + bodyW * 0.72f, bodyTop + 10f), 2.5f)
+        }
     }
 
     // 다리 + 부츠
@@ -84,23 +99,22 @@ fun DrawScope.drawHero(
     val legTop = bodyBottom - 2f
     drawRect(Pants, Offset(x - legW - 2f, legTop), Size(legW, baseY - legTop - 9f + swing * 0.4f))
     drawRect(Pants, Offset(x + 2f, legTop), Size(legW, baseY - legTop - 9f - swing * 0.4f))
-    drawRect(Boot, Offset(x - legW - 4f, baseY - 11f + swing * 0.4f), Size(legW + 5f, 11f))
-    drawRect(Boot, Offset(x + 1f, baseY - 11f - swing * 0.4f), Size(legW + 5f, 11f))
+    drawRect(Boot, Offset(x - legW - 4f, baseY - 12f + swing * 0.4f), Size(legW + 6f, 12f))
+    drawRect(Boot, Offset(x + 1f, baseY - 12f - swing * 0.4f), Size(legW + 6f, 12f))
 
-    // 몸통 (튜닉)
+    // 튜닉
     drawRect(Tunic, Offset(x - bodyW / 2f, bodyTop), Size(bodyW, bodyBottom - bodyTop))
-    drawRect(
-        TunicDark,
-        Offset(x - bodyW / 2f, bodyTop),
-        Size(bodyW * 0.28f, bodyBottom - bodyTop)
-    )
-    // 허리띠
-    drawRect(Belt, Offset(x - bodyW / 2f, bodyBottom - 10f), Size(bodyW, 9f))
-    drawRect(
-        Color(0xFFD9A441),
-        Offset(x - 5f, bodyBottom - 10f),
-        Size(10f, 9f)
-    )
+    drawRect(TunicDark, Offset(x - bodyW / 2f, bodyTop), Size(bodyW * 0.22f, bodyBottom - bodyTop))
+
+    // 가죽 조끼
+    drawRect(Vest, Offset(x - bodyW * 0.38f, bodyTop + 4f), Size(bodyW * 0.76f, (bodyBottom - bodyTop) * 0.72f))
+    drawRect(VestLight, Offset(x - bodyW * 0.10f, bodyTop + 6f), Size(bodyW * 0.08f, (bodyBottom - bodyTop) * 0.68f))
+    drawLine(Gold, Offset(x - bodyW * 0.08f, bodyTop + 10f), Offset(x - bodyW * 0.08f, bodyBottom - 18f), 1.5f)
+
+    // 허리띠 + 주머니
+    drawRect(Belt, Offset(x - bodyW / 2f, bodyBottom - 11f), Size(bodyW, 10f))
+    drawRect(Gold, Offset(x - 5f, bodyBottom - 10f), Size(10f, 8f))
+    drawRoundRect(Color(0xFF5A4030), Offset(x + bodyW * 0.18f, bodyBottom - 14f), Size(10f, 12f), androidx.compose.ui.geometry.CornerRadius(3f, 3f))
 
     // 팔
     val armW = bodyW * 0.24f
@@ -114,7 +128,6 @@ fun DrawScope.drawHero(
     drawCircle(Skin, headR, Offset(x, headCy))
     drawCircle(SkinShade, headR, Offset(x, headCy), style = Stroke(width = 1.5f))
 
-    // 머리카락
     val hairPath = Path().apply {
         moveTo(x - headR - 1f, headCy - headR * 0.05f)
         quadraticBezierTo(x, headCy - headR * 1.85f, x + headR + 1f, headCy - headR * 0.05f)
@@ -126,43 +139,36 @@ fun DrawScope.drawHero(
 
     when (facing) {
         Facing.DOWN -> {
-            drawCircle(Color(0xFF2C1E12), 2.2f, Offset(x - headR * 0.38f, headCy + headR * 0.08f))
-            drawCircle(Color(0xFF2C1E12), 2.2f, Offset(x + headR * 0.38f, headCy + headR * 0.08f))
+            drawCircle(Color(0xFF2C1E12), 2.3f, Offset(x - headR * 0.38f, headCy + headR * 0.08f))
+            drawCircle(Color(0xFF2C1E12), 2.3f, Offset(x + headR * 0.38f, headCy + headR * 0.08f))
+            drawCircle(Color(0x55FFFFFF), 0.9f, Offset(x - headR * 0.32f, headCy + headR * 0.02f))
+            drawCircle(Color(0x55FFFFFF), 0.9f, Offset(x + headR * 0.44f, headCy + headR * 0.02f))
             drawLine(
                 SkinShade,
-                Offset(x - headR * 0.28f, headCy + headR * 0.55f),
-                Offset(x + headR * 0.28f, headCy + headR * 0.55f),
+                Offset(x - headR * 0.22f, headCy + headR * 0.52f),
+                Offset(x + headR * 0.22f, headCy + headR * 0.52f),
                 strokeWidth = 1.8f
             )
         }
         Facing.LEFT -> {
-            drawCircle(Color(0xFF2C1E12), 2.2f, Offset(x - headR * 0.45f, headCy + headR * 0.08f))
+            drawCircle(Color(0xFF2C1E12), 2.3f, Offset(x - headR * 0.45f, headCy + headR * 0.08f))
             drawCircle(Hair, headR * 0.55f, Offset(x + headR * 0.55f, headCy - headR * 0.1f))
         }
         Facing.RIGHT -> {
-            drawCircle(Color(0xFF2C1E12), 2.2f, Offset(x + headR * 0.45f, headCy + headR * 0.08f))
+            drawCircle(Color(0xFF2C1E12), 2.3f, Offset(x + headR * 0.45f, headCy + headR * 0.08f))
             drawCircle(Hair, headR * 0.55f, Offset(x - headR * 0.55f, headCy - headR * 0.1f))
         }
         Facing.UP -> {
             drawCircle(Hair, headR * 0.92f, Offset(x, headCy - headR * 0.12f))
+            // 등 망토 끝
+            val backCloak = Path().apply {
+                moveTo(x - bodyW * 0.5f, bodyTop + 2f)
+                lineTo(x + bodyW * 0.5f, bodyTop + 2f)
+                lineTo(x + bodyW * 0.65f, bodyBottom + 8f)
+                lineTo(x - bodyW * 0.65f, bodyBottom + 8f)
+                close()
+            }
+            drawPath(backCloak, CloakDark)
         }
     }
-
-    // 어깨 견갑
-    drawArc(
-        color = Steel,
-        startAngle = 180f,
-        sweepAngle = 180f,
-        useCenter = true,
-        topLeft = Offset(x - bodyW * 0.62f, bodyTop - 3f),
-        size = Size(bodyW * 0.42f, bodyW * 0.34f)
-    )
-    drawArc(
-        color = Steel,
-        startAngle = 180f,
-        sweepAngle = 180f,
-        useCenter = true,
-        topLeft = Offset(x + bodyW * 0.20f, bodyTop - 3f),
-        size = Size(bodyW * 0.42f, bodyW * 0.34f)
-    )
 }

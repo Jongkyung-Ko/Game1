@@ -60,6 +60,14 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         val s = min(wPx / Village.W, hPx / Village.H)
         val ox = (wPx - Village.W * s) / 2f
         val oy = (hPx - Village.H * s) / 2f
+        // composition 단계에서 읽어 Canvas가 매 프레임 다시 그리게 한다
+        val animTime = vm.animTime
+        val heroX = vm.heroX
+        val heroY = vm.heroY
+        val facing = vm.facing
+        val walking = vm.walking
+        val walkPhase = vm.walkPhase
+        val party = vm.activeParty
 
         Canvas(
             modifier = Modifier
@@ -76,6 +84,8 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                 }
         ) {
+            // 따뜻한 석양빛 하늘 기운 (화면 여백)
+            drawRect(Palette.SkyWarm.copy(alpha = 0.35f), size = size)
             drawRect(Palette.Grass, size = size)
             withTransform({
                 translate(ox, oy)
@@ -85,18 +95,19 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawRoads()
                 drawScenery()
                 Village.places.sortedBy { it.bottom }.forEach { drawPlace(it) }
-                vm.activeParty.forEachIndexed { index, mercenary ->
+                drawVillageLife(animTime)
+                party.forEachIndexed { index, mercenary ->
                     val side = if (index == 0) -1f else 1f
                     drawMercenary(
                         mercenary = mercenary,
-                        x = vm.heroX + side * 54f,
-                        y = vm.heroY + 52f + index * 12f,
-                        facing = vm.facing,
-                        walking = vm.walking,
-                        phase = vm.walkPhase + index * 1.3f
+                        x = heroX + side * 54f,
+                        y = heroY + 52f + index * 12f,
+                        facing = facing,
+                        walking = walking,
+                        phase = walkPhase + index * 1.3f
                     )
                 }
-                drawHero(vm.heroX, vm.heroY, vm.facing, vm.walking, vm.walkPhase)
+                drawHero(heroX, heroY, facing, walking, walkPhase)
             }
         }
 
@@ -156,11 +167,19 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
 // ------------------------------------------------------------------ 지면
 
 private fun DrawScope.drawGround() {
+    // 부드러운 그라데이션 느낌의 잔디 지대
+    drawRect(Palette.Grass, Offset(0f, 0f), Size(Village.W, Village.H))
+    drawOval(Palette.SkyGlow, Offset(-80f, -120f), Size(Village.W * 0.7f, 280f))
     grassBlobs.forEach { (x, y, r) ->
         drawOval(
-            Palette.GrassDark.copy(alpha = 0.55f),
+            Palette.GrassDark.copy(alpha = 0.45f),
             topLeft = Offset(x - r, y - r * 0.5f),
             size = Size(r * 2f, r * 1.0f)
+        )
+        drawOval(
+            Palette.GrassLight.copy(alpha = 0.22f),
+            topLeft = Offset(x - r * 0.55f, y - r * 0.35f),
+            size = Size(r * 1.1f, r * 0.55f)
         )
     }
     flowers.forEach { (x, y, kind) ->
@@ -169,7 +188,9 @@ private fun DrawScope.drawGround() {
             1 -> Color(0xFFE3E0DA)
             else -> Color(0xFFD98BB0)
         }
-        drawCircle(c, 3.2f, Offset(x, y))
+        drawCircle(Color(0xFF4E6B3A), 1.6f, Offset(x, y + 2f))
+        drawCircle(c, 3.4f, Offset(x, y))
+        drawCircle(Color(0x66FFFFFF), 1.2f, Offset(x - 0.8f, y - 0.8f))
     }
 }
 
@@ -222,8 +243,8 @@ private fun DrawScope.drawRoads() {
 private fun DrawScope.roadSegment(x: Float, y: Float, w: Float, h: Float) {
     drawRoundRect(
         Palette.DirtDark,
-        topLeft = Offset(x - 4f, y - 4f),
-        size = Size(w + 8f, h + 8f),
+        topLeft = Offset(x - 5f, y - 5f),
+        size = Size(w + 10f, h + 10f),
         cornerRadius = CornerRadius(18f, 18f)
     )
     drawRoundRect(
@@ -232,12 +253,26 @@ private fun DrawScope.roadSegment(x: Float, y: Float, w: Float, h: Float) {
         size = Size(w, h),
         cornerRadius = CornerRadius(16f, 16f)
     )
+    // 길 가장자리 하이라이트
+    drawRoundRect(
+        Palette.DirtLight.copy(alpha = 0.35f),
+        topLeft = Offset(x + 4f, y + 3f),
+        size = Size(w - 8f, 5f),
+        cornerRadius = CornerRadius(8f, 8f)
+    )
     pebbles.forEach { (fx, fy, r) ->
         drawCircle(
             Palette.DirtDark.copy(alpha = 0.55f),
             r,
             Offset(x + fx * w, y + fy * h)
         )
+        if (r > 2.5f) {
+            drawCircle(
+                Palette.StoneLight.copy(alpha = 0.35f),
+                r * 0.35f,
+                Offset(x + fx * w - 0.5f, y + fy * h - 0.5f)
+            )
+        }
     }
 }
 
@@ -253,26 +288,31 @@ private fun DrawScope.drawScenery() {
 private fun DrawScope.drawTree(x: Float, y: Float, r: Float) {
     drawOval(Color(0x33000000), Offset(x - r * 0.8f, y - r * 0.16f), Size(r * 1.6f, r * 0.5f))
     drawRect(Color(0xFF6B4B2E), Offset(x - r * 0.14f, y - r * 1.05f), Size(r * 0.28f, r * 1.05f))
+    drawRect(Color(0xFF5A3A22), Offset(x - r * 0.08f, y - r * 1.05f), Size(r * 0.08f, r * 1.05f))
     drawCircle(Color(0xFF3F6B34), r * 0.78f, Offset(x, y - r * 1.35f))
     drawCircle(Color(0xFF4E8341), r * 0.62f, Offset(x - r * 0.34f, y - r * 1.55f))
     drawCircle(Color(0xFF57904A), r * 0.55f, Offset(x + r * 0.36f, y - r * 1.48f))
     drawCircle(Color(0xFF63A055), r * 0.42f, Offset(x, y - r * 1.85f))
+    drawCircle(Color(0x4463B068), r * 0.28f, Offset(x - r * 0.15f, y - r * 1.70f))
 }
 
 private fun DrawScope.drawLamp(x: Float, y: Float) {
     drawOval(Color(0x33000000), Offset(x - 12f, y - 5f), Size(24f, 10f))
     drawRect(Color(0xFF3B3733), Offset(x - 3f, y - 62f), Size(6f, 62f))
-    drawRect(Color(0xFF2E2A26), Offset(x - 9f, y - 78f), Size(18f, 18f))
-    drawCircle(Color(0xFFF7D46A), 6.5f, Offset(x, y - 69f))
-    drawCircle(Color(0x55F7D46A), 13f, Offset(x, y - 69f))
+    drawRect(Color(0xFF2E2A26), Offset(x - 10f, y - 80f), Size(20f, 20f))
+    drawRect(Color(0xFF4A4038), Offset(x - 11f, y - 82f), Size(22f, 4f))
+    drawCircle(Color(0xFFF7D46A), 7f, Offset(x, y - 70f))
+    drawCircle(Color(0x66F7D46A), 16f, Offset(x, y - 70f))
+    drawCircle(Color(0x33F0C48A), 28f, Offset(x, y - 70f))
 }
 
 private fun DrawScope.drawWell(x: Float, y: Float) {
     drawOval(Color(0x33000000), Offset(x - 36f, y - 10f), Size(72f, 26f))
-    drawOval(Palette.Stone, Offset(x - 32f, y - 26f), Size(64f, 40f))
+    drawOval(Palette.Stone, Offset(x - 34f, y - 28f), Size(68f, 42f))
+    drawOval(Palette.StoneLight, Offset(x - 28f, y - 30f), Size(56f, 18f))
     drawOval(Color(0xFF2C3B4A), Offset(x - 23f, y - 20f), Size(46f, 27f))
     drawOval(Palette.Water, Offset(x - 18f, y - 15f), Size(36f, 18f))
-    // 지붕과 기둥
+    drawOval(Color(0x55FFFFFF), Offset(x - 10f, y - 16f), Size(14f, 6f))
     drawRect(Color(0xFF6B4B2E), Offset(x - 30f, y - 74f), Size(6f, 52f))
     drawRect(Color(0xFF6B4B2E), Offset(x + 24f, y - 74f), Size(6f, 52f))
     val roof = androidx.compose.ui.graphics.Path().apply {
@@ -282,7 +322,11 @@ private fun DrawScope.drawWell(x: Float, y: Float) {
         close()
     }
     drawPath(roof, Color(0xFF8A5A2B))
+    drawPath(roof, Color(0x33000000), style = Stroke(2.5f))
     drawLine(Color(0xFF4A3524), Offset(x - 26f, y - 72f), Offset(x + 26f, y - 72f), strokeWidth = 4f)
+    // 두레박
+    drawLine(Color(0xFF3B2A1A), Offset(x, y - 72f), Offset(x, y - 28f), 2f)
+    drawRect(Color(0xFF6B4B2E), Offset(x - 7f, y - 34f), Size(14f, 12f))
 }
 
 private fun DrawScope.drawStall(x: Float, y: Float, kind: Int) {

@@ -76,6 +76,9 @@ class GameViewModel : ViewModel() {
         private set
     var walkPhase by mutableFloatStateOf(0f)
         private set
+    /** 마을 동적 연출(새·동물·연기)용 누적 시간 */
+    var animTime by mutableFloatStateOf(0f)
+        private set
 
     var pubHeroX by mutableFloatStateOf(500f)
         private set
@@ -182,6 +185,7 @@ class GameViewModel : ViewModel() {
     // ---------------------------------------------------------------- 이동
 
     fun tick(dt: Float) {
+        animTime += dt
         if (scene == Scene.INTERIOR && currentPlace == PlaceId.PUB) {
             tickPub(dt)
             return
