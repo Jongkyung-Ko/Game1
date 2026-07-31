@@ -7,6 +7,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.medieval.village.model.DungeonFactory
+import com.medieval.village.model.DungeonFloor
+import com.medieval.village.model.DungeonMonster
+import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.EquippedItem
 import com.medieval.village.model.InventoryEntry
@@ -37,6 +41,8 @@ class GameViewModel : ViewModel() {
 
     companion object {
         private const val WALK_SPEED = 360f
+        private const val DUNGEON_WALK_SPEED = 280f
+        private const val DUNGEON_TOUCH_RANGE = 52f
         const val MAX_ACTIVE_MERCENARY = 2
     }
 
@@ -88,10 +94,33 @@ class GameViewModel : ViewModel() {
     var arenaLosses by mutableStateOf(0)
         private set
 
+    /** 라그나로크식 걸어다니는 던전 상태 */
+    var dungeonFloor by mutableStateOf<DungeonFloor?>(null)
+        private set
+    var dungeonFloorNumber by mutableStateOf(1)
+        private set
+    var dungeonHeroX by mutableFloatStateOf(0f)
+        private set
+    var dungeonHeroY by mutableFloatStateOf(0f)
+        private set
+    var dungeonWalking by mutableStateOf(false)
+        private set
+    var dungeonHint by mutableStateOf("")
+        private set
+    /** UI에서 재생할 일회성 효과음 신호 */
+    var sfxSignal by mutableStateOf(0)
+        private set
+    var lastSfx by mutableStateOf<String?>(null)
+        private set
+
     private val path = ArrayDeque<Waypoint>()
     private var pendingEnter: PlaceId? = null
     private var pubTarget: Waypoint? = null
     private var pendingPubNpc: PubNpc? = null
+    private var dungeonTarget: Waypoint? = null
+    private var pendingDungeonMonster: DungeonMonster? = null
+    private var dungeonCombatLock = false
+    private var monsterWanderAcc = 0f
 
     init {
         newGame()
@@ -113,6 +142,7 @@ class GameViewModel : ViewModel() {
         pendingPubNpc = null
         arenaWins = 0
         arenaLosses = 0
+        clearDungeonState()
 
         addItem(ItemCatalog.potion, 3)
         addItem(ItemCatalog.bread, 2)
@@ -132,8 +162,9 @@ class GameViewModel : ViewModel() {
         scene = Scene.INTERIOR
         currentPlace = PlaceId.HOME
         menuTab = MenuTab.NONE
-        say("낡은 침대에서 눈을 떴다. 오늘부터 나의 모험이 시작된다.")
-        say("문을 열고 마을로 나가보자.")
+        say("풍요의 마을… 한때 '신성한 포도주'로 번영했던 이곳에 눈을 떴다.")
+        say("몇 년 전 지하 최심부에서 검붉은 '좀비석'이 발굴된 뒤, 마을은 저주에 잠식되고 있다.")
+        say("문을 열고, 지상으로 스며드는 재앙의 근원을 마주하자.")
     }
 
     // ---------------------------------------------------------------- 스탯 계산
@@ -153,6 +184,10 @@ class GameViewModel : ViewModel() {
     fun tick(dt: Float) {
         if (scene == Scene.INTERIOR && currentPlace == PlaceId.PUB) {
             tickPub(dt)
+            return
+        }
+        if (scene == Scene.INTERIOR && currentPlace == PlaceId.DUNGEON) {
+            tickDungeon(dt)
             return
         }
         if (scene != Scene.VILLAGE) return
@@ -295,6 +330,10 @@ class GameViewModel : ViewModel() {
             pubDialogue = null
             pubSpeakerId = null
         }
+        if (id == PlaceId.DUNGEON) {
+            enterDungeonFloor(1)
+            emitSfx("door")
+        }
         say(greetingOf(id))
     }
 
@@ -310,24 +349,30 @@ class GameViewModel : ViewModel() {
         pendingPubNpc = null
         walking = false
         pubWalking = false
+        if (id == PlaceId.DUNGEON) clearDungeonState()
         scene = Scene.VILLAGE
         currentPlace = null
         menuTab = MenuTab.NONE
     }
 
     private fun greetingOf(id: PlaceId): String = when (id) {
-        PlaceId.HOME -> "낡았지만 정든 나의 집이다."
-        PlaceId.SHOP -> "\"어서 오세요! 오늘 물건 좋습니다.\""
-        PlaceId.WEAPON_SHOP -> "\"좋은 쇠붙이를 찾나? 잘 왔군.\""
-        PlaceId.HOSPITAL -> "\"어디가 아파서 오셨습니까?\""
-        PlaceId.CHURCH -> "\"빛의 가호가 그대와 함께하기를.\""
-        PlaceId.INN -> "\"방 하나 잡으시겠어요?\""
-        PlaceId.PUB -> "따뜻한 불빛과 왁자지껄한 이야기 소리가 반긴다."
-        PlaceId.ARENA -> "\"몸 좀 풀러 왔나, 애송이?\""
-        PlaceId.DUNGEON -> "차가운 바람이 지하에서 올라온다."
-        PlaceId.BLACKSMITH -> "\"쇠는 두들길수록 강해지지.\""
-        PlaceId.MAGIC_SCHOOL -> "\"마법은 재능이 아니라 반복일세.\""
-        PlaceId.MERCENARY -> "\"돈만 주면 누구든 붙여주지.\""
+        PlaceId.HOME -> "창문 너머로도 하수구 냄새가 스며든다. 그래도 여기는 나의 오두막이다."
+        PlaceId.SHOP -> "\"어서 오세요… 횃불이랑 붕대는 늘 비치해 둡니다. 요즘엔 필수죠.\""
+        PlaceId.WEAPON_SHOP -> "\"좀비 뼈라도 가를 쇠를 찾나? 잘 왔네.\""
+        PlaceId.HOSPITAL -> "\"물린 상처입니까, 아니면… 좀비석 기운입니까?\""
+        PlaceId.CHURCH -> "\"저주가 지상을 핥고 있소. 빛의 가호가 그대와 함께하기를.\""
+        PlaceId.INN -> "\"문은 꼭 잠그세요. 밤엔 하수도 쪽에서 기척이 들립니다.\""
+        PlaceId.PUB -> "포도주 향 사이로, 좀비석과 영주를 향한 낮은 원성이 섞여 들린다."
+        PlaceId.ARENA -> "\"지상에서라도 칼날을 갈아야지. 지하에선 실수가 곧 죽음이야.\""
+        PlaceId.DUNGEON -> "축축한 하수도 바람이 얼굴을 스친다. 저주의 둥지가 발밑에서 숨 쉰다."
+        PlaceId.BLACKSMITH -> "\"좀비 이빨에 안 깨지려면, 쇠는 더 두들겨야지.\""
+        PlaceId.MAGIC_SCHOOL -> "\"연금술사들이 손을 댄 그 돌… 우리는 이제 해독만 연구한다네.\""
+        PlaceId.MERCENARY -> "\"좀비 둥지 안내라면 돈만 주면 붙여주지. 목숨값은 별도야.\""
+    }
+
+    private fun emitSfx(name: String) {
+        lastSfx = name
+        sfxSignal++
     }
 
     fun say(msg: String) {
@@ -472,7 +517,7 @@ class GameViewModel : ViewModel() {
             return
         }
         player = player.copy(gold = player.gold - amount, blessing = player.blessing + 3)
-        say("${amount}G를 헌금했다. 3일간 빛의 축복을 받는다. (전투력 상승)")
+        say("${amount}G를 헌금했다. 3일간 저주를 밀어내는 축복을 받는다. (전투력 상승)")
     }
 
     // ---------------------------------------------------------------- 여관
@@ -494,11 +539,12 @@ class GameViewModel : ViewModel() {
     }
 
     private val rumors = listOf(
-        "\"지하 던전 3층부터는 혼자 가면 위험하다더군.\"",
-        "\"대장간 영감은 강철 장검을 들고 가면 잘 봐준다던데.\"",
-        "\"마법학교에서 화염구를 배우면 던전이 한결 수월해진대.\"",
-        "\"교회에 헌금하면 며칠간 운이 따른다는 소문이 있어.\"",
-        "\"용병 고름은 덩치값 한다더라.\""
+        "\"최하층에서 캐낸 검붉은 돌… 사람들이 그걸 '좀비석'이라 부르지.\"",
+        "\"영주와 연금술사들이 병도 고치고 목숨도 늘리겠다고 그 돌을 만졌어. 결과는… 저주뿐이야.\"",
+        "\"오염된 사람들은 죽지도 못한 채 뇌가 썩고, 생살 허기만 남았다대.\"",
+        "\"지하 보관소랑 하수도가 통째로 좀비 둥지가 됐어. 저주가 지상까지 스며 나온다니까.\"",
+        "\"예전엔 신성한 포도주로 이 마을이 부유했는데… 지금은 술잔에도 그 그림자가 비친다.\"",
+        "\"교회에서는 좀비석 기운을 씻는 기도를 올린다더군. 헌금하면 며칠은 마음이 든든해진대.\""
     )
 
     fun listenRumor() {
@@ -628,42 +674,246 @@ class GameViewModel : ViewModel() {
         }
     }
 
-    // ---------------------------------------------------------------- 던전
+    // ---------------------------------------------------------------- 던전 (라그나로크식 도보 탐험)
 
-    fun exploreDungeon() {
-        if (player.hp <= player.maxHp * 0.15f) {
-            say("몸 상태로는 지하로 내려갈 수 없다. 먼저 회복하자.")
+    private fun clearDungeonState() {
+        dungeonFloor = null
+        dungeonFloorNumber = 1
+        dungeonHeroX = 0f
+        dungeonHeroY = 0f
+        dungeonWalking = false
+        dungeonHint = ""
+        dungeonTarget = null
+        pendingDungeonMonster = null
+        dungeonCombatLock = false
+        monsterWanderAcc = 0f
+    }
+
+    /** 몬스터 위치/사망 등 내부 변이 후 Compose 재구성을 유도한다. */
+    private fun refreshDungeonFloor() {
+        val map = dungeonFloor ?: return
+        dungeonFloor = map.copy(monsters = map.monsters.toMutableList())
+    }
+
+    private fun enterDungeonFloor(floor: Int) {
+        val map = DungeonFactory.generate(floor)
+        dungeonFloor = map
+        dungeonFloorNumber = floor
+        dungeonHeroX = map.spawnX
+        dungeonHeroY = map.spawnY
+        dungeonWalking = false
+        dungeonTarget = null
+        pendingDungeonMonster = null
+        dungeonCombatLock = false
+        dungeonHint = "stairs_up"
+        if (floor > player.dungeonDepth) {
+            player = player.copy(dungeonDepth = floor)
+        }
+        say("─── 지하 ${floor}층 · 오염된 통로 ───")
+        if (floor == 1) {
+            say("한때 포도주 보관소와 하수도였던 길이 좀비의 숨결로 가득하다.")
+        } else {
+            say("더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다.")
+        }
+    }
+
+    fun walkInDungeon(x: Float, y: Float) {
+        val map = dungeonFloor ?: return
+        if (dungeonCombatLock) return
+        pendingDungeonMonster = null
+        val tx = x.coerceIn(DungeonFactory.TILE, map.worldW - DungeonFactory.TILE)
+        val ty = y.coerceIn(DungeonFactory.TILE, map.worldH - DungeonFactory.TILE)
+        if (!map.isWalkable(tx, ty)) return
+        dungeonTarget = Waypoint(tx, ty)
+    }
+
+    fun approachDungeonMonster(monster: DungeonMonster) {
+        if (!monster.alive || dungeonCombatLock) return
+        pendingDungeonMonster = monster
+        dungeonTarget = Waypoint(monster.x, monster.y)
+    }
+
+    fun descendDungeon() {
+        val map = dungeonFloor ?: return
+        if (map.tileKindAt(dungeonHeroX, dungeonHeroY) != DungeonTile.STAIRS_DOWN) {
+            say("아래층으로 이어지는 계단 위에 서야 한다.")
             return
         }
-        val floor = player.dungeonDepth + 1
-        say("─── 지하 ${floor}층 탐험 ───")
+        if (player.hp <= player.maxHp * 0.15f) {
+            say("몸 상태로는 더 내려갈 수 없다. 물약을 쓰거나 지상으로 돌아가자.")
+            return
+        }
+        emitSfx("door")
+        enterDungeonFloor(dungeonFloorNumber + 1)
+    }
+
+    fun escapeDungeon() {
+        say("지상의 공기가 폐를 채운다. 저주는 아직 지하에 웅크리고 있다.")
+        emitSfx("door")
+        leavePlace()
+    }
+
+    private fun tickDungeon(dt: Float) {
+        val map = dungeonFloor ?: return
+        updateDungeonHint(map)
+        wanderMonsters(map, dt)
+        checkDungeonContact(map)
+
+        val target = dungeonTarget
+        if (target == null) {
+            dungeonWalking = false
+            return
+        }
+
+        val dx = target.x - dungeonHeroX
+        val dy = target.y - dungeonHeroY
+        val dist = hypot(dx, dy)
+        val step = DUNGEON_WALK_SPEED * dt
+        if (dist <= step || dist < 0.01f) {
+            tryMoveDungeon(map, target.x, target.y)
+            dungeonTarget = null
+            dungeonWalking = false
+            pendingDungeonMonster?.let { fightDungeonMonster(it) }
+            pendingDungeonMonster = null
+            return
+        }
+
+        val nx = dungeonHeroX + dx / dist * step
+        val ny = dungeonHeroY + dy / dist * step
+        val moved = tryMoveDungeon(map, nx, ny)
+        if (!moved) {
+            // 벽에 막히면 축 분리 시도 (라그나로크식 미끄러짐)
+            val movedX = tryMoveDungeon(map, nx, dungeonHeroY)
+            val movedY = tryMoveDungeon(map, dungeonHeroX, ny)
+            if (!movedX && !movedY) {
+                dungeonTarget = null
+                dungeonWalking = false
+                pendingDungeonMonster = null
+                return
+            }
+        }
+        dungeonWalking = true
+        walkPhase += dt * 10f
+        facing = if (abs(dx) > abs(dy)) {
+            if (dx > 0) Facing.RIGHT else Facing.LEFT
+        } else {
+            if (dy > 0) Facing.DOWN else Facing.UP
+        }
+        pendingDungeonMonster?.let { monster ->
+            if (monster.alive && hypot(dungeonHeroX - monster.x, dungeonHeroY - monster.y) < DUNGEON_TOUCH_RANGE) {
+                dungeonTarget = null
+                dungeonWalking = false
+                fightDungeonMonster(monster)
+                pendingDungeonMonster = null
+            }
+        }
+    }
+
+    private fun tryMoveDungeon(map: DungeonFloor, x: Float, y: Float): Boolean {
+        if (!map.isWalkable(x, y)) return false
+        // 몸통 반경 충돌
+        val r = 14f
+        if (!map.isWalkable(x - r, y) || !map.isWalkable(x + r, y) ||
+            !map.isWalkable(x, y - r) || !map.isWalkable(x, y + r)
+        ) return false
+        dungeonHeroX = x
+        dungeonHeroY = y
+        return true
+    }
+
+    private fun updateDungeonHint(map: DungeonFloor) {
+        dungeonHint = when (map.tileKindAt(dungeonHeroX, dungeonHeroY)) {
+            DungeonTile.STAIRS_UP -> "stairs_up"
+            DungeonTile.STAIRS_DOWN -> "stairs_down"
+            else -> ""
+        }
+    }
+
+    private fun wanderMonsters(map: DungeonFloor, dt: Float) {
+        monsterWanderAcc += dt
+        if (monsterWanderAcc < 0.45f) return
+        monsterWanderAcc = 0f
+        map.monsters.filter { it.alive }.forEach { zombie ->
+            val ang = Random.nextFloat() * (Math.PI * 2).toFloat()
+            val dist = Random.nextFloat() * 28f
+            val nx = zombie.x + kotlin.math.cos(ang) * dist
+            val ny = zombie.y + kotlin.math.sin(ang) * dist
+            if (map.isWalkable(nx, ny)) {
+                zombie.x = nx
+                zombie.y = ny
+            }
+        }
+        refreshDungeonFloor()
+    }
+
+    private fun checkDungeonContact(map: DungeonFloor) {
+        if (dungeonCombatLock) return
+        val hit = map.monsters.firstOrNull {
+            it.alive && hypot(dungeonHeroX - it.x, dungeonHeroY - it.y) < DUNGEON_TOUCH_RANGE
+        } ?: return
+        dungeonTarget = null
+        dungeonWalking = false
+        fightDungeonMonster(hit)
+    }
+
+    private fun fightDungeonMonster(monster: DungeonMonster) {
+        if (!monster.alive || dungeonCombatLock) return
+        dungeonCombatLock = true
+        emitSfx("hit")
+        val floor = dungeonFloorNumber
+        say("${monster.name}이(가) 생살 허기를 드러내며 덤벼든다!")
 
         val myPower = totalAtk + partyPower + blessBonus() + Random.nextInt(0, 10)
-        val enemyPower = 12 + floor * 9 + Random.nextInt(0, 9)
-        val monster = listOf("동굴 박쥐", "고블린 정찰병", "해골 병사", "늪 슬라임", "그림자 늑대").random()
-        say("$monster 이(가) 나타났다!")
-
+        val enemyPower = monster.power + Random.nextInt(0, 8)
         val dmg = (enemyPower - totalDef).coerceAtLeast(2) + Random.nextInt(0, 6)
+
         if (myPower >= enemyPower) {
-            val gold = 20 + floor * 15 + Random.nextInt(0, 20)
-            val exp = 22 + floor * 14
+            monster.alive = false
+            refreshDungeonFloor()
+            val gold = 18 + floor * 14 + Random.nextInt(0, 18)
+            val exp = 20 + floor * 12
             val takenHit = (dmg / 2).coerceAtLeast(1)
-            say("${monster}을(를) 물리쳤다! (HP -$takenHit, +${gold}G, EXP +$exp)")
-            player = player.copy(gold = player.gold + gold, dungeonDepth = floor)
+            say("${monster.name}을(를) 쓰러뜨렸다! (HP -$takenHit, +${gold}G, EXP +$exp)")
+            player = player.copy(gold = player.gold + gold)
+            if (floor > player.dungeonDepth) {
+                player = player.copy(dungeonDepth = floor)
+            }
             if (applyDamage(takenHit)) return
             gainExp(exp)
-            if (Random.nextInt(100) < 45) {
+            if (Random.nextInt(100) < 40) {
                 val loot = ItemCatalog.dungeonLoot.random()
                 addItem(loot)
-                say("전리품으로 ${loot.name}을(를) 얻었다!")
+                say("썩은 옷자락에서 ${loot.name}을(를) 챙겼다.")
             }
-            say("더 깊은 곳으로 가는 계단을 발견했다. (최고 기록 ${floor}층)")
+            if (mapCleared()) {
+                say("이 층의 좀비가 잠잠해졌다. 심층의 계단을 찾아보자.")
+            }
         } else {
-            say("${monster}에게 밀렸다! (HP -$dmg)")
+            say("${monster.name}의 이빨이 스쳤다! (HP -$dmg)")
             if (applyDamage(dmg)) return
-            gainExp(8)
-            say("간신히 지상으로 도망쳤다.")
+            gainExp(6)
+            // 밀려남
+            val push = 40f
+            val ang = Random.nextFloat() * (Math.PI * 2).toFloat()
+            tryMoveDungeon(
+                dungeonFloor!!,
+                dungeonHeroX + kotlin.math.cos(ang) * push,
+                dungeonHeroY + kotlin.math.sin(ang) * push
+            )
         }
+        dungeonCombatLock = false
+    }
+
+    private fun mapCleared(): Boolean =
+        dungeonFloor?.monsters?.none { it.alive } == true
+
+    /** 구버전 UI 호환: 입구에서 바로 탐험을 시작할 때 사용 */
+    fun exploreDungeon() {
+        if (currentPlace != PlaceId.DUNGEON) {
+            enterPlace(PlaceId.DUNGEON)
+            return
+        }
+        say("화면을 눌러 통로를 걸어 다니며 좀비와 싸우자.")
     }
 
     private fun blessBonus(): Int = if (player.blessing > 0) 9 else 0
@@ -674,9 +924,16 @@ class GameViewModel : ViewModel() {
         if (hp <= 0) {
             val lost = (player.gold * 0.2f).toInt()
             player = player.copy(hp = 1, gold = player.gold - lost)
-            say("의식을 잃었다... 누군가 병원으로 옮겨주었다. (${lost}G 분실)")
-            enterPlace(PlaceId.HOSPITAL)
-            say("눈을 떠보니 병원 침대 위였다.")
+            say("의식을 잃었다... 오염의 기운에 쓰러진 당신을 누군가가 병원으로 옮겼다. (${lost}G 분실)")
+            // enterPlace는 로그를 지우므로, 기절 연출은 직접 병원으로 보낸다.
+            clearDungeonState()
+            pubTarget = null
+            pendingPubNpc = null
+            pubWalking = false
+            currentPlace = PlaceId.HOSPITAL
+            scene = Scene.INTERIOR
+            menuTab = MenuTab.NONE
+            say("눈을 떠보니 오염 상처를 돌보는 집 침대 위였다.")
             return true
         }
         player = player.copy(hp = hp)

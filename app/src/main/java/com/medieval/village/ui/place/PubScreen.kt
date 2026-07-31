@@ -48,7 +48,7 @@ import kotlin.math.min
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
         Text(
-            text = "PUB · 황금 수사슴",
+            text = "PUB · 신성한 잔 선술집",
             color = Palette.Gold,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,

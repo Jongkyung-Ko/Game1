@@ -60,54 +60,54 @@ object Village {
 
     val places: List<Place> = listOf(
         Place(
-            PlaceId.CHURCH, "교회", "빛의 신전",
+            PlaceId.CHURCH, "교회", "저주를 씻는 신전",
             500f, 150f, 250f, 180f, BuildingStyle.CHURCH, 0xFF8C8FA6, 0xFFE6E1D3
         ),
         // 좌측 열
         Place(
-            PlaceId.MAGIC_SCHOOL, "마법학교", "아르카나 학당",
+            PlaceId.MAGIC_SCHOOL, "마법학교", "해독 연금 학당",
             175f, 210f, SIDE_W, SIDE_H, BuildingStyle.TOWER, 0xFF4B3B8F, 0xFFCFC7E8
         ),
         Place(
-            PlaceId.BLACKSMITH, "대장간", "불꽃의 모루",
+            PlaceId.BLACKSMITH, "대장간", "좀비 이빨을 부수는 모루",
             175f, 570f, SIDE_W, SIDE_H, BuildingStyle.FORGE, 0xFF5A4132, 0xFF9B8266
         ),
         Place(
-            PlaceId.WEAPON_SHOP, "무기점", "강철과 가죽",
+            PlaceId.WEAPON_SHOP, "무기점", "생사자 대비 병기",
             175f, 870f, SIDE_W, SIDE_H, BuildingStyle.ARMORY, 0xFF6B3A2E, 0xFFD8C49B
         ),
         Place(
-            PlaceId.SHOP, "상점", "마을 잡화점",
+            PlaceId.SHOP, "상점", "횃불과 붕대의 잡화",
             175f, 1150f, SIDE_W, SIDE_H, BuildingStyle.STORE, 0xFFB4573F, 0xFFEBD9B4
         ),
         // 우측 열
         Place(
-            PlaceId.DUNGEON, "던전입구", "잊혀진 지하",
+            PlaceId.DUNGEON, "던전입구", "좀비 둥지 · 오염된 지하",
             825f, 210f, SIDE_W, SIDE_H, BuildingStyle.CAVE, 0xFF3B3630, 0xFF56504A
         ),
         Place(
-            PlaceId.ARENA, "대련소", "무인들의 터",
+            PlaceId.ARENA, "대련소", "지상의 칼날 연마터",
             825f, 570f, SIDE_W, SIDE_H, BuildingStyle.ARENA, 0xFF7A5230, 0xFFC9A87C
         ),
         Place(
-            PlaceId.MERCENARY, "용병고용소", "떠돌이 칼잡이",
+            PlaceId.MERCENARY, "용병고용소", "좀비 사냥 용병",
             825f, 870f, SIDE_W, SIDE_H, BuildingStyle.CAMP, 0xFF4E5A3A, 0xFF8B9668
         ),
         Place(
-            PlaceId.HOSPITAL, "병원", "치유의 집",
+            PlaceId.HOSPITAL, "병원", "오염 상처를 돌보는 집",
             825f, 1150f, SIDE_W, SIDE_H, BuildingStyle.CLINIC, 0xFFB0B6C4, 0xFFF2F0E6
         ),
         // 하단
         Place(
-            PlaceId.INN, "INN", "여관 · 잠든 곰",
+            PlaceId.INN, "INN", "여관 · 잠든 포도송이",
             290f, 1430f, 250f, 180f, BuildingStyle.INN, 0xFF8A5A2B, 0xFFE3CFA4
         ),
         Place(
-            PlaceId.HOME, "주인공 집", "나의 오두막",
+            PlaceId.HOME, "주인공 집", "풍요의 마을 오두막",
             700f, 1430f, 250f, 180f, BuildingStyle.HOUSE, 0xFF9C4A34, 0xFFE8D4AC
         ),
         Place(
-            PlaceId.PUB, "PUB", "황금 수사슴 선술집",
+            PlaceId.PUB, "PUB", "신성한 잔 선술집",
             625f, 390f, 140f, 120f, BuildingStyle.PUB, 0xFF713B2A, 0xFFD0A66E
         )
     )
