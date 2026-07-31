@@ -1,6 +1,7 @@
 package com.medieval.village.ui.village
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -50,6 +51,9 @@ class CustomArt(
     }
 
     companion object {
+        @Volatile
+        private var cached: CustomArt? = null
+
         private val CHAR_NAMES = listOf(
             "warrior", "rogue", "mage", "paladin",
             "merchant", "shopkeeper", "blacksmith", "doctor",
@@ -59,43 +63,66 @@ class CustomArt(
         )
 
         fun load(context: Context): CustomArt {
-            fun loadAsset(path: String): ImageBitmap {
-                context.assets.open(path).use { stream ->
-                    val opts = BitmapFactory.Options().apply {
-                        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
-                        inPremultiplied = false
-                    }
-                    val bmp = BitmapFactory.decodeStream(stream, null, opts)
-                        ?: error("Failed to decode $path")
-                    bmp.setHasAlpha(true)
-                    // 반투명/잔광 제거: 알파를 0 또는 255로 고정하고 밝은 가장자리 픽셀 제거
-                    val w = bmp.width
-                    val h = bmp.height
-                    val px = IntArray(w * h)
-                    bmp.getPixels(px, 0, w, 0, 0, w, h)
-                    for (i in px.indices) {
-                        val c = px[i]
-                        val a = c ushr 24
-                        val r = (c shr 16) and 0xFF
-                        val g = (c shr 8) and 0xFF
-                        val b = c and 0xFF
-                        val nearWhite = r >= 236 && g >= 236 && b >= 236
-                        px[i] = when {
-                            a < 16 || nearWhite -> c and 0x00FFFFFF
-                            else -> c or 0xFF000000.toInt()
-                        }
-                    }
-                    bmp.setPixels(px, 0, w, 0, 0, w, h)
-                    return bmp.asImageBitmap()
+            cached?.let { return it }
+            synchronized(this) {
+                cached?.let { return it }
+                val app = context.applicationContext
+                val chars = CHAR_NAMES.associateWith { name ->
+                    loadAsset(app, "custom/chars/$name.png", cleanEdges = true)
+                }
+                val art = CustomArt(
+                    // 마을 맵은 불투명 일러스트라 픽셀 후처리 불필요 (불변 Bitmap setPixels 크래시/지연 방지)
+                    villageMap = loadAsset(app, "custom/village_map.png", cleanEdges = false),
+                    chars = chars,
+                )
+                cached = art
+                return art
+            }
+        }
+
+        private fun loadAsset(context: Context, path: String, cleanEdges: Boolean): ImageBitmap {
+            // AssetInputStream은 mark/reset이 불안정해서 byte 배열로 디코딩한다.
+            val bytes = context.assets.open(path).use { it.readBytes() }
+            val opts = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+                inMutable = true
+                inPremultiplied = true
+            }
+            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                ?: error("Failed to decode $path")
+            val bmp = if (decoded.isMutable) {
+                decoded
+            } else {
+                decoded.copy(Bitmap.Config.ARGB_8888, true).also { decoded.recycle() }
+            }
+            if (cleanEdges) {
+                hardenSpriteAlpha(bmp)
+            }
+            return bmp.asImageBitmap()
+        }
+
+        /**
+         * 캐릭터 PNG의 반투명/밝은 배경 잔광을 제거한다.
+         * 반드시 mutable Bitmap에서만 호출해야 한다.
+         */
+        private fun hardenSpriteAlpha(bmp: Bitmap) {
+            val w = bmp.width
+            val h = bmp.height
+            val px = IntArray(w * h)
+            bmp.getPixels(px, 0, w, 0, 0, w, h)
+            for (i in px.indices) {
+                val c = px[i]
+                val a = c ushr 24
+                val r = (c shr 16) and 0xFF
+                val g = (c shr 8) and 0xFF
+                val b = c and 0xFF
+                val nearWhite = r >= 236 && g >= 236 && b >= 236
+                px[i] = when {
+                    a < 16 || nearWhite -> c and 0x00FFFFFF
+                    else -> c or 0xFF000000.toInt()
                 }
             }
-            val chars = CHAR_NAMES.associateWith { name ->
-                loadAsset("custom/chars/$name.png")
-            }
-            return CustomArt(
-                villageMap = loadAsset("custom/village_map.png"),
-                chars = chars,
-            )
+            bmp.setPixels(px, 0, w, 0, 0, w, h)
         }
     }
 }
