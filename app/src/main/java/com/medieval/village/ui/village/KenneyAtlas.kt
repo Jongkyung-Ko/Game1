@@ -144,9 +144,10 @@ object TownTiles {
     const val CASTLE_BL = 108
     const val CASTLE_BM = 109
     const val CASTLE_BR = 110
-    const val WELL = 92
+    const val WELL = 104
     const val BARREL = 93
     const val CRATE = 94
+    const val SIGNPOST = 83
     // aliases used by house builder
     const val WALL_TAN_L = 84
     const val WALL_TAN_M = 86

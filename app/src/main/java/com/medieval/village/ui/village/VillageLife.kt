@@ -31,7 +31,7 @@ private fun DrawScope.drawBirds(atlas: KenneyAtlas, t: Float) {
             DungeonTiles.BAT,
             x,
             y,
-            WORLD_TILE * 0.7f,
+            WORLD_TILE * 1.1f,
             bob = flap,
             mirrorX = cos(a) < 0f
         )
@@ -45,7 +45,7 @@ private fun DrawScope.drawBirds(atlas: KenneyAtlas, t: Float) {
             DungeonTiles.BAT,
             x,
             y,
-            WORLD_TILE * 0.65f,
+            WORLD_TILE * 1.0f,
             bob = sin(t * 18f + i) * 2.5f,
             mirrorX = false
         )
@@ -62,7 +62,7 @@ private fun DrawScope.drawDog(atlas: KenneyAtlas, t: Float) {
         DungeonTiles.BLOB,
         x,
         y,
-        WORLD_TILE * 0.95f,
+        WORLD_TILE * 1.4f,
         bob = sin(t * 8f) * 2f,
         mirrorX = facingLeft
     )
@@ -75,10 +75,10 @@ private fun DrawScope.drawCat(atlas: KenneyAtlas, t: Float) {
     val y = shop.top + shop.h * 0.42f
     drawKenneySprite(
         atlas.dungeon,
-        DungeonTiles.SPIDER, // 작은 크리처로 지붕 위 움직임
+        DungeonTiles.SPIDER,
         x,
         y,
-        WORLD_TILE * 0.7f,
+        WORLD_TILE * 1.15f,
         bob = sin(t * 5f) * 1.5f,
         mirrorX = cos(t * 0.35f) < 0f
     )
@@ -96,7 +96,7 @@ private fun DrawScope.drawChickens(atlas: KenneyAtlas, t: Float) {
             DungeonTiles.SLIME,
             x,
             y,
-            WORLD_TILE * 0.75f,
+            WORLD_TILE * 1.15f,
             bob = sin(t * 9f + i) * 2f,
             mirrorX = sin(t * 0.8f + i) < 0f
         )

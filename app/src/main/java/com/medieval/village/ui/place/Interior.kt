@@ -45,7 +45,7 @@ fun DrawScope.drawInterior(
             tileId = tile,
             cx = w * npc.fx,
             footY = h * npc.fy,
-            size = h * 0.38f,
+            size = h * 0.48f,
             bob = bob + if (wave > 0.7f) -2f else 0f,
             mirrorX = false,
         )

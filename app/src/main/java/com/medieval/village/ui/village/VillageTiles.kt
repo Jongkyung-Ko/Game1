@@ -16,7 +16,7 @@ private val ROWS = (Village.H / WORLD_TILE).toInt() // 41
 
 /**
  * Precomputed Tiny Town ground layer (grass + roads).
- * Buildings/trees/props are drawn as sprites on top from place coordinates.
+ * Buildings are compact 2~3 tile-tall sprites (not wall-filled rectangles).
  */
 object VillageGround {
     val tiles: Array<IntArray> = Array(ROWS) { IntArray(COLS) { TownTiles.GRASS } }
@@ -25,21 +25,19 @@ object VillageGround {
         val rng = Random(42)
         for (r in 0 until ROWS) {
             for (c in 0 until COLS) {
-                tiles[r][c] = when (rng.nextInt(18)) {
+                tiles[r][c] = when (rng.nextInt(20)) {
                     0 -> TownTiles.GRASS_TUFT
                     1 -> TownTiles.GRASS_FLOWER
                     else -> TownTiles.GRASS
                 }
             }
         }
-        // Vertical road
         paintRoadRect(
             Village.ROAD_X - Village.ROAD_W / 2f,
             Village.ROAD_TOP - Village.ROAD_W / 2f,
             Village.ROAD_W,
             Village.BOTTOM_ROAD_Y - Village.ROAD_TOP + Village.ROAD_W
         )
-        // Horizontal row roads
         Village.rowRoads.forEach { y ->
             paintRoadRect(
                 Village.ROW_ROAD_LEFT - Village.ROAD_W / 2f,
@@ -48,15 +46,15 @@ object VillageGround {
                 Village.ROAD_W
             )
         }
-        // Bottom road
         paintRoadRect(
             Village.BOTTOM_ROAD_LEFT - Village.ROAD_W / 2f,
             Village.BOTTOM_ROAD_Y - Village.ROAD_W / 2f,
             (Village.BOTTOM_ROAD_RIGHT - Village.BOTTOM_ROAD_LEFT) + Village.ROAD_W,
             Village.ROAD_W
         )
-        // Plaza around well
-        paintRoadCircle(Village.WELL_X, Village.WELL_Y, 110f)
+        paintRoadCircle(Village.WELL_X, Village.WELL_Y, 100f)
+        // Re-apply soft edges after overlaps
+        softenPathEdges()
     }
 
     private fun paintRoadRect(x: Float, y: Float, w: Float, h: Float) {
@@ -65,7 +63,7 @@ object VillageGround {
         val c1 = floor((x + w) / WORLD_TILE).toInt().coerceIn(0, COLS - 1)
         val r1 = floor((y + h) / WORLD_TILE).toInt().coerceIn(0, ROWS - 1)
         for (r in r0..r1) for (c in c0..c1) {
-            tiles[r][c] = pathTile(c, r, c0, r0, c1, r1)
+            tiles[r][c] = TownTiles.PATH
         }
     }
 
@@ -80,27 +78,43 @@ object VillageGround {
             val py = (r + 0.5f) * WORLD_TILE
             val dx = px - cx
             val dy = py - cy
-            if (dx * dx + dy * dy <= r2) {
-                tiles[r][c] = TownTiles.PATH
-            }
+            if (dx * dx + dy * dy <= r2) tiles[r][c] = TownTiles.PATH
         }
     }
 
-    private fun pathTile(c: Int, r: Int, c0: Int, r0: Int, c1: Int, r1: Int): Int {
-        val left = c == c0
-        val right = c == c1
-        val top = r == r0
-        val bottom = r == r1
-        return when {
-            top && left -> TownTiles.PATH_TL
-            top && right -> TownTiles.PATH_TR
-            bottom && left -> TownTiles.PATH_BL
-            bottom && right -> TownTiles.PATH_BR
-            top -> TownTiles.PATH_T
-            bottom -> TownTiles.PATH_B
-            left -> TownTiles.PATH_L
-            right -> TownTiles.PATH_R
-            else -> TownTiles.PATH
+    private fun isPath(c: Int, r: Int): Boolean {
+        if (c !in 0 until COLS || r !in 0 until ROWS) return false
+        val t = tiles[r][c]
+        return t == TownTiles.PATH || t == TownTiles.PATH_T || t == TownTiles.PATH_B ||
+            t == TownTiles.PATH_L || t == TownTiles.PATH_R ||
+            t == TownTiles.PATH_TL || t == TownTiles.PATH_TR ||
+            t == TownTiles.PATH_BL || t == TownTiles.PATH_BR
+    }
+
+    private fun softenPathEdges() {
+        val copy = Array(ROWS) { r -> tiles[r].clone() }
+        for (r in 0 until ROWS) {
+            for (c in 0 until COLS) {
+                if (!isPath(c, r)) continue
+                val n = isPath(c, r - 1)
+                val s = isPath(c, r + 1)
+                val w = isPath(c - 1, r)
+                val e = isPath(c + 1, r)
+                copy[r][c] = when {
+                    !n && !w -> TownTiles.PATH_TL
+                    !n && !e -> TownTiles.PATH_TR
+                    !s && !w -> TownTiles.PATH_BL
+                    !s && !e -> TownTiles.PATH_BR
+                    !n -> TownTiles.PATH_T
+                    !s -> TownTiles.PATH_B
+                    !w -> TownTiles.PATH_L
+                    !e -> TownTiles.PATH_R
+                    else -> TownTiles.PATH
+                }
+            }
+        }
+        for (r in 0 until ROWS) {
+            for (c in 0 until COLS) tiles[r][c] = copy[r][c]
         }
     }
 }
@@ -124,39 +138,45 @@ fun DrawScope.drawKenneyPlace(atlas: KenneyAtlas, p: Place) {
         BuildingStyle.CAVE -> drawCaveBuilding(atlas, p)
         BuildingStyle.ARENA -> drawArenaBuilding(atlas, p)
         BuildingStyle.CAMP -> drawCampBuilding(atlas, p)
-        BuildingStyle.TOWER -> drawTowerBuilding(atlas, p)
+        BuildingStyle.TOWER -> drawCompactHouse(atlas, p, redRoof = false, stone = true, cols = 4, tall = true)
         BuildingStyle.CHURCH -> drawChurchBuilding(atlas, p)
-        BuildingStyle.FORGE -> drawHouseBuilding(atlas, p, redRoof = false, greyWall = true)
-        BuildingStyle.STORE -> drawHouseBuilding(atlas, p, redRoof = true, greyWall = false, awning = true)
-        BuildingStyle.INN, BuildingStyle.PUB -> drawHouseBuilding(atlas, p, redRoof = true, greyWall = false, tall = true)
-        BuildingStyle.CLINIC -> drawHouseBuilding(atlas, p, redRoof = false, greyWall = true)
-        BuildingStyle.ARMORY -> drawHouseBuilding(atlas, p, redRoof = true, greyWall = true)
-        else -> drawHouseBuilding(atlas, p, redRoof = true, greyWall = false)
+        BuildingStyle.FORGE -> drawCompactHouse(atlas, p, redRoof = false, stone = true, cols = 4)
+        BuildingStyle.STORE -> drawCompactHouse(atlas, p, redRoof = true, stone = false, cols = 4, props = true)
+        BuildingStyle.INN -> drawCompactHouse(atlas, p, redRoof = true, stone = false, cols = 5, tall = true)
+        BuildingStyle.PUB -> drawCompactHouse(atlas, p, redRoof = true, stone = false, cols = 3)
+        BuildingStyle.CLINIC -> drawCompactHouse(atlas, p, redRoof = false, stone = true, cols = 4)
+        BuildingStyle.ARMORY -> drawCompactHouse(atlas, p, redRoof = true, stone = true, cols = 4)
+        else -> drawCompactHouse(atlas, p, redRoof = true, stone = false, cols = 4)
     }
 }
 
-private fun DrawScope.drawHouseBuilding(
+/**
+ * Tiny Town 샘플처럼 지붕 1줄 + 벽/문 1~2줄의 작은 집.
+ * 장소 사각형 전체를 벽으로 채우지 않는다.
+ */
+private fun DrawScope.drawCompactHouse(
     atlas: KenneyAtlas,
     p: Place,
     redRoof: Boolean,
-    greyWall: Boolean,
+    stone: Boolean,
+    cols: Int,
     tall: Boolean = false,
-    awning: Boolean = false,
+    props: Boolean = false,
 ) {
     val tw = WORLD_TILE
-    val cols = (p.w / tw).toInt().coerceIn(4, 7)
-    val rows = if (tall) 5 else 4
+    val rows = if (tall) 3 else 2
     val originX = p.cx - cols * tw / 2f
+    // 문 바로 위에 붙도록 바닥 정렬
     val originY = p.bottom - rows * tw
 
     val roofL = if (redRoof) TownTiles.ROOF_RED_L else TownTiles.ROOF_BLUE_L
     val roofM = if (redRoof) TownTiles.ROOF_RED_M else TownTiles.ROOF_BLUE_M
     val roofR = if (redRoof) TownTiles.ROOF_RED_R else TownTiles.ROOF_BLUE_R
-    val win = if (greyWall) TownTiles.WALL_STONE_WIN else TownTiles.WALL_WOOD_WIN
-    val door = if (greyWall) TownTiles.WALL_STONE_DOOR else TownTiles.WALL_WOOD_DOOR
-    val mid = if (greyWall) TownTiles.WALL_STONE_M else TownTiles.WALL_WOOD_M
-    val right = if (greyWall) TownTiles.WALL_STONE_R else TownTiles.WALL_WOOD_R
-    val doorCol = cols / 2
+    val win = if (stone) TownTiles.WALL_STONE_WIN else TownTiles.WALL_WOOD_WIN
+    val door = if (stone) TownTiles.WALL_STONE_DOOR else TownTiles.WALL_WOOD_DOOR
+    val mid = if (stone) TownTiles.WALL_STONE_M else TownTiles.WALL_WOOD_M
+    val right = if (stone) TownTiles.WALL_STONE_R else TownTiles.WALL_WOOD_R
+    val doorCol = (cols - 1) / 2
 
     for (r in 0 until rows) {
         for (c in 0 until cols) {
@@ -167,118 +187,29 @@ private fun DrawScope.drawHouseBuilding(
                     else -> roofM
                 }
                 rows - 1 -> when (c) {
-                    cols - 1 -> right
                     doorCol -> door
-                    else -> mid
-                }
-                rows - 2 -> when (c) {
                     cols - 1 -> right
-                    1, cols - 2 -> win
+                    doorCol - 1, doorCol + 1 -> if (c in 0 until cols) win else mid
                     else -> mid
                 }
                 else -> when (c) {
                     cols - 1 -> right
+                    0, cols - 2 -> win
                     else -> mid
                 }
             }
             drawKenneyTile(atlas.town, tid, originX + c * tw, originY + r * tw, tw)
         }
     }
-    if (awning) {
-        drawKenneyTile(atlas.town, TownTiles.SIGN, p.cx - tw / 2f, p.bottom - tw * 1.2f, tw)
-        drawKenneyTile(atlas.town, TownTiles.CRATE, p.left + 4f, p.bottom - tw, tw)
-        drawKenneyTile(atlas.town, TownTiles.BASKET, p.right - tw - 4f, p.bottom - tw, tw)
+    if (props) {
+        drawKenneyTile(atlas.town, TownTiles.SIGN, p.cx + cols * tw * 0.35f, p.bottom - tw * 1.5f, tw * 0.85f)
+        drawKenneyTile(atlas.town, TownTiles.CRATE, originX - tw * 0.7f, p.bottom - tw, tw)
+        drawKenneyTile(atlas.town, TownTiles.BASKET, originX + cols * tw, p.bottom - tw, tw)
     }
 }
 
 private fun DrawScope.drawChurchBuilding(atlas: KenneyAtlas, p: Place) {
     val tw = WORLD_TILE
-    val cols = 6
-    val rows = 5
-    val ox = p.cx - cols * tw / 2f
-    val oy = p.bottom - rows * tw
-    for (r in 0 until rows) {
-        for (c in 0 until cols) {
-            val tid = when {
-                r == 0 && c in 2..3 -> TownTiles.CASTLE_TM
-                r == 0 -> TownTiles.ROOF_BLUE_M
-                r == 1 && c == 0 -> TownTiles.CASTLE_TL
-                r == 1 && c == cols - 1 -> TownTiles.CASTLE_TR
-                r == 1 -> TownTiles.STONE_B
-                r == rows - 1 && c == cols / 2 -> TownTiles.WALL_GREY_WIN
-                c == 0 -> TownTiles.WALL_GREY_L
-                c == cols - 1 -> TownTiles.WALL_GREY_R
-                r == 2 && c in 1..2 -> TownTiles.WALL_GREY_WIN
-                else -> TownTiles.WALL_GREY_M
-            }
-            drawKenneyTile(atlas.town, tid, ox + c * tw, oy + r * tw, tw)
-        }
-    }
-}
-
-private fun DrawScope.drawTowerBuilding(atlas: KenneyAtlas, p: Place) {
-    val tw = WORLD_TILE
-    val cols = 5
-    val rows = 5
-    val ox = p.cx - cols * tw / 2f
-    val oy = p.bottom - rows * tw
-    for (r in 0 until rows) {
-        for (c in 0 until cols) {
-            val tid = when {
-                r == 0 && c == cols - 1 -> TownTiles.CASTLE_TM
-                r == 0 -> TownTiles.ROOF_BLUE_M
-                r <= 2 && c == cols - 1 -> TownTiles.STONE_A
-                r == rows - 1 && c == 1 -> TownTiles.WALL_GREY_WIN
-                c == 0 -> TownTiles.WALL_TAN_L
-                c == cols - 1 -> TownTiles.WALL_TAN_R
-                else -> TownTiles.WALL_TAN_M
-            }
-            drawKenneyTile(atlas.town, tid, ox + c * tw, oy + r * tw, tw)
-        }
-    }
-}
-
-private fun DrawScope.drawCaveBuilding(atlas: KenneyAtlas, p: Place) {
-    val tw = WORLD_TILE
-    val cols = 5
-    val rows = 4
-    val ox = p.cx - cols * tw / 2f
-    val oy = p.bottom - rows * tw
-    for (r in 0 until rows) {
-        for (c in 0 until cols) {
-            val tid = when {
-                r == 0 && c == 0 -> TownTiles.CASTLE_TL
-                r == 0 && c == cols - 1 -> TownTiles.CASTLE_TR
-                r == 0 -> TownTiles.CASTLE_TM
-                r == rows - 1 && c == cols / 2 -> TownTiles.CASTLE_BM
-                r == rows - 1 && c == 0 -> TownTiles.CASTLE_BL
-                r == rows - 1 && c == cols - 1 -> TownTiles.CASTLE_BR
-                else -> TownTiles.STONE_C
-            }
-            drawKenneyTile(atlas.town, tid, ox + c * tw, oy + r * tw, tw)
-        }
-    }
-}
-
-private fun DrawScope.drawArenaBuilding(atlas: KenneyAtlas, p: Place) {
-    val tw = WORLD_TILE
-    val cols = 5
-    val rows = 4
-    val ox = p.cx - cols * tw / 2f
-    val oy = p.bottom - rows * tw
-    for (r in 0 until rows) {
-        for (c in 0 until cols) {
-            val edge = r == 0 || r == rows - 1 || c == 0 || c == cols - 1
-            val tid = if (edge) TownTiles.FENCE_H else TownTiles.PATH
-            drawKenneyTile(atlas.town, tid, ox + c * tw, oy + r * tw, tw)
-        }
-    }
-    drawKenneyTile(atlas.town, TownTiles.TARGET, p.cx - tw / 2f, p.cy - tw / 2f, tw)
-}
-
-private fun DrawScope.drawCampBuilding(atlas: KenneyAtlas, p: Place) {
-    val tw = WORLD_TILE
-    // Tent-like: red roof triangle over path floor
     val cols = 5
     val rows = 3
     val ox = p.cx - cols * tw / 2f
@@ -287,53 +218,121 @@ private fun DrawScope.drawCampBuilding(atlas: KenneyAtlas, p: Place) {
         for (c in 0 until cols) {
             val tid = when (r) {
                 0 -> when (c) {
+                    0 -> TownTiles.ROOF_BLUE_L
+                    cols - 1 -> TownTiles.ROOF_BLUE_R
+                    else -> TownTiles.ROOF_BLUE_M
+                }
+                1 -> when (c) {
+                    0, cols - 1 -> TownTiles.WALL_STONE_R
+                    1, 3 -> TownTiles.WALL_STONE_WIN
+                    else -> TownTiles.WALL_STONE_M
+                }
+                else -> when (c) {
+                    2 -> TownTiles.WALL_STONE_DOOR
+                    cols - 1 -> TownTiles.WALL_STONE_R
+                    else -> TownTiles.WALL_STONE_M
+                }
+            }
+            drawKenneyTile(atlas.town, tid, ox + c * tw, oy + r * tw, tw)
+        }
+    }
+}
+
+private fun DrawScope.drawCaveBuilding(atlas: KenneyAtlas, p: Place) {
+    val tw = WORLD_TILE
+    val cols = 4
+    val rows = 3
+    val ox = p.cx - cols * tw / 2f
+    val oy = p.bottom - rows * tw
+    // 돌 아치 입구
+    val grid = arrayOf(
+        intArrayOf(TownTiles.CASTLE_TL, TownTiles.CASTLE_TM, TownTiles.CASTLE_TM, TownTiles.CASTLE_TR),
+        intArrayOf(TownTiles.CASTLE_BL, 111, 112, TownTiles.CASTLE_BR),
+        intArrayOf(TownTiles.CASTLE_BL, 113, TownTiles.CASTLE_BM, TownTiles.CASTLE_BR),
+    )
+    for (r in 0 until rows) {
+        for (c in 0 until cols) {
+            drawKenneyTile(atlas.town, grid[r][c], ox + c * tw, oy + r * tw, tw)
+        }
+    }
+}
+
+private fun DrawScope.drawArenaBuilding(atlas: KenneyAtlas, p: Place) {
+    val tw = WORLD_TILE
+    val cols = 4
+    val rows = 3
+    val ox = p.cx - cols * tw / 2f
+    val oy = p.bottom - rows * tw
+    for (r in 0 until rows) {
+        for (c in 0 until cols) {
+            val edge = r == 0 || r == rows - 1 || c == 0 || c == cols - 1
+            drawKenneyTile(
+                atlas.town,
+                if (edge) TownTiles.FENCE_H else TownTiles.PATH,
+                ox + c * tw,
+                oy + r * tw,
+                tw
+            )
+        }
+    }
+    drawKenneyTile(atlas.town, TownTiles.TARGET, p.cx - tw / 2f, p.cy - tw * 0.2f, tw)
+}
+
+private fun DrawScope.drawCampBuilding(atlas: KenneyAtlas, p: Place) {
+    val tw = WORLD_TILE
+    val cols = 4
+    val rows = 2
+    val ox = p.cx - cols * tw / 2f
+    val oy = p.bottom - rows * tw
+    for (r in 0 until rows) {
+        for (c in 0 until cols) {
+            val tid = if (r == 0) {
+                when (c) {
                     0 -> TownTiles.ROOF_RED_L
                     cols - 1 -> TownTiles.ROOF_RED_R
                     else -> TownTiles.ROOF_RED_M
                 }
-                else -> when (c) {
+            } else {
+                when (c) {
+                    1 -> TownTiles.WALL_WOOD_DOOR
                     0, cols - 1 -> TownTiles.FENCE_V
-                    cols / 2 -> TownTiles.WALL_TAN_WIN
                     else -> TownTiles.PATH
                 }
             }
             drawKenneyTile(atlas.town, tid, ox + c * tw, oy + r * tw, tw)
         }
     }
-    drawKenneyTile(atlas.town, TownTiles.BARREL, p.left, p.bottom - tw, tw)
+    drawKenneyTile(atlas.town, TownTiles.BARREL, ox - tw * 0.8f, p.bottom - tw, tw)
 }
 
 fun DrawScope.drawKenneyScenery(atlas: KenneyAtlas) {
     Village.trees.forEachIndexed { i, (x, y, _) ->
-        val tid = when (i % 4) {
-            0 -> TownTiles.TREE_GREEN
-            1 -> TownTiles.TREE_ORANGE
-            2 -> TownTiles.BUSH
-            else -> TownTiles.TREE_GREEN
+        val tid = when (i % 3) {
+            0 -> 16 // round green tree with trunk
+            1 -> 15 // orange tree
+            else -> 17 // bush
         }
-        drawKenneyTile(atlas.town, tid, x - WORLD_TILE / 2f, y - WORLD_TILE, WORLD_TILE * 1.35f)
+        val size = WORLD_TILE * 1.6f
+        drawKenneyTile(atlas.town, tid, x - size / 2f, y - size * 0.85f, size)
     }
-    // Well
+    // Well (Kenney Tiny Town tile 104)
     drawKenneyTile(
         atlas.town,
-        TownTiles.WELL,
-        Village.WELL_X - WORLD_TILE / 2f,
-        Village.WELL_Y - WORLD_TILE,
-        WORLD_TILE * 1.2f
+        104,
+        Village.WELL_X - WORLD_TILE * 0.6f,
+        Village.WELL_Y - WORLD_TILE * 1.1f,
+        WORLD_TILE * 1.25f
     )
-    // Lamps → fence posts with sign flair
     Village.lamps.forEach { (x, y) ->
-        drawKenneyTile(atlas.town, TownTiles.FENCE_V, x - WORLD_TILE * 0.35f, y - WORLD_TILE, WORLD_TILE * 0.9f)
-        drawKenneyTile(atlas.town, TownTiles.SIGN, x - WORLD_TILE * 0.15f, y - WORLD_TILE * 1.35f, WORLD_TILE * 0.7f)
+        drawKenneyTile(atlas.town, TownTiles.FENCE_V, x - WORLD_TILE * 0.3f, y - WORLD_TILE, WORLD_TILE)
+        drawKenneyTile(atlas.town, 83, x - WORLD_TILE * 0.15f, y - WORLD_TILE * 1.4f, WORLD_TILE * 0.75f)
     }
-    // Market stalls
     Village.stalls.forEach { (x, y, _) ->
-        drawKenneyTile(atlas.town, TownTiles.ROOF_RED_M, x - WORLD_TILE, y - WORLD_TILE * 1.6f, WORLD_TILE)
-        drawKenneyTile(atlas.town, TownTiles.ROOF_RED_M, x, y - WORLD_TILE * 1.6f, WORLD_TILE)
-        drawKenneyTile(atlas.town, TownTiles.CRATE, x - WORLD_TILE * 0.7f, y - WORLD_TILE, WORLD_TILE)
-        drawKenneyTile(atlas.town, TownTiles.BARREL, x + WORLD_TILE * 0.2f, y - WORLD_TILE, WORLD_TILE)
+        drawKenneyTile(atlas.town, TownTiles.ROOF_RED_M, x - WORLD_TILE, y - WORLD_TILE * 1.5f, WORLD_TILE)
+        drawKenneyTile(atlas.town, TownTiles.ROOF_RED_M, x, y - WORLD_TILE * 1.5f, WORLD_TILE)
+        drawKenneyTile(atlas.town, TownTiles.CRATE, x - WORLD_TILE * 0.6f, y - WORLD_TILE, WORLD_TILE)
+        drawKenneyTile(atlas.town, TownTiles.BASKET, x + WORLD_TILE * 0.15f, y - WORLD_TILE, WORLD_TILE)
     }
-    // Mushrooms near home
     val home = Village.of(PlaceId.HOME)
-    drawKenneyTile(atlas.town, TownTiles.MUSHROOM, home.left - WORLD_TILE, home.doorY - WORLD_TILE, WORLD_TILE * 0.85f)
+    drawKenneyTile(atlas.town, TownTiles.MUSHROOM, home.left - WORLD_TILE, home.doorY - WORLD_TILE, WORLD_TILE)
 }

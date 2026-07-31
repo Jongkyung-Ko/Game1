@@ -94,7 +94,8 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         }
 
         Village.places.forEach { p ->
-            val labelWorldY = if (p.id == PlaceId.CHURCH) p.bottom + 2f else p.top - 28f
+            // 컴팩트 집(2~3타일) 지붕 바로 위에 라벨
+            val labelWorldY = p.bottom - WORLD_TILE * 3.4f
             Box(
                 modifier = Modifier
                     .offset {

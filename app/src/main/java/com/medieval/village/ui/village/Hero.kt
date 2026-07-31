@@ -13,8 +13,8 @@ fun DrawScope.drawHero(
     walking: Boolean,
     animTime: Float
 ) {
-    val bob = if (walking) sin(animTime * 14f) * 3f else sin(animTime * 2.4f) * 1.5f
-    val size = WORLD_TILE * 1.35f
+    val bob = if (walking) sin(animTime * 14f) * 4f else sin(animTime * 2.4f) * 2f
+    val size = WORLD_TILE * 2.1f
     drawKenneySprite(
         sheet = atlas.dungeon,
         tileId = DungeonTiles.HERO,

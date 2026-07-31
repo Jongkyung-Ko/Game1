@@ -21,13 +21,13 @@ fun DrawScope.drawMercenary(
         "방패병" -> DungeonTiles.KNIGHT_RED
         else -> DungeonTiles.MAGE
     }
-    val bob = if (walking) sin(animTime * 13f) * 2.5f else sin(animTime * 2.2f + 1f) * 1.2f
+    val bob = if (walking) sin(animTime * 13f) * 3.5f else sin(animTime * 2.2f + 1f) * 1.8f
     drawKenneySprite(
         sheet = atlas.dungeon,
         tileId = tile,
         cx = x,
         footY = y,
-        size = WORLD_TILE * 1.2f,
+        size = WORLD_TILE * 1.9f,
         bob = bob,
         mirrorX = facing == Facing.LEFT,
     )
