@@ -21,11 +21,7 @@ private val StoneDark = Color(0xFF77736B)
 
 fun DrawScope.drawPlace(p: Place) {
     // 바닥 그림자
-    drawOval(
-        Shadow,
-        topLeft = Offset(p.left - 6f, p.bottom - 16f),
-        size = Size(p.w + 12f, 30f)
-    )
+    kOval(Shadow, p.left - 6f, p.bottom - 16f, p.w + 12f, 30f, outline = false)
 
     when (p.style) {
         BuildingStyle.CAVE -> drawCave(p)
@@ -52,73 +48,50 @@ private fun DrawScope.drawHouse(
     stoneWall: Boolean = false
 ) {
     val roof = Color(p.roof)
-    val wall = if (stoneWall) Stone else Color(p.wall)
+    val wall = if (stoneWall) Kenney.WallStone else Color(p.wall)
     val bodyTop = p.top + p.h * 0.40f
     val bodyH = p.bottom - bodyTop
 
-    drawRect(wall, Offset(p.left, bodyTop), Size(p.w, bodyH))
-    // 벽 하단 음영
-    drawRect(
-        Color(0x22000000),
-        Offset(p.left, p.bottom - bodyH * 0.18f),
-        Size(p.w, bodyH * 0.18f)
-    )
+    // Kenney식 두꺼운 외곽선 건물 본체
+    kRect(wall, p.left, bodyTop, p.w, bodyH, stroke = 4f)
+    if (stoneWall) {
+        for (row in 0..3) {
+            val yy = bodyTop + bodyH * (0.18f + row * 0.18f)
+            drawLine(Color(0x33000000), Offset(p.left + 4f, yy), Offset(p.right - 4f, yy), 2f)
+        }
+    } else {
+        kRect(Color(0x22FFFFFF), p.left + 3f, bodyTop + 4f, p.w * 0.18f, bodyH - 8f, outline = false)
+    }
 
-    // 지붕
     val roofPath = Path().apply {
         moveTo(p.left - 14f, bodyTop + 2f)
         lineTo(p.cx, p.top)
         lineTo(p.right + 14f, bodyTop + 2f)
         close()
     }
-    drawPath(roofPath, roof)
-    drawPath(roofPath, Color(0x33000000), style = Stroke(width = 3f))
-    // 지붕 결
-    var ry = p.top + p.h * 0.12f
-    while (ry < bodyTop) {
-        val t = (ry - p.top) / (bodyTop - p.top)
-        val half = (p.w / 2f + 14f) * t
-        drawLine(
-            Color(0x22000000),
-            Offset(p.cx - half, ry),
-            Offset(p.cx + half, ry),
-            strokeWidth = 2f
-        )
-        ry += p.h * 0.09f
-    }
+    kPath(roof, roofPath, stroke = 4.5f)
+
+    val chimX = p.left + p.w * 0.72f
+    kRect(StoneDark, chimX, p.top + p.h * 0.04f, p.w * 0.12f, p.h * 0.28f, stroke = 3f)
+    kRect(Stone, chimX - 2f, p.top + p.h * 0.02f, p.w * 0.12f + 4f, 6f, stroke = 2.5f)
 
     if (twoFloor) {
-        drawRect(Frame, Offset(p.left, bodyTop + bodyH * 0.42f), Size(p.w, 5f))
-        drawRect(Glass, Offset(p.cx - p.w * 0.34f, bodyTop + bodyH * 0.10f), Size(p.w * 0.16f, bodyH * 0.22f))
-        drawRect(Glass, Offset(p.cx + p.w * 0.18f, bodyTop + bodyH * 0.10f), Size(p.w * 0.16f, bodyH * 0.22f))
+        kRect(Frame, p.left, bodyTop + bodyH * 0.42f, p.w, 5f, stroke = 2.5f)
+        drawWarmWindow(p.cx - p.w * 0.34f, bodyTop + bodyH * 0.10f, p.w * 0.16f, bodyH * 0.22f)
+        drawWarmWindow(p.cx + p.w * 0.18f, bodyTop + bodyH * 0.10f, p.w * 0.16f, bodyH * 0.22f)
     }
 
-    // 문
     val doorW = p.w * 0.22f
     val doorH = bodyH * 0.58f
-    drawRoundRect(
-        DoorWood,
-        topLeft = Offset(p.cx - doorW / 2f, p.bottom - doorH),
-        size = Size(doorW, doorH),
-        cornerRadius = CornerRadius(doorW * 0.4f, doorW * 0.4f)
-    )
-    drawRoundRect(
-        DoorDark,
-        topLeft = Offset(p.cx - doorW / 2f, p.bottom - doorH),
-        size = Size(doorW, doorH),
-        cornerRadius = CornerRadius(doorW * 0.4f, doorW * 0.4f),
-        style = Stroke(width = 3f)
-    )
-    drawCircle(Color(0xFFD9A441), 3.2f, Offset(p.cx + doorW * 0.30f, p.bottom - doorH * 0.5f))
+    kRound(DoorWood, p.cx - doorW / 2f, p.bottom - doorH, doorW, doorH, doorW * 0.35f, stroke = 3.5f)
+    drawLine(DoorDark, Offset(p.cx, p.bottom - doorH + 4f), Offset(p.cx, p.bottom - 4f), 2.5f)
+    kCircle(Color(0xFFD9A441), 3.2f, Offset(p.cx + doorW * 0.30f, p.bottom - doorH * 0.5f), stroke = 2f)
 
-    // 창문
     val winY = p.bottom - bodyH * 0.55f
     val winW = p.w * 0.15f
     val winH = bodyH * 0.26f
     listOf(p.cx - p.w * 0.32f, p.cx + p.w * 0.17f).forEach { wx ->
-        drawRect(Glass, Offset(wx, winY), Size(winW, winH))
-        drawRect(Frame, Offset(wx, winY), Size(winW, winH), style = Stroke(width = 2.5f))
-        drawLine(Frame, Offset(wx + winW / 2f, winY), Offset(wx + winW / 2f, winY + winH), strokeWidth = 2f)
+        drawWarmWindow(wx, winY, winW, winH)
     }
 
     if (awning) {
@@ -128,9 +101,16 @@ private fun DrawScope.drawHouse(
         val stripes = 6
         for (i in 0 until stripes) {
             val c = if (i % 2 == 0) Color(0xFFD8503F) else Color(0xFFF2E4C6)
-            drawRect(c, Offset(ax + aw / stripes * i, ay), Size(aw / stripes, p.h * 0.11f))
+            kRect(c, ax + aw / stripes * i, ay, aw / stripes, p.h * 0.11f, stroke = 2.5f)
         }
     }
+}
+
+private fun DrawScope.drawWarmWindow(x: Float, y: Float, w: Float, h: Float) {
+    kRect(Color(0x33F7D46A), x - 3f, y - 3f, w + 6f, h + 6f, outline = false)
+    kRect(Glass, x, y, w, h, stroke = 3f)
+    drawLine(Frame, Offset(x + w / 2f, y), Offset(x + w / 2f, y + h), strokeWidth = 2.5f)
+    drawLine(Frame, Offset(x, y + h / 2f), Offset(x + w, y + h / 2f), strokeWidth = 2.5f)
 }
 
 /** 교회: 첨탑 + 십자가 + 아치창 */
@@ -295,9 +275,12 @@ private fun DrawScope.drawCave(p: Place) {
     )
     drawRect(Color(0xFF15110E), Offset(p.cx - mw / 2f, p.bottom - mh + mw / 2f), Size(mw, mh - mw / 2f))
 
-    // 횃불 두 개
+    // 이끼와 횃불
+    drawCircle(Color(0x664E6B3A), p.w * 0.08f, Offset(p.left + p.w * 0.18f, p.cy))
+    drawCircle(Color(0x554E6B3A), p.w * 0.06f, Offset(p.right - p.w * 0.16f, p.cy + 10f))
     listOf(p.cx - mw * 0.85f, p.cx + mw * 0.85f).forEach { tx ->
         drawRect(DoorWood, Offset(tx - 3f, p.bottom - p.h * 0.34f), Size(6f, p.h * 0.30f))
+        drawCircle(Color(0x55E8843A), 16f, Offset(tx, p.bottom - p.h * 0.36f))
         drawCircle(Color(0xFFE8843A), 9f, Offset(tx, p.bottom - p.h * 0.36f))
         drawCircle(Color(0xFFF9DE85), 4.5f, Offset(tx, p.bottom - p.h * 0.37f))
     }

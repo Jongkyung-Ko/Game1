@@ -39,16 +39,18 @@ import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
-import com.medieval.village.ui.village.drawHero
+import com.medieval.village.ui.village.drawCustomHero
 import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.rememberCustomArt
 import kotlin.math.hypot
 import kotlin.math.min
 
 @Composable
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
+    val art = rememberCustomArt()
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
         Text(
-            text = "PUB · 황금 수사슴",
+            text = "PUB · 신성한 잔 선술집",
             color = Palette.Gold,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
@@ -68,6 +70,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val scale = min(widthPx / PubNpcCatalog.WORLD_W, heightPx / PubNpcCatalog.WORLD_H)
             val offsetX = (widthPx - PubNpcCatalog.WORLD_W * scale) / 2f
             val offsetY = (heightPx - PubNpcCatalog.WORLD_H * scale) / 2f
+            val facing = vm.facing
 
             Canvas(
                 modifier = Modifier
@@ -93,15 +96,14 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                     vm.activeParty.forEachIndexed { index, mercenary ->
                         drawMercenary(
+                            art,
                             mercenary,
                             vm.pubHeroX + if (index == 0) -58f else 58f,
                             vm.pubHeroY + 45f + index * 8f,
-                            vm.facing,
-                            vm.pubWalking,
-                            vm.walkPhase + index
+                            facing,
                         )
                     }
-                    drawHero(vm.pubHeroX, vm.pubHeroY, vm.facing, vm.pubWalking, vm.walkPhase)
+                    drawCustomHero(art, vm.pubHeroX, vm.pubHeroY, facing, worldHeight = 90f)
                 }
             }
         }

@@ -1,0 +1,7 @@
+Kenney asset packs used in this game (CC0 / Public Domain)
+https://kenney.nl
+
+- Tiny Town (tilemap) — village terrain, buildings, trees, props
+- Tiny Dungeon (tilemap) — characters, NPCs, creatures, interior tiles
+
+Support Kenney: https://kenney.nl/donate

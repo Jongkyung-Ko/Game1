@@ -2,6 +2,7 @@ package com.medieval.village.ui.place
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,11 +26,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.EQUIP_SLOTS
+import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.Item
 import com.medieval.village.model.ItemCatalog
 import com.medieval.village.model.MercenaryCatalog
@@ -43,6 +46,9 @@ import com.medieval.village.ui.SectionTitle
 import com.medieval.village.ui.ThinDivider
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.village.rememberCustomArt
+import com.medieval.village.ui.village.rememberKenneyAtlas
+import kotlin.math.hypot
 
 @Composable
 fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
@@ -50,20 +56,59 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         PubScreen(vm = vm, modifier = modifier)
         return
     }
+    if (id == PlaceId.DUNGEON) {
+        DungeonScreen(vm = vm, modifier = modifier)
+        return
+    }
     val place = Village.of(id)
+    val atlas = rememberKenneyAtlas()
+    val art = rememberCustomArt()
+    val animTime = vm.animTime
+    val speechId = vm.interiorSpeakerId
+    val speechText = vm.interiorSpeech
+    val npcs = remember(id) { InteriorNpcCatalog.forPlace(id) }
 
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
 
-        // 배경 일러스트
+        // 배경 일러스트 (주인공·용병·실내 NPC + 말풍선)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(168.dp)
+                .height(200.dp)
                 .padding(8.dp)
                 .clip(RoundedCornerShape(12.dp))
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawInterior(id, size.width, size.height, vm.activeParty)
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(npcs) {
+                        detectTapGestures { tap ->
+                            val hit = npcs.minByOrNull { npc ->
+                                hypot(tap.x - size.width * npc.fx, tap.y - size.height * npc.fy)
+                            }
+                            if (hit != null) {
+                                val dist = hypot(
+                                    tap.x - size.width * hit.fx,
+                                    tap.y - size.height * hit.fy
+                                )
+                                if (dist < minOf(size.width, size.height) * 0.18f) {
+                                    vm.talkToInteriorNpc(hit.id)
+                                }
+                            }
+                        }
+                    }
+            ) {
+                drawInterior(
+                    atlas = atlas,
+                    art = art,
+                    id = id,
+                    w = size.width,
+                    h = size.height,
+                    companions = vm.activeParty,
+                    animTime = animTime,
+                    speechNpcId = speechId,
+                    speechText = speechText,
+                )
             }
             Box(
                 modifier = Modifier
@@ -74,7 +119,11 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
             ) {
                 Column {
                     Text(place.name, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                    Text(place.subtitle, color = Palette.ParchmentDim, fontSize = 10.sp)
+                    Text(
+                        if (npcs.isEmpty()) place.subtitle else "NPC를 탭하면 인사한다 · ${place.subtitle}",
+                        color = Palette.ParchmentDim,
+                        fontSize = 10.sp
+                    )
                 }
             }
         }
@@ -96,7 +145,7 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
                 PlaceId.INN -> InnActions(vm)
                 PlaceId.PUB -> Unit
                 PlaceId.ARENA -> ArenaActions(vm)
-                PlaceId.DUNGEON -> DungeonActions(vm)
+                PlaceId.DUNGEON -> Unit
                 PlaceId.BLACKSMITH -> BlacksmithActions(vm)
                 PlaceId.MAGIC_SCHOOL -> MagicSchoolActions(vm)
                 PlaceId.MERCENARY -> MercenaryActions(vm)
@@ -120,9 +169,9 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
 
 @Composable
 private fun ColumnScope.HomeActions(vm: GameViewModel) {
-    SectionTitle("나의 오두막")
+    SectionTitle("풍요의 마을 오두막")
     Text(
-        "침대와 벽난로뿐인 작은 집. 여기서 하루를 마무리할 수 있다.",
+        "신성한 포도주의 향기가 희미한 작은 집. 저주가 스며든 밤에도 여기서 하루를 마무리할 수 있다.",
         color = Palette.ParchmentDim, fontSize = 12.sp
     )
     Spacer(Modifier.height(8.dp))
@@ -196,27 +245,27 @@ private fun ColumnScope.ShopActions(vm: GameViewModel, goods: List<Item>, title:
 
 @Composable
 private fun ColumnScope.HospitalActions(vm: GameViewModel) {
-    SectionTitle("치유의 집")
+    SectionTitle("오염 상처를 돌보는 집")
     val cost = vm.hospitalHealCost()
-    ListRow("상처 치료", if (cost == 0) "지금은 건강하다." else "HP를 모두 회복한다. 비용 ${cost}G") {
+    ListRow("상처 치료", if (cost == 0) "지금은 건강하다." else "좀비의 생채기와 타박을 치료한다. 비용 ${cost}G") {
         WoodButton("치료", enabled = cost > 0 && vm.player.gold >= cost, highlight = cost > 0) {
             vm.hospitalHeal()
         }
     }
     ThinDivider()
-    ListRow("영양제 처방", "최대 HP가 6 늘어난다. 비용 150G") {
+    ListRow("해독 영양제", "최대 HP가 6 늘어난다. 좀비석 잔향에 버티는 몸을 만든다. 150G") {
         WoodButton("복용", enabled = vm.player.gold >= 150) { vm.hospitalTonic() }
     }
 }
 
 @Composable
 private fun ColumnScope.ChurchActions(vm: GameViewModel) {
-    SectionTitle("빛의 신전")
-    ListRow("기도하기", "무료. MP를 회복하고 드물게 행운이 오른다.") {
+    SectionTitle("저주를 씻는 신전")
+    ListRow("기도하기", "무료. 좀비석 기운을 밀어내며 MP를 회복한다.") {
         WoodButton("기도", highlight = true) { vm.pray() }
     }
     ThinDivider()
-    ListRow("헌금하기", "100G. 3일간 축복을 받아 전투에서 유리해진다.") {
+    ListRow("헌금하기", "100G. 3일간 축복을 받아 좀비와의 싸움에서 유리해진다.") {
         WoodButton("100G 헌금", enabled = vm.player.gold >= 100) { vm.donate(100) }
     }
     Spacer(Modifier.height(8.dp))
@@ -227,63 +276,35 @@ private fun ColumnScope.ChurchActions(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.InnActions(vm: GameViewModel) {
-    SectionTitle("여관 · 잠든 곰")
-    ListRow("숙박하기", "60G. HP·MP를 모두 회복하고 하루가 지난다.") {
+    SectionTitle("여관 · 잠든 포도송이")
+    ListRow("숙박하기", "60G. HP·MP를 모두 회복하고 하루가 지난다. 문은 꼭 잠근다.") {
         WoodButton("60G 숙박", enabled = vm.player.gold >= 60, highlight = true) { vm.stayAtInn() }
     }
     ThinDivider()
-    ListRow("소문 듣기", "무료. 마을 사람들의 이야기를 들어본다.") {
+    ListRow("소문 듣기", "무료. 좀비석과 영주, 지하 비극에 대한 이야기를 듣는다.") {
         WoodButton("듣기") { vm.listenRumor() }
     }
 }
 
 @Composable
 private fun ColumnScope.ArenaActions(vm: GameViewModel) {
-    SectionTitle("무인들의 터")
+    SectionTitle("지상의 칼날 연마터")
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Chip("${vm.arenaWins}승 ${vm.arenaLosses}패", Palette.WoodLight)
         Chip("공격 ${vm.totalAtk}", Palette.Blood)
         Chip("방어 ${vm.totalDef}", Palette.Sky)
     }
     Spacer(Modifier.height(8.dp))
-    ListRow("대련 신청", "실력이 비슷한 상대와 겨룬다. 이기면 경험치와 상금.") {
+    ListRow("대련 신청", "지하에 들어가기 전, 비슷한 상대와 겨룬다.") {
         WoodButton("대련", highlight = true) { vm.spar() }
     }
 }
 
 @Composable
-private fun ColumnScope.DungeonActions(vm: GameViewModel) {
-    SectionTitle("잊혀진 지하")
-    Text(
-        "축축한 계단이 어둠 속으로 이어진다. 깊이 내려갈수록 위험하지만 보상도 커진다.",
-        color = Palette.ParchmentDim, fontSize = 12.sp
-    )
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip("최고 기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
-        Chip("활성 동료 ${vm.activeParty.size}명", Palette.Moss)
-    }
-    Spacer(Modifier.height(10.dp))
-    ListRow(
-        "지하 ${vm.player.dungeonDepth + 1}층 탐험",
-        "몬스터와 싸우고 전리품을 얻는다."
-    ) {
-        WoodButton("내려가기", highlight = true) { vm.exploreDungeon() }
-    }
-    ThinDivider()
-    val potion = vm.inventory.toList().firstOrNull { it.item.healHp > 0 }
-    if (potion != null) {
-        ListRow("${potion.item.name} x${potion.count}", "지금 마셔 체력을 회복한다.") {
-            WoodButton("마시기") { vm.useItem(potion.item) }
-        }
-    }
-}
-
-@Composable
 private fun ColumnScope.BlacksmithActions(vm: GameViewModel) {
-    SectionTitle("불꽃의 모루")
+    SectionTitle("좀비 이빨을 부수는 모루")
     Text(
-        "착용 중인 장비를 강화한다. 단계가 오를수록 비용이 늘고 실패할 수도 있다.",
+        "착용 장비를 강화한다. 좀비 둥지에서는 무딘 칼이 곧 죽음이다.",
         color = Palette.ParchmentDim, fontSize = 12.sp
     )
     Spacer(Modifier.height(8.dp))
@@ -308,13 +329,18 @@ private fun ColumnScope.BlacksmithActions(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.MagicSchoolActions(vm: GameViewModel) {
-    SectionTitle("아르카나 학당")
-    ListRow("고서 연구", "지능을 1 올린다. 비용 ${60 + vm.player.intel * 12}G") {
+    SectionTitle("해독 연금 학당")
+    Text(
+        "영주의 욕망이 부른 비극 이후, 학당은 좀비석 해독과 정화 연구에 매달린다.",
+        color = Palette.ParchmentDim, fontSize = 12.sp
+    )
+    Spacer(Modifier.height(8.dp))
+    ListRow("해독 고서 연구", "지능을 1 올린다. 비용 ${60 + vm.player.intel * 12}G") {
         WoodButton("연구", enabled = vm.player.gold >= 60 + vm.player.intel * 12) { vm.study() }
     }
     Spacer(Modifier.height(10.dp))
     ThinDivider()
-    SectionTitle("마법 수업")
+    SectionTitle("정화 마법 수업")
     SkillCatalog.all.forEach { skill ->
         val owned = vm.skills.any { it.id == skill.id }
         ListRow(
@@ -333,8 +359,8 @@ private fun ColumnScope.MagicSchoolActions(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
-    SectionTitle("떠돌이 칼잡이")
-    Text("용병은 여러 명 고용할 수 있고, Status에서 최대 2명을 원정대로 선택한다.", color = Palette.ParchmentDim, fontSize = 12.sp)
+    SectionTitle("좀비 사냥 용병")
+    Text("용병은 여러 명 고용할 수 있고, Status에서 최대 2명을 원정대로 선택한다. 좀비 둥지 전투력에 반영된다.", color = Palette.ParchmentDim, fontSize = 12.sp)
     Spacer(Modifier.height(8.dp))
 
     if (vm.party.isNotEmpty()) {

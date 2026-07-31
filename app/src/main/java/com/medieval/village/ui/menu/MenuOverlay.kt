@@ -143,7 +143,7 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     Spacer(Modifier.height(10.dp))
     SectionTitle("기록")
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip("던전 최고 ${p.dungeonDepth}층")
+        Chip("좀비 둥지 ${p.dungeonDepth}층")
         Chip("대련 ${vm.arenaWins}승 ${vm.arenaLosses}패")
         Chip(if (p.blessing > 0) "축복 ${p.blessing}일 남음" else "축복 없음")
     }
@@ -179,7 +179,7 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
             }
         }
         Text(
-            "선택한 최대 2명만 마을·장소 화면에 함께 나오고 던전 전투에 참여합니다.",
+            "선택한 최대 2명만 마을·장소 화면에 함께 나오고 좀비 둥지 전투에 참여합니다.",
             color = Palette.ParchmentDim,
             fontSize = 11.sp,
             modifier = Modifier.padding(top = 5.dp)

@@ -57,9 +57,9 @@ data class Mercenary(
 
 object MercenaryCatalog {
     val all = listOf(
-        Mercenary("bern", "베른", "검사", 250, 10, "묵묵히 앞장서는 베테랑 검사."),
-        Mercenary("lyra", "리라", "궁수", 320, 13, "백발백중의 사냥꾼."),
-        Mercenary("gorm", "고름", "방패병", 400, 16, "산더미 같은 체격의 방패병."),
-        Mercenary("sela", "셀라", "마법사", 560, 22, "마법학교를 갓 졸업한 재원.")
+        Mercenary("bern", "베른", "전사", 250, 12, "방패와 검으로 앞장서는 베테랑 전사."),
+        Mercenary("shade", "셰이드", "도적", 320, 14, "그림자처럼 파고드는 쌍단검 도적."),
+        Mercenary("elara", "엘라라", "성기사", 420, 18, "태양의 방패를 든 성기사."),
+        Mercenary("aldric", "알드릭", "마법사", 560, 22, "해독과 화염을 다루는 노련한 마법사.")
     )
 }
