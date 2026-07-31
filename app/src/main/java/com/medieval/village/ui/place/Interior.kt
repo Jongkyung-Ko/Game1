@@ -15,10 +15,11 @@ import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InteriorNpcKind
 import com.medieval.village.model.Mercenary
 import com.medieval.village.model.PlaceId
+import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.TownTiles
-import com.medieval.village.ui.village.drawHero
+import com.medieval.village.ui.village.drawCustomHero
 import com.medieval.village.ui.village.drawKenneySpriteAsset
 import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.drawMercenary
@@ -26,6 +27,7 @@ import kotlin.math.sin
 
 fun DrawScope.drawInterior(
     atlas: KenneyAtlas,
+    art: CustomArt,
     id: PlaceId,
     w: Float,
     h: Float,
@@ -58,7 +60,7 @@ fun DrawScope.drawInterior(
             Facing.RIGHT, false, animTime + index * 0.35f
         )
     }
-    drawHero(atlas, w * 0.18f, h * 0.90f, Facing.RIGHT, false, animTime)
+    drawCustomHero(art, w * 0.18f, h * 0.90f, Facing.RIGHT, worldHeight = h * 0.55f)
 }
 
 private fun npcSprite(npc: InteriorNpc): String = when (npc.kind) {

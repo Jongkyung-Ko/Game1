@@ -39,8 +39,9 @@ import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
-import com.medieval.village.ui.village.drawHero
+import com.medieval.village.ui.village.drawCustomHero
 import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.rememberCustomArt
 import com.medieval.village.ui.village.rememberKenneyAtlas
 import kotlin.math.hypot
 import kotlin.math.min
@@ -48,6 +49,7 @@ import kotlin.math.min
 @Composable
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     val atlas = rememberKenneyAtlas()
+    val art = rememberCustomArt()
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
         Text(
             text = "PUB · 신성한 잔 선술집",
@@ -107,7 +109,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             animTime + index * 0.35f
                         )
                     }
-                    drawHero(atlas, vm.pubHeroX, vm.pubHeroY, facing, pubWalking, animTime)
+                    drawCustomHero(art, vm.pubHeroX, vm.pubHeroY, facing, worldHeight = 90f)
                 }
             }
         }

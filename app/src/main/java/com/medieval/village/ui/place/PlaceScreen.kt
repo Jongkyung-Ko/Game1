@@ -46,6 +46,7 @@ import com.medieval.village.ui.SectionTitle
 import com.medieval.village.ui.ThinDivider
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.village.rememberCustomArt
 import com.medieval.village.ui.village.rememberKenneyAtlas
 import kotlin.math.hypot
 
@@ -61,6 +62,7 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
     }
     val place = Village.of(id)
     val atlas = rememberKenneyAtlas()
+    val art = rememberCustomArt()
     val animTime = vm.animTime
     val speechId = vm.interiorSpeakerId
     val speechText = vm.interiorSpeech
@@ -98,6 +100,7 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
             ) {
                 drawInterior(
                     atlas = atlas,
+                    art = art,
                     id = id,
                     w = size.width,
                     h = size.height,

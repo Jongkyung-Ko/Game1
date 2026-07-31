@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -27,7 +28,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
-import com.medieval.village.model.PlaceId
 import com.medieval.village.model.Village
 import com.medieval.village.ui.theme.Palette
 import kotlin.math.hypot
@@ -36,15 +36,15 @@ import kotlin.math.roundToInt
 
 @Composable
 fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
-    val atlas = rememberKenneyAtlas()
-    BoxWithConstraints(modifier.background(Color(0xFF3D6B2E))) {
+    val kenney = rememberKenneyAtlas()
+    val art = rememberCustomArt()
+    BoxWithConstraints(modifier.background(Color(0xFF1A140E))) {
         val density = LocalDensity.current
         val wPx = with(density) { maxWidth.toPx() }
         val hPx = with(density) { maxHeight.toPx() }
         val s = min(wPx / Village.W, hPx / Village.H)
         val ox = (wPx - Village.W * s) / 2f
         val oy = (hPx - Village.H * s) / 2f
-        val animTime = vm.animTime
         val heroX = vm.heroX
         val heroY = vm.heroY
         val facing = vm.facing
@@ -59,53 +59,59 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         val wx = (tap.x - ox) / s
                         val wy = (tap.y - oy) / s
                         val hit = Village.places.firstOrNull { p ->
-                            wx >= p.left - 12f && wx <= p.right + 12f &&
-                                wy >= p.top - 20f && wy <= p.doorY + 16f
+                            wx >= p.left - 16f && wx <= p.right + 16f &&
+                                wy >= p.top - 24f && wy <= p.doorY + 20f
                         }
                         if (hit != null) vm.goToPlace(hit) else vm.walkTo(wx, wy)
                     }
                 }
         ) {
-            // Letterbox
-            drawRect(Color(0xFF2A4A22), size = size)
+            drawRect(Color(0xFF120E0A), size = size)
             withTransform({
                 translate(ox, oy)
                 scale(s, s, Offset.Zero)
             }) {
-                // Real Kenney Tiny Town tilemap (Option A)
-                drawVillageTilemap(atlas)
-                drawKenneyScenery(atlas)
-                Village.places.sortedBy { it.bottom }.forEach { drawKenneyPlace(atlas, it) }
-                drawVillageLife(atlas, animTime)
+                // 직접 그린 마을 일러스트 (Style B)
+                drawCustomVillageMap(art)
+
+                // 건물 핫스팟 힌트 (얇은 테두리)
+                Village.places.forEach { p ->
+                    drawRoundRect(
+                        color = Color(0x55FFF3C4),
+                        topLeft = Offset(p.left, p.top),
+                        size = androidx.compose.ui.geometry.Size(p.w, p.h),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(10f, 10f),
+                        style = Stroke(width = 2f)
+                    )
+                }
+
                 party.forEachIndexed { index, mercenary ->
                     val side = if (index == 0) -1f else 1f
                     drawMercenary(
-                        atlas = atlas,
+                        atlas = kenney,
                         mercenary = mercenary,
-                        x = heroX + side * 44f,
-                        y = heroY + 36f + index * 10f,
+                        x = heroX + side * 28f,
+                        y = heroY + 18f + index * 8f,
                         facing = facing,
-                        walking = walking,
-                        animTime = animTime + index * 0.4f
+                        walking = false,
+                        animTime = 0f
                     )
                 }
-                drawHero(atlas, heroX, heroY, facing, walking, animTime)
+                // 걷기 프레임 없이 방향별 정지 스프라이트만
+                drawCustomHero(art, heroX, heroY, facing, worldHeight = 78f)
             }
         }
 
         Village.places.forEach { p ->
-            val hTiles = BuildingRecipes.heightTiles(p.style, p.id)
-            val labelWorldY = p.bottom - WORLD_TILE * (hTiles + 0.35f)
-            val labelW = BuildingRecipes.widthTiles(p.style, p.id) * WORLD_TILE
             Box(
                 modifier = Modifier
                     .offset {
                         IntOffset(
-                            (ox + (p.cx - labelW / 2f) * s).roundToInt(),
-                            (oy + labelWorldY * s).roundToInt()
+                            (ox + p.left * s).roundToInt(),
+                            (oy + (p.top - 18f) * s).roundToInt()
                         )
                     }
-                    .width(with(density) { (labelW * s).toDp() }),
+                    .width(with(density) { (p.w * s).toDp() }),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
@@ -125,10 +131,9 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // 설치 확인용 — 구 APK와 구분
         Text(
-            text = "Style A · Kenney v5",
-            color = Color(0xFFE8F5C8),
+            text = "Style B · Custom v6",
+            color = Color(0xFFFFE29A),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
@@ -139,9 +144,9 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         )
 
         val near = Village.places.firstOrNull {
-            hypot(vm.heroX - it.doorX, vm.heroY - it.doorY) < 42f
+            hypot(vm.heroX - it.doorX, vm.heroY - it.doorY) < 48f
         }
-        if (near != null && !vm.walking) {
+        if (near != null && !walking) {
             Button(
                 onClick = { vm.enterPlace(near.id) },
                 colors = ButtonDefaults.buttonColors(
