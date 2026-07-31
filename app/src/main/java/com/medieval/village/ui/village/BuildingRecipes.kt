@@ -14,7 +14,6 @@ object BuildingRecipes {
     fun tiles(style: BuildingStyle, id: PlaceId): Array<Array<Int?>> = when (style) {
         BuildingStyle.CHURCH -> arrayOf(
             arrayOf(48, 49, 50, 51),
-            arrayOf(60, 61, 62, 61),
             arrayOf(76, 84, 85, 76),
         )
         BuildingStyle.TOWER -> arrayOf(
