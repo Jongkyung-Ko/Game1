@@ -316,18 +316,10 @@ class GameViewModel : ViewModel() {
         pendingEnter = place.id
     }
 
-    /** 마을 길(중앙 대로)을 경유하는 ㄱ자 경로를 만든다. */
+    /** 오크헤이븐 일러스트 맵에서는 목표점까지 직선으로 이동한다. */
     private fun buildPath(tx: Float, ty: Float) {
         path.clear()
-        val sameRow = abs(heroY - ty) < 2f
-        val onMainRoad = abs(heroX - Village.ROAD_X) < 2f && abs(tx - Village.ROAD_X) < 2f
-        if (sameRow || onMainRoad) {
-            path.addLast(Waypoint(tx, ty))
-        } else {
-            path.addLast(Waypoint(Village.ROAD_X, heroY))
-            path.addLast(Waypoint(Village.ROAD_X, ty))
-            path.addLast(Waypoint(tx, ty))
-        }
+        path.addLast(Waypoint(tx, ty))
     }
 
     // ---------------------------------------------------------------- 장소 출입

@@ -70,17 +70,17 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 translate(ox, oy)
                 scale(s, s, Offset.Zero)
             }) {
-                // 직접 그린 마을 일러스트 (Style B)
+                // 오크헤이븐 마을 일러스트
                 drawCustomVillageMap(art)
 
                 // 건물 핫스팟 힌트 (얇은 테두리)
                 Village.places.forEach { p ->
                     drawRoundRect(
-                        color = Color(0x55FFF3C4),
+                        color = Color(0x44FFE29A),
                         topLeft = Offset(p.left, p.top),
                         size = androidx.compose.ui.geometry.Size(p.w, p.h),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(10f, 10f),
-                        style = Stroke(width = 2f)
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f),
+                        style = Stroke(width = 2.5f)
                     )
                 }
 
@@ -94,7 +94,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         facing = facing,
                     )
                 }
-                drawCustomHero(art, heroX, heroY, facing, worldHeight = 78f)
+                drawCustomHero(art, heroX, heroY, facing, worldHeight = 96f)
             }
         }
 
@@ -128,7 +128,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = "Style B · Roster v8",
+            text = "Oakhaven · v9",
             color = Color(0xFFFFE29A),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
