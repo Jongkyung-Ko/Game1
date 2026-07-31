@@ -31,47 +31,54 @@ class GameAudioEngine(context: Context) {
     private var released = false
     private var walking = false
 
-    private val soundPool: SoundPool = SoundPool.Builder()
-        .setMaxStreams(4)
-        .setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_GAME)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build()
-        )
-        .build()
+    private val soundPool: SoundPool? = runCatching {
+        SoundPool.Builder()
+            .setMaxStreams(4)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_GAME)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            .build()
+    }.getOrNull()
 
-    private val sfxIds = mapOf(
-        Sfx.HIT to soundPool.load(appContext, R.raw.sfx_hit, 1),
-        Sfx.DOOR to soundPool.load(appContext, R.raw.sfx_door, 1),
-        Sfx.CLICK to soundPool.load(appContext, R.raw.sfx_click, 1)
-    )
+    private val sfxIds: Map<Sfx, Int> = soundPool?.let { pool ->
+        mapOf(
+            Sfx.HIT to pool.load(appContext, R.raw.sfx_hit, 1),
+            Sfx.DOOR to pool.load(appContext, R.raw.sfx_door, 1),
+            Sfx.CLICK to pool.load(appContext, R.raw.sfx_click, 1)
+        )
+    } ?: emptyMap()
 
     fun playMusic(mood: MusicMood) {
         if (released || mood == currentMood) return
         currentMood = mood
-        musicPlayer?.release()
+        runCatching { musicPlayer?.release() }
+        musicPlayer = null
         val resId = when (mood) {
             MusicMood.VILLAGE -> R.raw.bgm_village
             MusicMood.COZY -> R.raw.bgm_cozy
             MusicMood.TENSE -> R.raw.bgm_dungeon
         }
-        musicPlayer = MediaPlayer.create(appContext, resId)?.apply {
-            isLooping = true
-            setVolume(
-                when (mood) {
-                    MusicMood.TENSE -> 0.42f
-                    MusicMood.COZY -> 0.34f
-                    MusicMood.VILLAGE -> 0.36f
-                },
-                when (mood) {
-                    MusicMood.TENSE -> 0.42f
-                    MusicMood.COZY -> 0.34f
-                    MusicMood.VILLAGE -> 0.36f
-                }
-            )
-            start()
-        }
+        musicPlayer = runCatching {
+            MediaPlayer.create(appContext, resId)?.apply {
+                isLooping = true
+                setVolume(
+                    when (mood) {
+                        MusicMood.TENSE -> 0.42f
+                        MusicMood.COZY -> 0.34f
+                        MusicMood.VILLAGE -> 0.36f
+                    },
+                    when (mood) {
+                        MusicMood.TENSE -> 0.42f
+                        MusicMood.COZY -> 0.34f
+                        MusicMood.VILLAGE -> 0.36f
+                    }
+                )
+                start()
+            }
+        }.getOrNull()
     }
 
     fun setWalking(walking: Boolean) {
@@ -82,10 +89,12 @@ class GameAudioEngine(context: Context) {
             return
         }
         if (footstepPlayer == null) {
-            footstepPlayer = MediaPlayer.create(appContext, R.raw.sfx_footstep)?.apply {
-                isLooping = true
-                setVolume(0.55f, 0.55f)
-            }
+            footstepPlayer = runCatching {
+                MediaPlayer.create(appContext, R.raw.sfx_footstep)?.apply {
+                    isLooping = true
+                    setVolume(0.55f, 0.55f)
+                }
+            }.getOrNull()
         }
         if (footstepPlayer?.isPlaying != true) {
             runCatching { footstepPlayer?.start() }
@@ -94,8 +103,9 @@ class GameAudioEngine(context: Context) {
 
     fun playSfx(sfx: Sfx) {
         if (released) return
+        val pool = soundPool ?: return
         val id = sfxIds[sfx] ?: return
-        soundPool.play(id, 0.7f, 0.7f, 1, 0, 1f)
+        runCatching { pool.play(id, 0.7f, 0.7f, 1, 0, 1f) }
     }
 
     fun pause() {
@@ -111,10 +121,10 @@ class GameAudioEngine(context: Context) {
 
     fun release() {
         released = true
-        musicPlayer?.release()
-        footstepPlayer?.release()
+        runCatching { musicPlayer?.release() }
+        runCatching { footstepPlayer?.release() }
         musicPlayer = null
         footstepPlayer = null
-        soundPool.release()
+        runCatching { soundPool?.release() }
     }
 }

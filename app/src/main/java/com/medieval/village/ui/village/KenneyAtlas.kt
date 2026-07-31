@@ -44,22 +44,31 @@ class KenneyAtlas(
             "critter_a", "critter_b", "critter_c",
         )
 
+        @Volatile
+        private var cached: KenneyAtlas? = null
+
         fun load(context: Context): KenneyAtlas {
-            fun loadAsset(path: String): ImageBitmap {
-                context.assets.open(path).use { stream ->
-                    val bmp = BitmapFactory.decodeStream(stream)
+            cached?.let { return it }
+            synchronized(this) {
+                cached?.let { return it }
+                val app = context.applicationContext
+                fun loadAsset(path: String): ImageBitmap {
+                    val bytes = app.assets.open(path).use { it.readBytes() }
+                    val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                         ?: error("Failed to decode $path")
                     return bmp.asImageBitmap()
                 }
+                val sprites = SPRITE_NAMES.associateWith { name ->
+                    loadAsset("kenney/sprites/$name.png")
+                }
+                val atlas = KenneyAtlas(
+                    town = loadAsset("kenney/tiny_town.png"),
+                    dungeon = loadAsset("kenney/tiny_dungeon.png"),
+                    sprites = sprites,
+                )
+                cached = atlas
+                return atlas
             }
-            val sprites = SPRITE_NAMES.associateWith { name ->
-                loadAsset("kenney/sprites/$name.png")
-            }
-            return KenneyAtlas(
-                town = loadAsset("kenney/tiny_town.png"),
-                dungeon = loadAsset("kenney/tiny_dungeon.png"),
-                sprites = sprites,
-            )
         }
 
         fun buildingSprite(style: BuildingStyle, id: PlaceId): String = when (style) {
