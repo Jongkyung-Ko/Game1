@@ -61,8 +61,31 @@ class CustomArt(
         fun load(context: Context): CustomArt {
             fun loadAsset(path: String): ImageBitmap {
                 context.assets.open(path).use { stream ->
-                    val bmp = BitmapFactory.decodeStream(stream)
+                    val opts = BitmapFactory.Options().apply {
+                        inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+                        inPremultiplied = false
+                    }
+                    val bmp = BitmapFactory.decodeStream(stream, null, opts)
                         ?: error("Failed to decode $path")
+                    bmp.setHasAlpha(true)
+                    // 반투명/잔광 제거: 알파를 0 또는 255로 고정하고 밝은 가장자리 픽셀 제거
+                    val w = bmp.width
+                    val h = bmp.height
+                    val px = IntArray(w * h)
+                    bmp.getPixels(px, 0, w, 0, 0, w, h)
+                    for (i in px.indices) {
+                        val c = px[i]
+                        val a = c ushr 24
+                        val r = (c shr 16) and 0xFF
+                        val g = (c shr 8) and 0xFF
+                        val b = c and 0xFF
+                        val nearWhite = r >= 236 && g >= 236 && b >= 236
+                        px[i] = when {
+                            a < 16 || nearWhite -> c and 0x00FFFFFF
+                            else -> c or 0xFF000000.toInt()
+                        }
+                    }
+                    bmp.setPixels(px, 0, w, 0, 0, w, h)
                     return bmp.asImageBitmap()
                 }
             }
@@ -117,6 +140,7 @@ fun DrawScope.drawCustomSprite(
                     srcSize = IntSize(image.width, image.height),
                     dstOffset = IntOffset.Zero,
                     dstSize = IntSize(dw, dh),
+                    alpha = 1f,
                     filterQuality = FilterQuality.None,
                 )
             }
@@ -128,6 +152,7 @@ fun DrawScope.drawCustomSprite(
             srcSize = IntSize(image.width, image.height),
             dstOffset = IntOffset(left.roundToInt(), top.roundToInt()),
             dstSize = IntSize(dw, dh),
+            alpha = 1f,
             filterQuality = FilterQuality.None,
         )
     }

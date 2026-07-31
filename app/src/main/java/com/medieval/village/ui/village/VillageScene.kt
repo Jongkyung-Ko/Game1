@@ -128,7 +128,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = "Style B · Roster v7",
+            text = "Style B · Roster v8",
             color = Color(0xFFFFE29A),
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
