@@ -48,6 +48,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         val heroY = vm.heroY
         val facing = vm.facing
         val walking = vm.walking
+        val walkPhase = vm.walkPhase
         val party = vm.activeParty
 
         Canvas(
@@ -87,14 +88,17 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 party.forEachIndexed { index, mercenary ->
                     val side = if (index == 0) -1f else 1f
                     drawMercenary(
-                        art = art,
                         mercenary = mercenary,
                         x = heroX + side * 28f,
                         y = heroY + 18f + index * 8f,
                         facing = facing,
+                        walking = walking,
+                        phase = walkPhase + index * 0.7f,
+                        scale = 0.95f,
                     )
                 }
-                drawCustomHero(art, heroX, heroY, facing, worldHeight = 96f)
+                // 이전 버전처럼 걸어다니는 Canvas 캐릭터
+                drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.05f)
             }
         }
 
