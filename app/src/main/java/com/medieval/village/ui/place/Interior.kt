@@ -18,8 +18,8 @@ import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.TownTiles
-import com.medieval.village.ui.village.drawCustomHero
 import com.medieval.village.ui.village.drawCustomSprite
+import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.drawMercenary
 import kotlin.math.sin
@@ -50,18 +50,26 @@ fun DrawScope.drawInterior(
         }
     }
 
+    val heroScale = (h * 0.58f) / 108f
     companions.forEachIndexed { index, mercenary ->
         drawMercenary(
-            art,
-            mercenary,
-            w * (0.30f + index * 0.12f),
-            h * 0.90f,
-            Facing.RIGHT,
-            false,
-            animTime + index * 0.35f
+            mercenary = mercenary,
+            x = w * (0.30f + index * 0.12f),
+            y = h * 0.90f,
+            facing = Facing.RIGHT,
+            walking = false,
+            phase = animTime + index * 0.35f,
+            scale = heroScale * 0.9f,
         )
     }
-    drawCustomHero(art, w * 0.18f, h * 0.90f, Facing.RIGHT, worldHeight = h * 0.58f)
+    drawHero(
+        x = w * 0.18f,
+        y = h * 0.90f,
+        facing = Facing.RIGHT,
+        walking = false,
+        phase = animTime,
+        scale = heroScale,
+    )
 }
 
 private fun npcSpriteKey(npc: InteriorNpc): String = when (npc.placeId) {

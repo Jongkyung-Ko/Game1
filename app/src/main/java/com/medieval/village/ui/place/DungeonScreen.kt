@@ -44,8 +44,8 @@ import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
-import com.medieval.village.ui.village.drawCustomHero
 import com.medieval.village.ui.village.drawCustomSprite
+import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawMercenary
 import com.medieval.village.ui.village.rememberCustomArt
 import kotlin.math.hypot
@@ -94,6 +94,8 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val widthPx = with(density) { maxWidth.toPx() }
             val heightPx = with(density) { maxHeight.toPx() }
             val facing = vm.facing
+            val walking = vm.dungeonWalking
+            val walkPhase = vm.walkPhase
 
             Canvas(
                 modifier = Modifier
@@ -125,14 +127,23 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     map.monsters.filter { it.alive }.forEach { drawZombie(art, it) }
                     vm.activeParty.forEachIndexed { index, mercenary ->
                         drawMercenary(
-                            art,
-                            mercenary,
-                            vm.dungeonHeroX + if (index == 0) -40f else 40f,
-                            vm.dungeonHeroY + 28f + index * 6f,
-                            facing,
+                            mercenary = mercenary,
+                            x = vm.dungeonHeroX + if (index == 0) -40f else 40f,
+                            y = vm.dungeonHeroY + 28f + index * 6f,
+                            facing = facing,
+                            walking = walking,
+                            phase = walkPhase + index * 0.7f,
+                            scale = 0.72f,
                         )
                     }
-                    drawCustomHero(art, vm.dungeonHeroX, vm.dungeonHeroY, facing, worldHeight = 70f)
+                    drawHero(
+                        vm.dungeonHeroX,
+                        vm.dungeonHeroY,
+                        facing,
+                        walking,
+                        walkPhase,
+                        scale = 0.78f,
+                    )
                 }
                 drawMinimap(map, vm.dungeonHeroX, vm.dungeonHeroY, size.width, size.height)
             }
