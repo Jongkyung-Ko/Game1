@@ -106,6 +106,6 @@ app/src/main/java/com/medieval/village/
 
 - 저장/불러오기 (DataStore)
 - 턴제 전투 화면 (지금은 결과 요약 방식)
-- 던전 층별 맵과 보스
+- 던전 층별 보스전 (맵 UI는 만화풍 탑다운으로 구현됨)
 - 효과음 / BGM
 - 퀘스트와 NPC 대화
