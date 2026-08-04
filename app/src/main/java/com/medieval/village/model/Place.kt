@@ -33,104 +33,97 @@ data class Place(
 }
 
 /**
- * 마을 좌표계. 폰 화면 하나에 전부 담기도록 고정 크기 월드를 정의하고,
- * 렌더링 시 화면 크기에 맞춰 균등 스케일한다.
+ * 오크헤이븐 마을 일러스트(1536×1024)에 맞춘 좌표계.
+ * 핫스팟은 그림 위 건물 위치에 대응한다.
  */
 object Village {
 
-    const val W = 1000f
-    const val H = 1650f
+    /** oakhaven 마을 맵 픽셀 크기와 1:1 */
+    const val W = 1536f
+    const val H = 1024f
 
-    const val ROAD_X = 500f
-    const val ROAD_W = 96f
-    const val DOOR_GAP = 50f
+    const val ROAD_X = 768f
+    const val ROAD_W = 90f
+    const val DOOR_GAP = 16f
 
-    /** 좌우 건물 열이 붙는 가로길 y 좌표 */
-    val rowRoads = listOf(345f, 705f, 1005f, 1285f)
-    const val ROW_ROAD_LEFT = 175f
-    const val ROW_ROAD_RIGHT = 825f
+    val rowRoads = listOf(320f, 520f, 700f, 880f)
+    const val ROW_ROAD_LEFT = 160f
+    const val ROW_ROAD_RIGHT = 1300f
 
-    const val ROAD_TOP = 250f
-    const val BOTTOM_ROAD_Y = 1570f
-    const val BOTTOM_ROAD_LEFT = 290f
-    const val BOTTOM_ROAD_RIGHT = 700f
-
-    private const val SIDE_W = 232f
-    private const val SIDE_H = 170f
+    const val ROAD_TOP = 220f
+    const val BOTTOM_ROAD_Y = 900f
+    const val BOTTOM_ROAD_LEFT = 300f
+    const val BOTTOM_ROAD_RIGHT = 1100f
 
     val places: List<Place> = listOf(
+        // 황금 잔 여관 (좌상단 대형 건물)
         Place(
-            PlaceId.CHURCH, "교회", "빛의 신전",
-            500f, 150f, 250f, 180f, BuildingStyle.CHURCH, 0xFF8C8FA6, 0xFFE6E1D3
-        ),
-        // 좌측 열
-        Place(
-            PlaceId.MAGIC_SCHOOL, "마법학교", "아르카나 학당",
-            175f, 210f, SIDE_W, SIDE_H, BuildingStyle.TOWER, 0xFF4B3B8F, 0xFFCFC7E8
+            PlaceId.PUB, "선술집", "황금 잔 · Golden Tankard",
+            300f, 240f, 200f, 150f, BuildingStyle.PUB, 0xFF713B2A, 0xFFD0A66E
         ),
         Place(
-            PlaceId.BLACKSMITH, "대장간", "불꽃의 모루",
-            175f, 570f, SIDE_W, SIDE_H, BuildingStyle.FORGE, 0xFF5A4132, 0xFF9B8266
+            PlaceId.INN, "여관", "잠자리와 따뜻한 식사",
+            420f, 280f, 130f, 100f, BuildingStyle.INN, 0xFF8A5A2B, 0xFFE3CFA4
+        ),
+        // 푸른 지붕 마법탑
+        Place(
+            PlaceId.MAGIC_SCHOOL, "마법학교", "오크헤이븐 연금 탑",
+            500f, 190f, 110f, 150f, BuildingStyle.TOWER, 0xFF4B3B8F, 0xFFCFC7E8
+        ),
+        // 성당 + 공동묘지
+        Place(
+            PlaceId.CHURCH, "교회", "성 알라릭 예배당",
+            1120f, 250f, 160f, 150f, BuildingStyle.CHURCH, 0xFF8C8FA6, 0xFFE6E1D3
+        ),
+        // 우측 절벽 동굴
+        Place(
+            PlaceId.DUNGEON, "던전입구", "저주받은 동굴 · 지하묘소",
+            1380f, 200f, 130f, 110f, BuildingStyle.CAVE, 0xFF3B3630, 0xFF56504A
+        ),
+        // 광장 시장 포장
+        Place(
+            PlaceId.SHOP, "상점", "광장 잡화 노점",
+            640f, 540f, 150f, 100f, BuildingStyle.STORE, 0xFFB4573F, 0xFFEBD9B4
+        ),
+        // 합성 대장간
+        Place(
+            PlaceId.BLACKSMITH, "대장간", "모루와 불꽃의 공방",
+            210f, 520f, 170f, 140f, BuildingStyle.FORGE, 0xFF5A4132, 0xFF9B8266
         ),
         Place(
-            PlaceId.WEAPON_SHOP, "무기점", "강철과 가죽",
-            175f, 870f, SIDE_W, SIDE_H, BuildingStyle.ARMORY, 0xFF6B3A2E, 0xFFD8C49B
+            PlaceId.WEAPON_SHOP, "무기점", "생사자 대비 병기",
+            340f, 560f, 120f, 90f, BuildingStyle.ARMORY, 0xFF6B3A2E, 0xFFD8C49B
         ),
+        // 약초원 오두막 (좌하단)
         Place(
-            PlaceId.SHOP, "상점", "마을 잡화점",
-            175f, 1150f, SIDE_W, SIDE_H, BuildingStyle.STORE, 0xFFB4573F, 0xFFEBD9B4
+            PlaceId.HOSPITAL, "병원", "약초와 치료의 집",
+            260f, 700f, 150f, 110f, BuildingStyle.CLINIC, 0xFFB0B6C4, 0xFFF2F0E6
         ),
-        // 우측 열
+        // 주거 단지 (하단 중앙)
         Place(
-            PlaceId.DUNGEON, "던전입구", "잊혀진 지하",
-            825f, 210f, SIDE_W, SIDE_H, BuildingStyle.CAVE, 0xFF3B3630, 0xFF56504A
+            PlaceId.HOME, "주인공 집", "오크헤이븐 오두막",
+            720f, 780f, 190f, 130f, BuildingStyle.HOUSE, 0xFF9C4A34, 0xFFE8D4AC
         ),
+        // 합성 훈련장
         Place(
-            PlaceId.ARENA, "대련소", "무인들의 터",
-            825f, 570f, SIDE_W, SIDE_H, BuildingStyle.ARENA, 0xFF7A5230, 0xFFC9A87C
+            PlaceId.ARENA, "대련소", "말뚝 울타리 훈련장",
+            400f, 880f, 180f, 120f, BuildingStyle.ARENA, 0xFF7A5230, 0xFFC9A87C
         ),
+        // 합성 용병 야영지
         Place(
-            PlaceId.MERCENARY, "용병고용소", "떠돌이 칼잡이",
-            825f, 870f, SIDE_W, SIDE_H, BuildingStyle.CAMP, 0xFF4E5A3A, 0xFF8B9668
+            PlaceId.MERCENARY, "용병고용소", "강변 용병 야영",
+            1080f, 860f, 180f, 120f, BuildingStyle.CAMP, 0xFF4E5A3A, 0xFF8B9668
         ),
-        Place(
-            PlaceId.HOSPITAL, "병원", "치유의 집",
-            825f, 1150f, SIDE_W, SIDE_H, BuildingStyle.CLINIC, 0xFFB0B6C4, 0xFFF2F0E6
-        ),
-        // 하단
-        Place(
-            PlaceId.INN, "INN", "여관 · 잠든 곰",
-            290f, 1430f, 250f, 180f, BuildingStyle.INN, 0xFF8A5A2B, 0xFFE3CFA4
-        ),
-        Place(
-            PlaceId.HOME, "주인공 집", "나의 오두막",
-            700f, 1430f, 250f, 180f, BuildingStyle.HOUSE, 0xFF9C4A34, 0xFFE8D4AC
-        ),
-        Place(
-            PlaceId.PUB, "PUB", "황금 수사슴 선술집",
-            625f, 390f, 140f, 120f, BuildingStyle.PUB, 0xFF713B2A, 0xFFD0A66E
-        )
     )
 
     fun of(id: PlaceId): Place = places.first { it.id == id }
 
-    /** 나무 (x, y, 크기) */
-    val trees = listOf(
-        Triple(360f, 480f, 46f), Triple(370f, 900f, 42f),
-        Triple(345f, 1180f, 38f), Triple(660f, 250f, 36f),
-        Triple(105f, 1360f, 44f), Triple(915f, 1400f, 46f),
-        Triple(150f, 1615f, 38f), Triple(870f, 1600f, 42f)
-    )
+    val trees = emptyList<Triple<Float, Float, Float>>()
+    val lamps = emptyList<Pair<Float, Float>>()
+    val fences = emptyList<Pair<Float, Float>>()
 
-    /** 가로등 (x, y) */
-    val lamps = listOf(
-        420f to 500f, 580f to 500f, 420f to 1120f, 580f to 1120f, 420f to 860f, 580f to 860f
-    )
+    const val WELL_X = 768f
+    const val WELL_Y = 520f
 
-    /** 광장 우물 위치 */
-    const val WELL_X = 640f
-    const val WELL_Y = 830f
-
-    /** 장터 좌판 (x, y, 천막 색 인덱스) */
-    val stalls = listOf(Triple(352f, 620f, 0), Triple(628f, 1190f, 1))
+    val stalls = emptyList<Triple<Float, Float, Int>>()
 }

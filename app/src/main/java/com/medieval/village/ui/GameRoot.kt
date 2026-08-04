@@ -12,12 +12,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.medieval.village.audio.GameAudioEngine
 import com.medieval.village.audio.MusicMood
+import com.medieval.village.audio.Sfx
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
 import com.medieval.village.game.Scene
@@ -30,7 +32,8 @@ import com.medieval.village.ui.village.VillageScene
 @Composable
 fun GameRoot(modifier: Modifier = Modifier) {
     val vm: GameViewModel = viewModel()
-    val audio = remember { GameAudioEngine() }
+    val context = LocalContext.current
+    val audio = remember(context) { GameAudioEngine(context) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -58,8 +61,17 @@ fun GameRoot(modifier: Modifier = Modifier) {
         audio.playMusic(mood)
     }
 
-    LaunchedEffect(vm.walking, vm.pubWalking) {
-        audio.setWalking(vm.walking || vm.pubWalking)
+    LaunchedEffect(vm.walking, vm.pubWalking, vm.dungeonWalking) {
+        audio.setWalking(vm.walking || vm.pubWalking || vm.dungeonWalking)
+    }
+
+    LaunchedEffect(vm.sfxSignal) {
+        if (vm.sfxSignal == 0) return@LaunchedEffect
+        when (vm.lastSfx) {
+            "hit" -> audio.playSfx(Sfx.HIT)
+            "door" -> audio.playSfx(Sfx.DOOR)
+            "click" -> audio.playSfx(Sfx.CLICK)
+        }
     }
 
     // 프레임 루프 - 주인공 이동 처리
@@ -79,6 +91,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
     BackHandler(enabled = vm.menuTab != MenuTab.NONE || vm.scene == Scene.INTERIOR) {
         when {
             vm.menuTab != MenuTab.NONE -> vm.menuTab = MenuTab.NONE
+            vm.scene == Scene.INTERIOR && vm.currentPlace == PlaceId.DUNGEON -> vm.escapeDungeon()
             vm.scene == Scene.INTERIOR -> vm.leavePlace()
         }
     }

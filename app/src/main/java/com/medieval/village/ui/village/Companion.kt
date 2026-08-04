@@ -6,33 +6,56 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import com.medieval.village.game.Facing
 import com.medieval.village.model.Mercenary
 import kotlin.math.sin
 
-/** 역할에 따라 망토·무기·색이 달라지는 작은 동행 용병 스프라이트. */
+/**
+ * 걸어다니는 용병 스프라이트 (Canvas 도형).
+ * 역할에 따라 망토·무기·색이 달라진다.
+ */
 fun DrawScope.drawMercenary(
     mercenary: Mercenary,
     x: Float,
     y: Float,
     facing: Facing,
-    walking: Boolean,
-    phase: Float
+    walking: Boolean = false,
+    phase: Float = 0f,
+    scale: Float = 1f,
 ) {
-    val h = 88f
+    if (scale != 1f) {
+        scale(scale, scale, pivot = Offset(x, y)) {
+            drawMercenaryBody(mercenary, x, y, facing, walking, phase)
+        }
+    } else {
+        drawMercenaryBody(mercenary, x, y, facing, walking, phase)
+    }
+}
+
+private fun DrawScope.drawMercenaryBody(
+    mercenary: Mercenary,
+    x: Float,
+    y: Float,
+    facing: Facing,
+    walking: Boolean,
+    phase: Float,
+) {
     val bob = if (walking) sin(phase) * 2f else 0f
     val foot = if (walking) sin(phase) * 5f else 0f
     val baseY = y + bob
     val roleColor = when (mercenary.role) {
-        "검사" -> Color(0xFF496A8A)
-        "궁수" -> Color(0xFF4E753F)
-        "방패병" -> Color(0xFF777D86)
+        "전사" -> Color(0xFF496A8A)
+        "도적" -> Color(0xFF4E753F)
+        "성기사" -> Color(0xFF777D86)
+        "마법사" -> Color(0xFF684A8F)
         else -> Color(0xFF684A8F)
     }
     val hair = when (mercenary.id) {
-        "lyra" -> Color(0xFFD4B36A)
-        "gorm" -> Color(0xFF2F241C)
-        "sela" -> Color(0xFFB8B3C8)
+        "elara" -> Color(0xFFD4B36A)
+        "bern" -> Color(0xFF2F241C)
+        "shade" -> Color(0xFF3A2A40)
+        "aldric" -> Color(0xFFB8B3C8)
         else -> Color(0xFF6B3F28)
     }
 
@@ -65,21 +88,14 @@ fun DrawScope.drawMercenary(
     )
 
     when (mercenary.role) {
-        "궁수" -> {
-            drawArc(
-                Color(0xFF8A5A2B),
-                -80f,
-                160f,
-                false,
-                Offset(x + 12f, bodyTop - 2f),
-                Size(20f, 52f),
-                style = Stroke(3f)
-            )
-            drawLine(Color(0xFFD9C8A4), Offset(x + 24f, bodyTop), Offset(x + 24f, bodyBottom + 5f), 1f)
+        "도적" -> {
+            drawLine(Color(0xFFBFC5CC), Offset(x + 16f, bodyTop + 6f), Offset(x + 22f, bodyBottom + 4f), 3f)
+            drawLine(Color(0xFFBFC5CC), Offset(x - 16f, bodyTop + 8f), Offset(x - 20f, bodyBottom + 2f), 3f)
         }
-        "방패병" -> {
+        "성기사" -> {
             drawCircle(Color(0xFF6D7680), 15f, Offset(x + 19f, bodyTop + 22f))
             drawCircle(Color(0xFFD9A441), 15f, Offset(x + 19f, bodyTop + 22f), style = Stroke(2f))
+            drawLine(Color(0xFFBFC5CC), Offset(x - 18f, bodyTop - 2f), Offset(x - 16f, bodyBottom + 8f), 4f)
         }
         "마법사" -> {
             drawLine(Color(0xFF6B4B2E), Offset(x + 17f, bodyTop - 8f), Offset(x + 20f, baseY - 5f), 4f)
@@ -92,5 +108,8 @@ fun DrawScope.drawMercenary(
 
     if (facing == Facing.LEFT || facing == Facing.RIGHT) {
         drawCircle(Color(0xFF2C1E12), 1.8f, Offset(x + if (facing == Facing.RIGHT) 5f else -5f, head.y + 1f))
+    } else if (facing == Facing.DOWN) {
+        drawCircle(Color(0xFF2C1E12), 1.6f, Offset(x - 4f, head.y + 1f))
+        drawCircle(Color(0xFF2C1E12), 1.6f, Offset(x + 4f, head.y + 1f))
     }
 }

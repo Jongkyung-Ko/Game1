@@ -24,10 +24,15 @@ object Palette {
 
     val Grass = Color(0xFF6F9A54)
     val GrassDark = Color(0xFF5E8748)
+    val GrassLight = Color(0xFF85B06A)
     val Dirt = Color(0xFFC2A16B)
     val DirtDark = Color(0xFFA9884F)
+    val DirtLight = Color(0xFFD4B888)
     val Stone = Color(0xFF9E9A90)
+    val StoneLight = Color(0xFFB8B3A8)
     val Water = Color(0xFF5B92C4)
+    val SkyWarm = Color(0xFF8FB8D8)
+    val SkyGlow = Color(0x66F0C48A)
 }
 
 private val scheme = darkColorScheme(

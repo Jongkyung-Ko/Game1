@@ -53,13 +53,13 @@ object ItemCatalog {
     val hiPotion = Item("hi_potion", "고급 체력 물약", ItemType.CONSUMABLE, 90, healHp = 120, desc = "HP를 120 회복한다.")
     val ether = Item("ether", "마나 물약", ItemType.CONSUMABLE, 45, healMp = 25, desc = "MP를 25 회복한다.")
     val bread = Item("bread", "호밀빵", ItemType.CONSUMABLE, 10, healHp = 12, desc = "소박하지만 든든하다. HP 12 회복.")
-    val torch = Item("torch", "횃불", ItemType.CONSUMABLE, 20, desc = "던전 탐험 시 함정을 피하기 쉬워진다.")
+    val torch = Item("torch", "횃불", ItemType.CONSUMABLE, 20, desc = "오염된 하수도를 비춘다. 좀비 둥지 탐험의 필수품.")
 
     // 무기 - 무기점
-    val rustySword = Item("rusty_sword", "낡은 검", ItemType.WEAPON, 80, atk = 5, desc = "아버지가 쓰던 검.")
-    val ironSword = Item("iron_sword", "강철 장검", ItemType.WEAPON, 280, atk = 13, desc = "마을 대장장이의 역작.")
-    val knightSword = Item("knight_sword", "기사의 검", ItemType.WEAPON, 760, atk = 24, desc = "왕국 기사단 제식 검.")
-    val battleAxe = Item("battle_axe", "전투 도끼", ItemType.WEAPON, 520, atk = 20, def = -2, desc = "무겁지만 파괴력이 크다.")
+    val rustySword = Item("rusty_sword", "낡은 검", ItemType.WEAPON, 80, atk = 5, desc = "아버지가 쓰던 검. 풍요의 마을이 웃던 시절의 유품.")
+    val ironSword = Item("iron_sword", "강철 장검", ItemType.WEAPON, 280, atk = 13, desc = "좀비 뼈를 가르라고 다듬은 대장장이의 역작.")
+    val knightSword = Item("knight_sword", "기사의 검", ItemType.WEAPON, 760, atk = 24, desc = "저주가 퍼지기 전, 영주 경호대가 쓰던 제식 검.")
+    val battleAxe = Item("battle_axe", "전투 도끼", ItemType.WEAPON, 520, atk = 20, def = -2, desc = "무겁지만 부패한 육체를 부수는 데 좋다.")
 
     // 방어구 - 무기점
     val woodShield = Item("wood_shield", "나무 방패", ItemType.SHIELD, 70, def = 4, desc = "가볍고 값싸다.")

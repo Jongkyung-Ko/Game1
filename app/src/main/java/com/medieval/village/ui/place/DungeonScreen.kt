@@ -4,7 +4,9 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,94 +18,69 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.medieval.village.game.Facing
 import com.medieval.village.game.GameViewModel
-import com.medieval.village.model.DungeonCell
+import com.medieval.village.model.DungeonFactory
 import com.medieval.village.model.DungeonFloor
-import com.medieval.village.model.DungeonLayout
+import com.medieval.village.model.DungeonMonster
+import com.medieval.village.model.DungeonTile
 import com.medieval.village.ui.Chip
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.village.CustomArt
+import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.rememberCustomArt
+import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sin
-
-private val Rock = Color(0xFF5A544C)
-private val RockLight = Color(0xFF726B61)
-private val RockDark = Color(0xFF3B3630)
-private val RockOutline = Color(0xFF231E19)
-private val FloorA = Color(0xFFC9A876)
-private val FloorB = Color(0xFFB8955F)
-private val FloorShadow = Color(0x33231810)
-private val TorchOrange = Color(0xFFE8843A)
-private val TorchYellow = Color(0xFFF9DE85)
-private val ParchmentFrame = Color(0xFFEFE0C0)
-private val WoodFrame = Color(0xFF4A3524)
 
 @Composable
 fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
-    val floorNum = vm.player.dungeonDepth + 1
-    val layout = remember(floorNum) { DungeonLayout.forFloor(floorNum) }
-    var animPhase by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        var last = 0L
-        while (true) {
-            withFrameNanos { now ->
-                if (last != 0L) {
-                    val dt = ((now - last) / 1_000_000_000.0).toFloat().coerceAtMost(0.05f)
-                    animPhase += dt * 4f
-                }
-                last = now
-            }
-        }
-    }
-
-    Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
+    val art = rememberCustomArt()
+    val floor = vm.dungeonFloor
+    Column(modifier = modifier.fillMaxSize().background(Color(0xFF14100C))) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
                 Text(
-                    "잊혀진 지하 · ${floorNum}층",
+                    "잊혀진 지하 · ${vm.dungeonFloorNumber}층",
                     color = Palette.Gold,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "횃불이 비추는 돌복도를 따라 내려간다",
+                    "횃불이 비추는 돌복도 — 화면을 눌러 이동",
                     color = Palette.ParchmentDim,
-                    fontSize = 11.sp
+                    fontSize = 10.sp
                 )
             }
-            Chip("최고 ${vm.player.dungeonDepth}층", Palette.WoodLight)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip("기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
+                Chip("좀비 ${floor?.monsters?.count { it.alive } ?: 0}", Palette.Blood)
+            }
         }
 
         BoxWithConstraints(
@@ -111,311 +88,321 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
-                .background(Color(0xFF1A1510), RoundedCornerShape(12.dp))
+                .background(Color(0xFFD9C8A4), RoundedCornerShape(12.dp))
         ) {
             val density = LocalDensity.current
             val widthPx = with(density) { maxWidth.toPx() }
             val heightPx = with(density) { maxHeight.toPx() }
-            val scale = min(widthPx / DungeonLayout.WORLD_W, heightPx / DungeonLayout.WORLD_H)
-            val offsetX = (widthPx - DungeonLayout.WORLD_W * scale) / 2f
-            val offsetY = (heightPx - DungeonLayout.WORLD_H * scale) / 2f
+            val facing = vm.facing
+            val walking = vm.dungeonWalking
+            val walkPhase = vm.walkPhase
+            val heroX = vm.dungeonHeroX
+            val heroY = vm.dungeonHeroY
             val party = vm.activeParty
-            val phase = animPhase
 
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                withTransform({
-                    translate(offsetX, offsetY)
-                    scale(scale, scale, Offset.Zero)
-                }) {
-                    drawCartoonDungeonMap(layout, phase)
-                    // 동료
-                    party.forEachIndexed { index, merc ->
-                        val spot = layout.companions.getOrElse(index) { layout.companions.last() }
-                        val (cx, cy) = DungeonLayout.cellCenter(spot.x, spot.y)
-                        withTransform({
-                            translate(cx, cy + 8f)
-                            scale(0.42f, 0.42f, Offset.Zero)
-                        }) {
-                            drawMercenary(merc, 0f, 0f, Facing.UP, false, phase + index)
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(floor?.floor, widthPx, heightPx) {
+                        detectTapGestures { tap ->
+                            val map = vm.dungeonFloor ?: return@detectTapGestures
+                            val cam = cameraOffset(map, vm.dungeonHeroX, vm.dungeonHeroY, widthPx, heightPx)
+                            val worldX = tap.x + cam.first
+                            val worldY = tap.y + cam.second
+                            val zombie = map.monsters
+                                .filter { it.alive }
+                                .minByOrNull { hypot(worldX - it.x, worldY - it.y) }
+                                ?.takeIf { hypot(worldX - it.x, worldY - it.y) < DungeonFactory.TILE * 0.9f }
+                            if (zombie != null) {
+                                vm.approachDungeonMonster(zombie)
+                            } else {
+                                vm.walkInDungeon(worldX, worldY)
+                            }
                         }
                     }
-                    // 주인공
-                    val (hx, hy) = DungeonLayout.cellCenter(layout.hero.x, layout.hero.y)
-                    withTransform({
-                        translate(hx, hy + 10f)
-                        scale(0.48f, 0.48f, Offset.Zero)
-                    }) {
-                        drawHero(0f, 0f, Facing.UP, false, phase)
-                    }
+            ) {
+                // 화면 좌표계 배경 — 변환 실패해도 빈 화면이 되지 않게
+                drawRect(Color(0xFFEFE0C0), size = size)
+                drawRoundRect(
+                    Color(0xFF4A3524),
+                    Offset(6f, 6f),
+                    Size(size.width - 12f, size.height - 12f),
+                    CornerRadius(14f, 14f),
+                    style = Stroke(5f)
+                )
+
+                val map = floor
+                if (map == null) {
+                    drawLabel("지도를 펼치는 중…", size.width * 0.28f, size.height * 0.5f, 28f, Color(0xFF5A4231))
+                    return@Canvas
                 }
+
+                val viewW = size.width.coerceAtLeast(1f)
+                val viewH = size.height.coerceAtLeast(1f)
+                val (camX, camY) = cameraOffset(map, heroX, heroY, viewW, viewH)
+                withTransform({
+                    translate(-camX, -camY)
+                }) {
+                    drawDungeonFloor(map)
+                    map.monsters.filter { it.alive }.forEach { drawZombie(art, it) }
+                    party.forEachIndexed { index, mercenary ->
+                        drawMercenary(
+                            mercenary = mercenary,
+                            x = heroX + if (index == 0) -40f else 40f,
+                            y = heroY + 28f + index * 6f,
+                            facing = facing,
+                            walking = walking,
+                            phase = walkPhase + index * 0.7f,
+                            scale = 0.72f,
+                        )
+                    }
+                    drawHero(
+                        heroX,
+                        heroY,
+                        facing,
+                        walking,
+                        walkPhase,
+                        scale = 0.78f,
+                    )
+                }
+                drawMinimap(map, heroX, heroY, viewW, viewH)
+            }
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(8.dp)
+                    .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    when (vm.dungeonHint) {
+                        "stairs_up" -> "↑ 지상 출구 — 아래에서 ‘탈출’"
+                        "stairs_down" -> "↓ 더 깊은 층 — 아래에서 ‘내려가기’"
+                        else -> "화면을 눌러 이동 · 좀비를 누르면 다가가 전투"
+                    },
+                    color = Palette.Parchment,
+                    fontSize = 11.sp
+                )
             }
         }
 
         Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Chip("활성 동료 ${vm.activeParty.size}명", Palette.Moss)
-                Chip("공격 ${vm.totalAtk + vm.partyPower}", Palette.Blood)
-            }
-            Spacer(modifier.height(6.dp))
             MessageLog(vm.log, Modifier.height(78.dp))
-            Spacer(modifier.height(7.dp))
+            Spacer(Modifier.height(7.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val potion = vm.inventory.toList().firstOrNull { it.item.healHp > 0 }
-                if (potion != null) {
-                    WoodButton("물약") { vm.useItem(potion.item) }
+                when (vm.dungeonHint) {
+                    "stairs_up" -> WoodButton("탈출", Modifier.weight(1f), highlight = true) {
+                        vm.escapeDungeon()
+                    }
+                    "stairs_down" -> WoodButton("내려가기", Modifier.weight(1f), highlight = true) {
+                        vm.descendDungeon()
+                    }
+                    else -> WoodButton("탈출", Modifier.weight(1f)) { vm.escapeDungeon() }
                 }
+                val potion = vm.inventory.toList().firstOrNull { it.item.healHp > 0 }
                 WoodButton(
-                    "탐험하기",
+                    text = if (potion != null) "물약" else "물약 없음",
                     modifier = Modifier.weight(1f),
-                    highlight = true
-                ) { vm.exploreDungeon() }
-            }
-            Spacer(modifier.height(7.dp))
-            WoodButton("마을로 나가기", Modifier.fillMaxWidth(), highlight = true) {
-                vm.leavePlace()
+                    enabled = potion != null
+                ) {
+                    potion?.let { vm.useItem(it.item) }
+                }
             }
         }
     }
 }
 
-/** 양피지 프레임 + 두꺼운 외곽선 돌미로 만화 지도 */
-private fun DrawScope.drawCartoonDungeonMap(floor: DungeonFloor, phase: Float) {
-    val w = DungeonLayout.WORLD_W
-    val h = DungeonLayout.WORLD_H
-    val cell = DungeonLayout.CELL
-    val padX = DungeonLayout.PAD_X
-    val padY = DungeonLayout.PAD_Y
+private fun cameraOffset(
+    map: DungeonFloor,
+    heroX: Float,
+    heroY: Float,
+    viewW: Float,
+    viewH: Float
+): Pair<Float, Float> {
+    val maxX = max(0f, map.worldW - viewW)
+    val maxY = max(0f, map.worldH - viewH)
+    val camX = (heroX - viewW / 2f).coerceIn(0f, maxX)
+    val camY = (heroY - viewH / 2f).coerceIn(0f, maxY)
+    return camX to camY
+}
 
-    // 어두운 배경
-    drawRect(Color(0xFF1E1914), size = Size(w, h))
+private fun DrawScope.drawDungeonFloor(map: DungeonFloor) {
+    // 만화풍: 밝은 양피지 바탕 + 두꺼운 돌벽 외곽선
+    drawRect(Color(0xFFCDB892), size = Size(map.worldW, map.worldH))
+    val ts = map.tileSize
+    val rock = Color(0xFF5A544C)
+    val rockLight = Color(0xFF726B61)
+    val rockDark = Color(0xFF3B3630)
+    val outline = Color(0xFF231E19)
+    val floorA = Color(0xFFC9A876)
+    val floorB = Color(0xFFB8955F)
 
-    // 양피지 보드
-    val boardL = padX - 28f
-    val boardT = padY - 48f
-    val boardW = floor.cols * cell + 56f
-    val boardH = floor.rows * cell + 72f
-    drawRoundRect(WoodFrame, Offset(boardL - 10f, boardT - 10f), Size(boardW + 20f, boardH + 20f), CornerRadius(22f))
-    drawRoundRect(ParchmentFrame, Offset(boardL, boardT), Size(boardW, boardH), CornerRadius(16f))
-    drawRoundRect(Color(0xFFD9C8A4), Offset(boardL + 8f, boardT + 8f), Size(boardW - 16f, boardH - 16f), CornerRadius(12f))
+    for (r in 0 until map.rows) {
+        for (c in 0 until map.cols) {
+            val tile = map.tileAt(c, r)
+            val x = c * ts
+            val y = r * ts
+            when (tile) {
+                DungeonTile.WALL -> {
+                    drawRoundRect(rock, Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), CornerRadius(8f, 8f))
+                    drawRoundRect(outline, Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), CornerRadius(8f, 8f), style = Stroke(4f))
+                    drawCircle(rockLight.copy(alpha = 0.55f), ts * 0.12f, Offset(x + ts * 0.35f, y + ts * 0.35f))
+                    drawCircle(rockDark.copy(alpha = 0.4f), ts * 0.10f, Offset(x + ts * 0.65f, y + ts * 0.62f))
+                }
+                DungeonTile.FLOOR -> {
+                    val tone = if ((c + r) % 2 == 0) floorA else floorB
+                    drawRoundRect(tone, Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
+                }
+                DungeonTile.SEWER -> {
+                    drawRoundRect(Color(0xFF8FAE7A), Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
+                    drawRoundRect(Color(0xFF4E6B3A), Offset(x + ts * 0.35f, y + 6f), Size(ts * 0.30f, ts - 12f), CornerRadius(4f, 4f))
+                    drawCircle(Color(0x6626A86A), 12f, Offset(x + ts / 2f, y + ts * 0.72f))
+                }
+                DungeonTile.VAULT -> {
+                    drawRoundRect(floorA, Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
+                    // 보물상자
+                    drawRoundRect(Color(0xFF6B4B2E), Offset(x + ts * 0.22f, y + ts * 0.42f), Size(ts * 0.56f, ts * 0.32f), CornerRadius(4f, 4f))
+                    drawRoundRect(Color(0xFF8A5A2B), Offset(x + ts * 0.22f, y + ts * 0.28f), Size(ts * 0.56f, ts * 0.20f), CornerRadius(4f, 4f))
+                    drawRoundRect(Color(0xFFD9A441), Offset(x + ts * 0.22f, y + ts * 0.44f), Size(ts * 0.56f, 4f), CornerRadius(2f, 2f))
+                    drawCircle(Color(0xFFF9DE85), 5f, Offset(x + ts / 2f, y + ts * 0.55f))
+                    drawRoundRect(outline, Offset(x + ts * 0.22f, y + ts * 0.28f), Size(ts * 0.56f, ts * 0.46f), CornerRadius(4f, 4f), style = Stroke(3f))
+                }
+                DungeonTile.STAIRS_UP -> {
+                    drawRoundRect(floorA, Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
+                    for (i in 0..3) {
+                        drawRoundRect(
+                            Color(0xFF8A7350),
+                            Offset(x + 10f + i * 4f, y + 12f + i * 10f),
+                            Size(ts - 20f - i * 8f, 8f),
+                            CornerRadius(3f, 3f)
+                        )
+                        drawLine(
+                            outline,
+                            Offset(x + 10f + i * 4f, y + 12f + i * 10f),
+                            Offset(x + ts - 10f - i * 4f, y + 12f + i * 10f),
+                            2.5f
+                        )
+                    }
+                    drawLabel("입구", x + 14f, y + ts - 8f, 16f, Color(0xFF5A4231))
+                }
+                DungeonTile.STAIRS_DOWN -> {
+                    drawRoundRect(floorB, Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
+                    drawCircle(Color(0xFF2A2218), ts * 0.28f, Offset(x + ts / 2f, y + ts / 2f))
+                    drawCircle(outline, ts * 0.28f, Offset(x + ts / 2f, y + ts / 2f), style = Stroke(4f))
+                    drawArc(
+                        Color(0xFFD9A441),
+                        startAngle = 20f,
+                        sweepAngle = 240f,
+                        useCenter = false,
+                        topLeft = Offset(x + ts * 0.28f, y + ts * 0.28f),
+                        size = Size(ts * 0.44f, ts * 0.44f),
+                        style = Stroke(4f)
+                    )
+                    drawLabel("아래", x + 14f, y + ts - 8f, 16f, Color(0xFF5A4231))
+                }
+            }
+            // 횃불
+            if (tile != DungeonTile.WALL && (c * 17 + r * 31) % 23 == 0) {
+                drawCircle(Color(0x55E8843A), 22f, Offset(x + ts / 2f, y + 14f))
+                drawRect(Color(0xFF5A3A22), Offset(x + ts / 2f - 3.5f, y + 16f), Size(7f, ts * 0.28f))
+                drawCircle(Color(0xFFE8843A), 8f, Offset(x + ts / 2f, y + 12f))
+                drawCircle(Color(0xFFF9DE85), 4f, Offset(x + ts / 2f, y + 10f))
+            }
+        }
+    }
 
-    // 제목 띠
+    // 통로 가장자리 두꺼운 외곽선
+    for (r in 0 until map.rows) {
+        for (c in 0 until map.cols) {
+            if (map.tileAt(c, r) == DungeonTile.WALL) continue
+            val x = c * ts
+            val y = r * ts
+            if (map.tileAt(c, r - 1) == DungeonTile.WALL) {
+                drawLine(outline, Offset(x + 4f, y + 3f), Offset(x + ts - 4f, y + 3f), 5f)
+            }
+            if (map.tileAt(c, r + 1) == DungeonTile.WALL) {
+                drawLine(outline, Offset(x + 4f, y + ts - 3f), Offset(x + ts - 4f, y + ts - 3f), 5f)
+            }
+            if (map.tileAt(c - 1, r) == DungeonTile.WALL) {
+                drawLine(outline, Offset(x + 3f, y + 4f), Offset(x + 3f, y + ts - 4f), 5f)
+            }
+            if (map.tileAt(c + 1, r) == DungeonTile.WALL) {
+                drawLine(outline, Offset(x + ts - 3f, y + 4f), Offset(x + ts - 3f, y + ts - 4f), 5f)
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawZombie(art: CustomArt, monster: DungeonMonster) {
+    val x = monster.x
+    val y = monster.y
+    drawOval(Color(0x55000000), Offset(x - 22f, y - 4f), Size(44f, 14f))
+    drawCustomSprite(
+        image = art.zombieSprite(monster.kind),
+        cx = x,
+        footY = y,
+        worldHeight = 64f,
+    )
+    drawLabel(monster.name, x - 48f, y + 14f, 13f, Color(0xFFE8B4B4))
+}
+
+private fun DrawScope.drawMinimap(
+    map: DungeonFloor,
+    heroX: Float,
+    heroY: Float,
+    viewW: Float,
+    viewH: Float
+) {
+    val mw = min(140f, viewW * 0.28f)
+    val mh = mw * (map.rows.toFloat() / map.cols)
+    val left = viewW - mw - 12f
+    val top = 12f
+    drawRoundRect(Color(0xAA0D0B09), Offset(left - 4f, top - 4f), Size(mw + 8f, mh + 8f), CornerRadius(8f, 8f))
+    val sx = mw / map.worldW
+    val sy = mh / map.worldH
+    for (r in 0 until map.rows step 1) {
+        for (c in 0 until map.cols step 1) {
+            val tile = map.tileAt(c, r)
+            if (tile == DungeonTile.WALL) continue
+            val color = when (tile) {
+                DungeonTile.STAIRS_UP -> Color(0xFF8FCF7A)
+                DungeonTile.STAIRS_DOWN -> Color(0xFFC0392B)
+                DungeonTile.SEWER -> Color(0xFF6F9A54)
+                DungeonTile.VAULT -> Color(0xFFD9A441)
+                else -> Color(0xFFC9A876)
+            }
+            drawRect(
+                color,
+                Offset(left + c * map.tileSize * sx, top + r * map.tileSize * sy),
+                Size(max(1.5f, map.tileSize * sx), max(1.5f, map.tileSize * sy))
+            )
+        }
+    }
+    map.monsters.filter { it.alive }.forEach {
+        drawCircle(Color(0xFFC0392B), 2.2f, Offset(left + it.x * sx, top + it.y * sy))
+    }
+    drawCircle(Color(0xFFF4D35E), 3.2f, Offset(left + heroX * sx, top + heroY * sy))
     drawRoundRect(
-        Color(0xFF3B2A1A),
-        Offset(w * 0.28f, boardT + 10f),
-        Size(w * 0.44f, 36f),
-        CornerRadius(10f)
+        Color(0x66E8D9B8),
+        Offset(left - 4f, top - 4f),
+        Size(mw + 8f, mh + 8f),
+        CornerRadius(8f, 8f),
+        style = Stroke(1.5f)
     )
-    drawLabel("지하 ${floor.floor}층", w * 0.36f, boardT + 36f, 26f, Palette.Gold)
-
-    // 바닥 타일
-    for (y in 0 until floor.rows) {
-        for (x in 0 until floor.cols) {
-            if (floor.cell(x, y) == DungeonCell.WALL) continue
-            val left = padX + x * cell
-            val top = padY + y * cell
-            val tone = if ((x + y) % 2 == 0) FloorA else FloorB
-            drawRoundRect(tone, Offset(left + 2f, top + 2f), Size(cell - 4f, cell - 4f), CornerRadius(6f))
-            drawRoundRect(FloorShadow, Offset(left + 2f, top + cell * 0.62f), Size(cell - 4f, cell * 0.28f), CornerRadius(4f))
-        }
-    }
-
-    // 돌벽 (만화 블롭)
-    for (y in 0 until floor.rows) {
-        for (x in 0 until floor.cols) {
-            if (floor.cell(x, y) != DungeonCell.WALL) continue
-            if (!touchesFloor(floor, x, y)) continue
-            drawCartoonWall(padX + x * cell, padY + y * cell, cell, (x * 13 + y * 7) % 3)
-        }
-    }
-
-    // 벽 외곽선 (통로 가장자리)
-    for (y in 0 until floor.rows) {
-        for (x in 0 until floor.cols) {
-            if (floor.cell(x, y) == DungeonCell.WALL) continue
-            val left = padX + x * cell
-            val top = padY + y * cell
-            if (floor.cell(x, y - 1) == DungeonCell.WALL) {
-                drawLine(RockOutline, Offset(left + 4f, top + 3f), Offset(left + cell - 4f, top + 3f), 5f)
-            }
-            if (floor.cell(x, y + 1) == DungeonCell.WALL) {
-                drawLine(RockOutline, Offset(left + 4f, top + cell - 3f), Offset(left + cell - 4f, top + cell - 3f), 5f)
-            }
-            if (floor.cell(x - 1, y) == DungeonCell.WALL) {
-                drawLine(RockOutline, Offset(left + 3f, top + 4f), Offset(left + 3f, top + cell - 4f), 5f)
-            }
-            if (floor.cell(x + 1, y) == DungeonCell.WALL) {
-                drawLine(RockOutline, Offset(left + cell - 3f, top + 4f), Offset(left + cell - 3f, top + cell - 4f), 5f)
-            }
-        }
-    }
-
-    // 특수 오브젝트
-    for (y in 0 until floor.rows) {
-        for (x in 0 until floor.cols) {
-            val (cx, cy) = DungeonLayout.cellCenter(x, y)
-            when (floor.cell(x, y)) {
-                DungeonCell.ENTRANCE -> drawStairsUp(cx, cy, cell)
-                DungeonCell.EXIT -> drawStairsDown(cx, cy, cell)
-                DungeonCell.CHEST -> drawTreasureChest(cx, cy, cell)
-                DungeonCell.GATE -> drawIronGate(cx, cy, cell)
-                DungeonCell.TORCH -> drawWallTorch(cx, cy, cell, phase + x + y)
-                else -> Unit
-            }
-        }
-    }
-
-    floor.slime?.let { s ->
-        val (sx, sy) = DungeonLayout.cellCenter(s.x, s.y)
-        drawCuteSlime(sx, sy, cell, phase)
-    }
-
-    // 범례
-    drawLegend(boardL + 18f, boardT + boardH - 28f)
-}
-
-private fun touchesFloor(floor: DungeonFloor, x: Int, y: Int): Boolean {
-    val dirs = arrayOf(0 to -1, 0 to 1, -1 to 0, 1 to 0)
-    return dirs.any { (dx, dy) -> floor.cell(x + dx, y + dy) != DungeonCell.WALL }
-}
-
-private fun DrawScope.drawCartoonWall(left: Float, top: Float, cell: Float, variant: Int) {
-    val inset = 3f
-    val path = Path().apply {
-        when (variant) {
-            0 -> {
-                moveTo(left + inset, top + cell * 0.35f)
-                quadraticBezierTo(left + cell * 0.15f, top + inset, left + cell * 0.45f, top + inset + 2f)
-                quadraticBezierTo(left + cell * 0.75f, top + inset, left + cell - inset, top + cell * 0.28f)
-                quadraticBezierTo(left + cell - inset - 1f, top + cell * 0.65f, left + cell * 0.70f, top + cell - inset)
-                quadraticBezierTo(left + cell * 0.40f, top + cell - inset + 1f, left + inset + 2f, top + cell * 0.70f)
-                close()
-            }
-            1 -> {
-                moveTo(left + inset + 2f, top + cell * 0.25f)
-                lineTo(left + cell * 0.55f, top + inset)
-                lineTo(left + cell - inset, top + cell * 0.40f)
-                lineTo(left + cell - inset - 2f, top + cell - inset)
-                lineTo(left + inset, top + cell * 0.75f)
-                close()
-            }
-            else -> {
-                moveTo(left + inset, top + cell * 0.45f)
-                quadraticBezierTo(left + cell * 0.20f, top + inset + 4f, left + cell * 0.55f, top + inset)
-                quadraticBezierTo(left + cell - inset, top + cell * 0.20f, left + cell - inset, top + cell * 0.55f)
-                quadraticBezierTo(left + cell * 0.60f, top + cell - inset, left + cell * 0.25f, top + cell - inset)
-                close()
-            }
-        }
-    }
-    drawPath(path, Rock)
-    drawPath(path, RockOutline, style = Stroke(width = 4.5f))
-    // 하이라이트 돌무늬
-    drawCircle(RockLight.copy(alpha = 0.55f), cell * 0.10f, Offset(left + cell * 0.35f, top + cell * 0.38f))
-    drawCircle(RockDark.copy(alpha = 0.45f), cell * 0.08f, Offset(left + cell * 0.62f, top + cell * 0.58f))
-}
-
-private fun DrawScope.drawWallTorch(cx: Float, cy: Float, cell: Float, phase: Float) {
-    val flicker = 1f + 0.08f * sin(phase * 3.2f)
-    drawCircle(Color(0x55E8843A), cell * 0.42f * flicker, Offset(cx, cy - cell * 0.08f))
-    drawRect(Color(0xFF5A3A22), Offset(cx - 3.5f, cy - cell * 0.02f), Size(7f, cell * 0.28f))
-    drawCircle(TorchOrange, cell * 0.14f * flicker, Offset(cx, cy - cell * 0.12f))
-    drawCircle(TorchYellow, cell * 0.07f, Offset(cx, cy - cell * 0.14f))
-}
-
-private fun DrawScope.drawStairsUp(cx: Float, cy: Float, cell: Float) {
-    for (i in 0..3) {
-        val t = i / 3f
-        drawRoundRect(
-            Color(0xFF8A7350).copy(alpha = 0.95f - t * 0.15f),
-            Offset(cx - cell * (0.32f - i * 0.04f), cy - cell * 0.28f + i * cell * 0.12f),
-            Size(cell * (0.64f - i * 0.08f), cell * 0.10f),
-            CornerRadius(3f)
-        )
-        drawLine(
-            RockOutline,
-            Offset(cx - cell * (0.32f - i * 0.04f), cy - cell * 0.28f + i * cell * 0.12f),
-            Offset(cx + cell * (0.32f - i * 0.04f), cy - cell * 0.28f + i * cell * 0.12f),
-            2.5f
-        )
-    }
-    drawLabel("입구", cx - 18f, cy + cell * 0.38f, 14f, Color(0xFF5A4231))
-}
-
-private fun DrawScope.drawStairsDown(cx: Float, cy: Float, cell: Float) {
-    drawCircle(Color(0xFF2A2218), cell * 0.30f, Offset(cx, cy))
-    drawCircle(RockOutline, cell * 0.30f, Offset(cx, cy), style = Stroke(4f))
-    // 나선형 느낌
-    drawArc(
-        Color(0xFFD9A441),
-        startAngle = 20f,
-        sweepAngle = 240f,
-        useCenter = false,
-        topLeft = Offset(cx - cell * 0.18f, cy - cell * 0.18f),
-        size = Size(cell * 0.36f, cell * 0.36f),
-        style = Stroke(4f)
-    )
-    drawLabel("아래", cx - 16f, cy + cell * 0.40f, 14f, Color(0xFF5A4231))
-}
-
-private fun DrawScope.drawTreasureChest(cx: Float, cy: Float, cell: Float) {
-    drawRoundRect(Color(0xFF6B4B2E), Offset(cx - cell * 0.22f, cy - cell * 0.08f), Size(cell * 0.44f, cell * 0.26f), CornerRadius(4f))
-    drawRoundRect(Color(0xFF8A5A2B), Offset(cx - cell * 0.22f, cy - cell * 0.20f), Size(cell * 0.44f, cell * 0.16f), CornerRadius(4f))
-    drawRoundRect(Color(0xFFD9A441), Offset(cx - cell * 0.22f, cy - cell * 0.06f), Size(cell * 0.44f, 4f), CornerRadius(2f))
-    drawCircle(Color(0xFFF9DE85), 5f, Offset(cx, cy + 2f))
-    drawRoundRect(RockOutline, Offset(cx - cell * 0.22f, cy - cell * 0.20f), Size(cell * 0.44f, cell * 0.38f), CornerRadius(4f), style = Stroke(3f))
-}
-
-private fun DrawScope.drawIronGate(cx: Float, cy: Float, cell: Float) {
-    drawRoundRect(Color(0xFF3A3733), Offset(cx - cell * 0.20f, cy - cell * 0.28f), Size(cell * 0.40f, cell * 0.50f), CornerRadius(3f))
-    for (i in 0..3) {
-        val x = cx - cell * 0.14f + i * cell * 0.09f
-        drawLine(Color(0xFF7E858C), Offset(x, cy - cell * 0.24f), Offset(x, cy + cell * 0.18f), 4f)
-    }
-    drawLine(Color(0xFFBFC5CC), Offset(cx - cell * 0.18f, cy - cell * 0.02f), Offset(cx + cell * 0.18f, cy - cell * 0.02f), 5f)
-    drawCircle(Color(0xFFD9A441), 4f, Offset(cx + cell * 0.12f, cy))
-    drawRoundRect(RockOutline, Offset(cx - cell * 0.20f, cy - cell * 0.28f), Size(cell * 0.40f, cell * 0.50f), CornerRadius(3f), style = Stroke(3f))
-}
-
-private fun DrawScope.drawCuteSlime(cx: Float, cy: Float, cell: Float, phase: Float) {
-    val bob = sin(phase * 2.4f) * 2.5f
-    val bodyTop = cy - cell * 0.18f + bob
-    drawOval(Color(0x33000000), Offset(cx - cell * 0.18f, cy + cell * 0.10f), Size(cell * 0.36f, cell * 0.12f))
-    val body = Path().apply {
-        moveTo(cx - cell * 0.22f, bodyTop + cell * 0.22f)
-        quadraticBezierTo(cx - cell * 0.24f, bodyTop, cx, bodyTop - cell * 0.02f)
-        quadraticBezierTo(cx + cell * 0.24f, bodyTop, cx + cell * 0.22f, bodyTop + cell * 0.22f)
-        close()
-    }
-    drawPath(body, Color(0xFF6FBF5A))
-    drawPath(body, Color(0xFF2F5A28), style = Stroke(3.5f))
-    drawCircle(Color(0x99D8FFC8), cell * 0.06f, Offset(cx - cell * 0.06f, bodyTop + cell * 0.04f))
-    drawCircle(Color(0xFF1E2A18), 3.2f, Offset(cx - cell * 0.07f, bodyTop + cell * 0.10f))
-    drawCircle(Color(0xFF1E2A18), 3.2f, Offset(cx + cell * 0.07f, bodyTop + cell * 0.10f))
-    drawCircle(Color.White, 1.4f, Offset(cx - cell * 0.06f, bodyTop + cell * 0.09f))
-    drawCircle(Color.White, 1.4f, Offset(cx + cell * 0.08f, bodyTop + cell * 0.09f))
-}
-
-private fun DrawScope.drawLegend(x: Float, y: Float) {
-    drawCircle(TorchOrange, 5f, Offset(x, y))
-    drawLabel("횃불", x + 10f, y + 5f, 12f, Color(0xFF5A4231))
-    drawRoundRect(Color(0xFF8A5A2B), Offset(x + 70f, y - 6f), Size(12f, 10f), CornerRadius(2f))
-    drawLabel("상자", x + 86f, y + 5f, 12f, Color(0xFF5A4231))
-    drawCircle(Color(0xFF6FBF5A), 5f, Offset(x + 150f, y))
-    drawLabel("몬스터", x + 160f, y + 5f, 12f, Color(0xFF5A4231))
 }
 
 private fun DrawScope.drawLabel(text: String, x: Float, y: Float, size: Float, color: Color) {
     drawIntoCanvas { canvas ->
-        val paint = Paint().apply {
-            isAntiAlias = true
-            textSize = size
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = android.graphics.Color.argb(
                 (color.alpha * 255).toInt(),
                 (color.red * 255).toInt(),
                 (color.green * 255).toInt(),
                 (color.blue * 255).toInt()
             )
-            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            textSize = size
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         canvas.nativeCanvas.drawText(text, x, y, paint)
     }
