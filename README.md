@@ -89,6 +89,8 @@ app/src/main/java/com/medieval/village/
     ├── menu/MenuOverlay.kt      Status/Inventory/Equipment/System
     └── place/
         ├── PlaceScreen.kt       장소별 행동 UI
+        ├── PubScreen.kt         PUB 실내 탐험
+        ├── DungeonScreen.kt     만화풍 탑다운 던전 맵
         └── Interior.kt          장소별 실내 배경
 ```
 

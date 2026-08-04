@@ -50,6 +50,10 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         PubScreen(vm = vm, modifier = modifier)
         return
     }
+    if (id == PlaceId.DUNGEON) {
+        DungeonScreen(vm = vm, modifier = modifier)
+        return
+    }
     val place = Village.of(id)
 
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
@@ -96,7 +100,7 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
                 PlaceId.INN -> InnActions(vm)
                 PlaceId.PUB -> Unit
                 PlaceId.ARENA -> ArenaActions(vm)
-                PlaceId.DUNGEON -> DungeonActions(vm)
+                PlaceId.DUNGEON -> Unit
                 PlaceId.BLACKSMITH -> BlacksmithActions(vm)
                 PlaceId.MAGIC_SCHOOL -> MagicSchoolActions(vm)
                 PlaceId.MERCENARY -> MercenaryActions(vm)
@@ -248,34 +252,6 @@ private fun ColumnScope.ArenaActions(vm: GameViewModel) {
     Spacer(Modifier.height(8.dp))
     ListRow("대련 신청", "실력이 비슷한 상대와 겨룬다. 이기면 경험치와 상금.") {
         WoodButton("대련", highlight = true) { vm.spar() }
-    }
-}
-
-@Composable
-private fun ColumnScope.DungeonActions(vm: GameViewModel) {
-    SectionTitle("잊혀진 지하")
-    Text(
-        "축축한 계단이 어둠 속으로 이어진다. 깊이 내려갈수록 위험하지만 보상도 커진다.",
-        color = Palette.ParchmentDim, fontSize = 12.sp
-    )
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip("최고 기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
-        Chip("활성 동료 ${vm.activeParty.size}명", Palette.Moss)
-    }
-    Spacer(Modifier.height(10.dp))
-    ListRow(
-        "지하 ${vm.player.dungeonDepth + 1}층 탐험",
-        "몬스터와 싸우고 전리품을 얻는다."
-    ) {
-        WoodButton("내려가기", highlight = true) { vm.exploreDungeon() }
-    }
-    ThinDivider()
-    val potion = vm.inventory.toList().firstOrNull { it.item.healHp > 0 }
-    if (potion != null) {
-        ListRow("${potion.item.name} x${potion.count}", "지금 마셔 체력을 회복한다.") {
-            WoodButton("마시기") { vm.useItem(potion.item) }
-        }
     }
 }
 
