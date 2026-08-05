@@ -3,6 +3,7 @@ package com.medieval.village.ui.village
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Offset
@@ -19,38 +20,29 @@ import com.medieval.village.game.Facing
 import com.medieval.village.model.Village
 import kotlin.math.roundToInt
 
-/** 커스텀 마을 맵 + 캐릭터 시트 스프라이트. */
+/** 커스텀 마을 맵 + 캐릭터 스프라이트. 로딩 실패 시 null을 허용한다. */
 class CustomArt(
     val villageMap: ImageBitmap,
     private val chars: Map<String, ImageBitmap>,
 ) {
-    fun char(name: String): ImageBitmap =
-        chars[name] ?: error("Missing custom char: $name")
+    fun charOrNull(name: String): ImageBitmap? = chars[name]
 
-    fun heroSprite(): ImageBitmap = char("warrior")
+    fun npcSpriteOrNull(key: String): ImageBitmap? = charOrNull(key)
 
-    fun mercSprite(role: String): ImageBitmap = when (role) {
-        "전사" -> char("warrior")
-        "도적" -> char("rogue")
-        "성기사" -> char("paladin")
-        "마법사" -> char("mage")
-        else -> char("warrior")
-    }
-
-    fun npcSprite(key: String): ImageBitmap = char(key)
-
-    fun zombieSprite(kind: String): ImageBitmap = when (kind) {
-        "shambler" -> char("zombie_shambler")
-        "runner" -> char("zombie_runner")
-        "bloater" -> char("zombie_bloater")
-        "armored" -> char("zombie_armored")
-        "blacksmith" -> char("zombie_blacksmith")
-        "farmer" -> char("zombie_farmer")
-        "golem" -> char("golem_teacher")
-        else -> char("zombie_shambler")
+    fun zombieSpriteOrNull(kind: String): ImageBitmap? = when (kind) {
+        "shambler" -> charOrNull("zombie_shambler")
+        "runner" -> charOrNull("zombie_runner")
+        "bloater" -> charOrNull("zombie_bloater")
+        "armored" -> charOrNull("zombie_armored")
+        "blacksmith" -> charOrNull("zombie_blacksmith")
+        "farmer" -> charOrNull("zombie_farmer")
+        "golem" -> charOrNull("golem_teacher")
+        else -> charOrNull("zombie_shambler")
     }
 
     companion object {
+        private const val TAG = "CustomArt"
+
         @Volatile
         private var cached: CustomArt? = null
 
@@ -62,50 +54,65 @@ class CustomArt(
             "zombie_blacksmith", "zombie_farmer", "golem_teacher",
         )
 
-        fun load(context: Context): CustomArt {
+        fun loadOrNull(context: Context): CustomArt? {
             cached?.let { return it }
-            synchronized(this) {
-                cached?.let { return it }
-                val app = context.applicationContext
-                val chars = CHAR_NAMES.associateWith { name ->
-                    loadAsset(app, "custom/chars/$name.png", cleanEdges = true)
+            return try {
+                synchronized(this) {
+                    cached?.let { return it }
+                    val app = context.applicationContext
+                    val village = loadVillageMap(app) ?: return null
+                    val chars = LinkedHashMap<String, ImageBitmap>()
+                    CHAR_NAMES.forEach { name ->
+                        loadAsset(app, "custom/chars/$name.png", cleanEdges = true)?.let {
+                            chars[name] = it
+                        }
+                    }
+                    val art = CustomArt(villageMap = village, chars = chars)
+                    cached = art
+                    art
                 }
-                val art = CustomArt(
-                    // 마을 맵은 불투명 일러스트라 픽셀 후처리 불필요 (불변 Bitmap setPixels 크래시/지연 방지)
-                    villageMap = loadAsset(app, "custom/village_map.png", cleanEdges = false),
-                    chars = chars,
-                )
-                cached = art
-                return art
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to load custom art", t)
+                null
             }
         }
 
-        private fun loadAsset(context: Context, path: String, cleanEdges: Boolean): ImageBitmap {
-            // AssetInputStream은 mark/reset이 불안정해서 byte 배열로 디코딩한다.
-            val bytes = context.assets.open(path).use { it.readBytes() }
-            val opts = BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-                inMutable = true
-                inPremultiplied = true
-            }
-            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-                ?: error("Failed to decode $path")
-            val bmp = if (decoded.isMutable) {
-                decoded
-            } else {
-                decoded.copy(Bitmap.Config.ARGB_8888, true).also { decoded.recycle() }
-            }
-            if (cleanEdges) {
-                hardenSpriteAlpha(bmp)
-            }
-            return bmp.asImageBitmap()
+        private fun loadVillageMap(context: Context): ImageBitmap? {
+            // oakhaven_base 우선, 실패 시 village_map
+            return loadAsset(context, "custom/oakhaven_base.png", cleanEdges = false)
+                ?: loadAsset(context, "custom/village_map.png", cleanEdges = false)
         }
 
-        /**
-         * 캐릭터 PNG의 반투명/밝은 배경 잔광을 제거한다.
-         * 반드시 mutable Bitmap에서만 호출해야 한다.
-         */
+        private fun loadAsset(context: Context, path: String, cleanEdges: Boolean): ImageBitmap? {
+            return try {
+                val bytes = context.assets.open(path).use { it.readBytes() }
+                val opts = BitmapFactory.Options().apply {
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                    inMutable = cleanEdges
+                    inPremultiplied = true
+                }
+                val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                    ?: return null
+                val bmp = if (cleanEdges) {
+                    val mutable = if (decoded.isMutable) {
+                        decoded
+                    } else {
+                        decoded.copy(Bitmap.Config.ARGB_8888, true).also { decoded.recycle() }
+                    }
+                    hardenSpriteAlpha(mutable)
+                    mutable
+                } else {
+                    decoded
+                }
+                bmp.asImageBitmap()
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to decode $path", t)
+                null
+            }
+        }
+
         private fun hardenSpriteAlpha(bmp: Bitmap) {
+            if (!bmp.isMutable) return
             val w = bmp.width
             val h = bmp.height
             val px = IntArray(w * h)
@@ -128,9 +135,16 @@ class CustomArt(
 }
 
 @Composable
-fun rememberCustomArt(): CustomArt {
+fun rememberCustomArtOrNull(): CustomArt? {
     val context = LocalContext.current
-    return remember(context) { CustomArt.load(context) }
+    return remember(context) { CustomArt.loadOrNull(context) }
+}
+
+/** 하위 호환: 실패하면 예외 대신 null 경로를 쓰도록 화면 쪽에서 처리한다. */
+@Composable
+fun rememberCustomArt(): CustomArt {
+    return rememberCustomArtOrNull()
+        ?: error("Custom art assets missing — rebuild APK with assets/custom")
 }
 
 fun DrawScope.drawCustomVillageMap(art: CustomArt) {
@@ -185,7 +199,6 @@ fun DrawScope.drawCustomSprite(
     }
 }
 
-/** 주인공: 전사 정지 스프라이트 (걷기 프레임 없음, 좌측만 반전). */
 fun DrawScope.drawCustomHero(
     art: CustomArt,
     x: Float,
@@ -193,8 +206,9 @@ fun DrawScope.drawCustomHero(
     facing: Facing,
     worldHeight: Float = 72f,
 ) {
+    val sprite = art.charOrNull("warrior") ?: return
     drawCustomSprite(
-        image = art.heroSprite(),
+        image = sprite,
         cx = x,
         footY = y,
         worldHeight = worldHeight,

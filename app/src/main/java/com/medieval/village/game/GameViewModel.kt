@@ -758,6 +758,11 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    /** 던전 화면 진입 시 맵이 없으면 즉시 생성한다. */
+    fun ensureDungeonLoaded() {
+        if (dungeonFloor == null) enterDungeonFloor(1)
+    }
+
     fun walkInDungeon(x: Float, y: Float) {
         val map = dungeonFloor ?: return
         if (dungeonCombatLock) return

@@ -18,12 +18,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -47,14 +49,16 @@ import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawMercenary
-import com.medieval.village.ui.village.rememberCustomArt
+import com.medieval.village.ui.village.rememberCustomArtOrNull
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
 @Composable
 fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
-    val art = rememberCustomArt()
+    // 맵 타일 그리기는 아트 로딩과 무관하게 동작해야 한다.
+    val art = rememberCustomArtOrNull()
+    LaunchedEffect(Unit) { vm.ensureDungeonLoaded() }
     val floor = vm.dungeonFloor
     Column(modifier = modifier.fillMaxSize().background(Color(0xFF14100C))) {
         Row(
@@ -166,6 +170,8 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
+                // 버전 확인용 워터마크 (적용 여부 즉시 판별)
+                drawLabel("v0.3.2 dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             Box(
@@ -334,17 +340,32 @@ private fun DrawScope.drawDungeonFloor(map: DungeonFloor) {
     }
 }
 
-private fun DrawScope.drawZombie(art: CustomArt, monster: DungeonMonster) {
+private fun DrawScope.drawZombie(art: CustomArt?, monster: DungeonMonster) {
     val x = monster.x
     val y = monster.y
     drawOval(Color(0x55000000), Offset(x - 22f, y - 4f), Size(44f, 14f))
-    drawCustomSprite(
-        image = art.zombieSprite(monster.kind),
-        cx = x,
-        footY = y,
-        worldHeight = 64f,
-    )
-    drawLabel(monster.name, x - 48f, y + 14f, 13f, Color(0xFFE8B4B4))
+    val sprite = art?.zombieSpriteOrNull(monster.kind)
+    if (sprite != null) {
+        drawCustomSprite(
+            image = sprite,
+            cx = x,
+            footY = y,
+            worldHeight = 64f,
+        )
+    } else {
+        // 스프라이트 없이도 보이는 만화풍 슬라임/좀비 대체 표시
+        val body = Path().apply {
+            moveTo(x - 18f, y)
+            quadraticBezierTo(x - 20f, y - 34f, x, y - 38f)
+            quadraticBezierTo(x + 20f, y - 34f, x + 18f, y)
+            close()
+        }
+        drawPath(body, Color(0xFF6FBF5A))
+        drawPath(body, Color(0xFF2F5A28), style = Stroke(3f))
+        drawCircle(Color(0xFF1E2A18), 3f, Offset(x - 6f, y - 22f))
+        drawCircle(Color(0xFF1E2A18), 3f, Offset(x + 6f, y - 22f))
+    }
+    drawLabel(monster.name, x - 48f, y + 14f, 13f, Color(0xFF5A4231))
 }
 
 private fun DrawScope.drawMinimap(

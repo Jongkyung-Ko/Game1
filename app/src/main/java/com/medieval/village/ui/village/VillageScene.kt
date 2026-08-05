@@ -36,12 +36,12 @@ import kotlin.math.roundToInt
 
 @Composable
 fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
-    val art = rememberCustomArt()
+    val art = rememberCustomArtOrNull()
     BoxWithConstraints(modifier.background(Color(0xFF1A140E))) {
         val density = LocalDensity.current
         val wPx = with(density) { maxWidth.toPx() }
         val hPx = with(density) { maxHeight.toPx() }
-        val s = min(wPx / Village.W, hPx / Village.H)
+        val s = min(wPx / Village.W, hPx / Village.H).coerceAtLeast(0.01f)
         val ox = (wPx - Village.W * s) / 2f
         val oy = (hPx - Village.H * s) / 2f
         val heroX = vm.heroX
@@ -66,22 +66,28 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                 }
         ) {
-            drawRect(Color(0xFF120E0A), size = size)
+            // 화면 좌표계 배경 (변환 실패해도 빈 화면 방지)
+            drawRect(Color(0xFF2A1C12), size = size)
             withTransform({
                 translate(ox, oy)
                 scale(s, s, Offset.Zero)
             }) {
-                // 오크헤이븐 마을 일러스트
-                drawCustomVillageMap(art)
+                if (art != null) {
+                    drawCustomVillageMap(art)
+                } else {
+                    // 에셋 로드 실패 시에도 오크헤이븐 좌표에 맞춘 임시 바닥
+                    drawRect(Color(0xFF6F9A54), size = androidx.compose.ui.geometry.Size(Village.W, Village.H))
+                    drawRect(Color(0xFFC2A16B), topLeft = Offset(Village.W * 0.45f, 0f), size = androidx.compose.ui.geometry.Size(Village.W * 0.1f, Village.H))
+                }
 
-                // 건물 핫스팟 힌트 (얇은 테두리)
+                // 건물 핫스팟 힌트
                 Village.places.forEach { p ->
                     drawRoundRect(
-                        color = Color(0x44FFE29A),
+                        color = Color(0x66FFE29A),
                         topLeft = Offset(p.left, p.top),
                         size = androidx.compose.ui.geometry.Size(p.w, p.h),
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f),
-                        style = Stroke(width = 2.5f)
+                        style = Stroke(width = 3f)
                     )
                 }
 
@@ -97,7 +103,6 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         scale = 0.95f,
                     )
                 }
-                // 이전 버전처럼 걸어다니는 Canvas 캐릭터
                 drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.05f)
             }
         }
@@ -132,15 +137,15 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = "Oakhaven · v9",
+            text = if (art != null) "Oakhaven · v0.3.2" else "Oakhaven · v0.3.2 (맵 로딩 실패)",
             color = Color(0xFFFFE29A),
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(8.dp)
-                .background(Color(0x99000000), RoundedCornerShape(6.dp))
-                .padding(horizontal = 8.dp, vertical = 3.dp)
+                .background(Color(0xCC000000), RoundedCornerShape(6.dp))
+                .padding(horizontal = 10.dp, vertical = 4.dp)
         )
 
         val near = Village.places.firstOrNull {

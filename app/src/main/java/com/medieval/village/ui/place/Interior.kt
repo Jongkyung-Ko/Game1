@@ -26,7 +26,7 @@ import kotlin.math.sin
 
 fun DrawScope.drawInterior(
     atlas: KenneyAtlas,
-    art: CustomArt,
+    art: CustomArt?,
     id: PlaceId,
     w: Float,
     h: Float,
@@ -39,12 +39,18 @@ fun DrawScope.drawInterior(
 
     InteriorNpcCatalog.forPlace(id).forEachIndexed { index, npc ->
         val bob = sin(animTime * 2.6f + index) * 2f
-        drawCustomSprite(
-            image = art.npcSprite(npcSpriteKey(npc)),
-            cx = w * npc.fx,
-            footY = h * npc.fy + bob,
-            worldHeight = h * 0.55f,
-        )
+        val sprite = art?.npcSpriteOrNull(npcSpriteKey(npc))
+        if (sprite != null) {
+            drawCustomSprite(
+                image = sprite,
+                cx = w * npc.fx,
+                footY = h * npc.fy + bob,
+                worldHeight = h * 0.55f,
+            )
+        } else {
+            drawCircle(Color(0xFFE7B98F), h * 0.06f, Offset(w * npc.fx, h * npc.fy - h * 0.28f + bob))
+            drawRect(Color(0xFF3E6B8A), Offset(w * npc.fx - h * 0.05f, h * npc.fy - h * 0.22f + bob), Size(h * 0.10f, h * 0.22f))
+        }
         if (speechNpcId == npc.id && !speechText.isNullOrBlank()) {
             drawSpeechBubble(w * npc.fx, h * npc.fy - h * 0.34f, speechText, w)
         }
