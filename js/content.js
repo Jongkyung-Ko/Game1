@@ -48,12 +48,12 @@ window.COURSE = {
       summary: "코드가 하드웨어에서 어떻게 실행되는지 Fetch–Decode–Execute 흐름으로 이해합니다.",
       images: [
         {
-          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/ComputerMemoryHierarchy.svg/960px-ComputerMemoryHierarchy.svg.png",
+          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e3/Computer_Memory_Hierarchy.svg/960px-Computer_Memory_Hierarchy.svg.png",
           alt: "컴퓨터 메모리 계층",
           caption: "메모리 계층 구조 — CPU 캐시부터 저장장치까지",
         },
         {
-          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Von_Neumann_model.png/960px-Von_Neumann_model.png",
+          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Von_Neumann_Architecture-Enhanced_Version.jpg/960px-Von_Neumann_Architecture-Enhanced_Version.jpg",
           alt: "폰 노이만 구조",
           caption: "폰 노이만 모델 — CPU, 메모리, 입출력의 기본 연결",
         },
@@ -71,9 +71,9 @@ window.COURSE = {
           caption: "Motorola 6800 어셈블리 — 저급 언어의 대표적 모습",
         },
         {
-          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/BookClassUML.svg/960px-BookClassUML.svg.png",
-          alt: "UML 클래스 다이어그램",
-          caption: "UML 클래스 — 객체지향 설계의 시각적 표현",
+          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Programming_paradigms.svg/960px-Programming_paradigms.svg.png",
+          alt: "프로그래밍 패러다임",
+          caption: "프로그래밍 패러다임 계보 — 고급·객체지향 언어의 위치",
         },
       ],
     },
@@ -89,9 +89,9 @@ window.COURSE = {
           caption: "V-Model — 개발 단계와 검증 단계의 대칭 구조",
         },
         {
-          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Systems_Engineering_Process_II.svg/960px-Systems_Engineering_Process_II.svg.png",
-          alt: "시스템 엔지니어링 프로세스",
-          caption: "시스템 엔지니어링 프로세스 — 요구부터 검증까지의 흐름",
+          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Waterfall_model.svg/960px-Waterfall_model.svg.png",
+          alt: "폭포수/단계형 개발 모델",
+          caption: "단계형 개발 흐름 — V모델의 기반이 되는 순차 검증 사고",
         },
       ],
     },
@@ -156,9 +156,9 @@ window.COURSE = {
       summary: "인터넷에서 반복적으로 강조되는 대표 지침 5가지를 정리하고, 프롬프트로 바로 적용해 봅니다.",
       images: [
         {
-          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Prompt_injection.svg/960px-Prompt_injection.svg.png",
-          alt: "프롬프트/컨텍스트 개념",
-          caption: "프롬프트·컨텍스트 관련 개념 도식 — 입력 구조의 중요성",
+          src: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Colored_neural_network.svg/960px-Colored_neural_network.svg.png",
+          alt: "신경망과 컨텍스트 흐름",
+          caption: "신경망 개념도 — 입력 컨텍스트가 결과에 영향을 주는 구조",
         },
         {
           src: "https://upload.wikimedia.org/wikipedia/commons/0/09/Pros_and_cons_of_Search_Engines%2C_Knowledge_Graphs_and_Large_Language_Modells%2C_2025.png",

@@ -330,21 +330,26 @@ button, input, textarea, select { font: inherit; }
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--line);
-  background: #0f1f1a;
+  background: #ffffff;
   position: relative;
+  box-shadow: inset 0 0 0 1px rgba(19, 36, 31, 0.04);
 }
 .media-frame img {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 320px;
-  object-fit: cover;
+  max-height: 360px;
+  object-fit: contain;
+  object-position: center;
+  background: #ffffff;
+  padding: 0.75rem;
 }
 .media-frame figcaption {
   padding: 0.65rem 0.85rem;
   font-size: 0.78rem;
   color: var(--ink-soft);
-  background: #fff;
+  background: #f7faf8;
+  border-top: 1px solid var(--line);
 }
 
 .stack { display: grid; gap: 1rem; }
