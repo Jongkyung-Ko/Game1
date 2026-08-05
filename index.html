@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SW × Vibe Coding 인터랙티브 강좌</title>
+  <meta name="description" content="SW와 컴퓨터 기초부터 AI 바이브 코딩 요구사항 관리까지, 9페이지 인터랙티브 강좌" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="#home" data-nav="home">
+      <span class="brand-mark">SV</span>
+      <span class="brand-text">
+        <strong>SW × Vibe</strong>
+        <small>Interactive Course</small>
+      </span>
+    </a>
+    <div class="progress-wrap" aria-label="학습 진행률">
+      <div class="progress-meta">
+        <span id="progressLabel">시작 전</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+    <button class="nav-toggle" id="navToggle" aria-label="목차 열기" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <aside class="sidebar" id="sidebar">
+    <p class="sidebar-label">목차</p>
+    <nav id="sideNav"></nav>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <main id="app">
+    <!-- pages injected by JS -->
+  </main>
+
+  <footer class="site-footer">
+    <p>이미지 출처: Wikimedia Commons · 교육용 비영리 목적</p>
+  </footer>
+
+  <script src="js/content.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
