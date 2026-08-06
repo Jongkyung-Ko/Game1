@@ -46,17 +46,22 @@ import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
+import com.medieval.village.ui.village.DungeonTiles
+import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawHero
+import com.medieval.village.ui.village.drawKenneySprite
+import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.drawMercenary
 import com.medieval.village.ui.village.rememberCustomArtOrNull
+import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
 @Composable
 fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
-    // 맵 타일 그리기는 아트 로딩과 무관하게 동작해야 한다.
+    val atlas = rememberKenneyAtlasOrNull()
     val art = rememberCustomArtOrNull()
     LaunchedEffect(Unit) { vm.ensureDungeonLoaded() }
     val floor = vm.dungeonFloor
@@ -76,7 +81,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "횃불이 비추는 돌복도 — 화면을 눌러 이동",
+                    "Kenney Tiny Dungeon — 화면을 눌러 이동",
                     color = Palette.ParchmentDim,
                     fontSize = 10.sp
                 )
@@ -147,8 +152,14 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 withTransform({
                     translate(-camX, -camY)
                 }) {
-                    drawDungeonFloor(map)
-                    map.monsters.filter { it.alive }.forEach { drawZombie(art, it) }
+                    if (atlas != null) {
+                        drawKenneyDungeonFloor(atlas, map)
+                    } else {
+                        drawDungeonFloorFallback(map)
+                    }
+                    map.monsters.filter { it.alive }.forEach { monster ->
+                        drawDungeonMonster(atlas, art, monster)
+                    }
                     party.forEachIndexed { index, mercenary ->
                         drawMercenary(
                             mercenary = mercenary,
@@ -170,8 +181,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                // 버전 확인용 워터마크 (적용 여부 즉시 판별)
-                drawLabel("v0.3.2 dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.3.3 Kenney dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             Box(
@@ -233,139 +243,137 @@ private fun cameraOffset(
     return camX to camY
 }
 
-private fun DrawScope.drawDungeonFloor(map: DungeonFloor) {
-    // 만화풍: 밝은 양피지 바탕 + 두꺼운 돌벽 외곽선
-    drawRect(Color(0xFFCDB892), size = Size(map.worldW, map.worldH))
+/** Kenney Tiny Dungeon 타일시트로 층 맵을 그린다. */
+private fun DrawScope.drawKenneyDungeonFloor(atlas: KenneyAtlas, map: DungeonFloor) {
+    drawRect(Color(0xFF1A1410), size = Size(map.worldW, map.worldH))
     val ts = map.tileSize
-    val rock = Color(0xFF5A544C)
-    val rockLight = Color(0xFF726B61)
-    val rockDark = Color(0xFF3B3630)
-    val outline = Color(0xFF231E19)
-    val floorA = Color(0xFFC9A876)
-    val floorB = Color(0xFFB8955F)
+    val sheet = atlas.dungeon
 
-    for (r in 0 until map.rows) {
-        for (c in 0 until map.cols) {
-            val tile = map.tileAt(c, r)
-            val x = c * ts
-            val y = r * ts
-            when (tile) {
-                DungeonTile.WALL -> {
-                    drawRoundRect(rock, Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), CornerRadius(8f, 8f))
-                    drawRoundRect(outline, Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), CornerRadius(8f, 8f), style = Stroke(4f))
-                    drawCircle(rockLight.copy(alpha = 0.55f), ts * 0.12f, Offset(x + ts * 0.35f, y + ts * 0.35f))
-                    drawCircle(rockDark.copy(alpha = 0.4f), ts * 0.10f, Offset(x + ts * 0.65f, y + ts * 0.62f))
-                }
-                DungeonTile.FLOOR -> {
-                    val tone = if ((c + r) % 2 == 0) floorA else floorB
-                    drawRoundRect(tone, Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
-                }
-                DungeonTile.SEWER -> {
-                    drawRoundRect(Color(0xFF8FAE7A), Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
-                    drawRoundRect(Color(0xFF4E6B3A), Offset(x + ts * 0.35f, y + 6f), Size(ts * 0.30f, ts - 12f), CornerRadius(4f, 4f))
-                    drawCircle(Color(0x6626A86A), 12f, Offset(x + ts / 2f, y + ts * 0.72f))
-                }
-                DungeonTile.VAULT -> {
-                    drawRoundRect(floorA, Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
-                    // 보물상자
-                    drawRoundRect(Color(0xFF6B4B2E), Offset(x + ts * 0.22f, y + ts * 0.42f), Size(ts * 0.56f, ts * 0.32f), CornerRadius(4f, 4f))
-                    drawRoundRect(Color(0xFF8A5A2B), Offset(x + ts * 0.22f, y + ts * 0.28f), Size(ts * 0.56f, ts * 0.20f), CornerRadius(4f, 4f))
-                    drawRoundRect(Color(0xFFD9A441), Offset(x + ts * 0.22f, y + ts * 0.44f), Size(ts * 0.56f, 4f), CornerRadius(2f, 2f))
-                    drawCircle(Color(0xFFF9DE85), 5f, Offset(x + ts / 2f, y + ts * 0.55f))
-                    drawRoundRect(outline, Offset(x + ts * 0.22f, y + ts * 0.28f), Size(ts * 0.56f, ts * 0.46f), CornerRadius(4f, 4f), style = Stroke(3f))
-                }
-                DungeonTile.STAIRS_UP -> {
-                    drawRoundRect(floorA, Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
-                    for (i in 0..3) {
-                        drawRoundRect(
-                            Color(0xFF8A7350),
-                            Offset(x + 10f + i * 4f, y + 12f + i * 10f),
-                            Size(ts - 20f - i * 8f, 8f),
-                            CornerRadius(3f, 3f)
-                        )
-                        drawLine(
-                            outline,
-                            Offset(x + 10f + i * 4f, y + 12f + i * 10f),
-                            Offset(x + ts - 10f - i * 4f, y + 12f + i * 10f),
-                            2.5f
-                        )
-                    }
-                    drawLabel("입구", x + 14f, y + ts - 8f, 16f, Color(0xFF5A4231))
-                }
-                DungeonTile.STAIRS_DOWN -> {
-                    drawRoundRect(floorB, Offset(x + 3f, y + 3f), Size(ts - 6f, ts - 6f), CornerRadius(6f, 6f))
-                    drawCircle(Color(0xFF2A2218), ts * 0.28f, Offset(x + ts / 2f, y + ts / 2f))
-                    drawCircle(outline, ts * 0.28f, Offset(x + ts / 2f, y + ts / 2f), style = Stroke(4f))
-                    drawArc(
-                        Color(0xFFD9A441),
-                        startAngle = 20f,
-                        sweepAngle = 240f,
-                        useCenter = false,
-                        topLeft = Offset(x + ts * 0.28f, y + ts * 0.28f),
-                        size = Size(ts * 0.44f, ts * 0.44f),
-                        style = Stroke(4f)
-                    )
-                    drawLabel("아래", x + 14f, y + ts - 8f, 16f, Color(0xFF5A4231))
-                }
-            }
-            // 횃불
-            if (tile != DungeonTile.WALL && (c * 17 + r * 31) % 23 == 0) {
-                drawCircle(Color(0x55E8843A), 22f, Offset(x + ts / 2f, y + 14f))
-                drawRect(Color(0xFF5A3A22), Offset(x + ts / 2f - 3.5f, y + 16f), Size(7f, ts * 0.28f))
-                drawCircle(Color(0xFFE8843A), 8f, Offset(x + ts / 2f, y + 12f))
-                drawCircle(Color(0xFFF9DE85), 4f, Offset(x + ts / 2f, y + 10f))
-            }
+    fun isWalk(c: Int, r: Int): Boolean = map.tileAt(c, r) != DungeonTile.WALL
+
+    fun wallTile(c: Int, r: Int): Int {
+        val below = isWalk(c, r + 1)
+        val above = isWalk(c, r - 1)
+        val side = isWalk(c - 1, r) || isWalk(c + 1, r)
+        return when {
+            below && !above -> DungeonTiles.WALL_TOP
+            side && !below -> DungeonTiles.WALL_MID
+            (c + r) % 5 == 0 -> DungeonTiles.WALL_WINDOW
+            (c * 3 + r) % 7 == 0 -> DungeonTiles.WALL_BRICK
+            else -> DungeonTiles.WALL_FILL
         }
     }
 
-    // 통로 가장자리 두꺼운 외곽선
+    // 1) 바닥 / 벽
     for (r in 0 until map.rows) {
         for (c in 0 until map.cols) {
-            if (map.tileAt(c, r) == DungeonTile.WALL) continue
             val x = c * ts
             val y = r * ts
-            if (map.tileAt(c, r - 1) == DungeonTile.WALL) {
-                drawLine(outline, Offset(x + 4f, y + 3f), Offset(x + ts - 4f, y + 3f), 5f)
+            val cell = map.tileAt(c, r)
+            if (cell == DungeonTile.WALL) {
+                // 보이는 벽만 타일 (깊은 벽은 배경색)
+                val visible = isWalk(c, r - 1) || isWalk(c, r + 1) || isWalk(c - 1, r) || isWalk(c + 1, r)
+                if (visible) {
+                    drawKenneyTile(sheet, wallTile(c, r), x, y, ts)
+                }
+                continue
             }
-            if (map.tileAt(c, r + 1) == DungeonTile.WALL) {
-                drawLine(outline, Offset(x + 4f, y + ts - 3f), Offset(x + ts - 4f, y + ts - 3f), 5f)
+            val floorId = when {
+                (c * 5 + r * 3) % 11 == 0 -> DungeonTiles.FLOOR_STONE
+                (c + r) % 2 == 0 -> DungeonTiles.FLOOR
+                else -> DungeonTiles.FLOOR_ALT
             }
-            if (map.tileAt(c - 1, r) == DungeonTile.WALL) {
-                drawLine(outline, Offset(x + 3f, y + 4f), Offset(x + 3f, y + ts - 4f), 5f)
-            }
-            if (map.tileAt(c + 1, r) == DungeonTile.WALL) {
-                drawLine(outline, Offset(x + ts - 3f, y + 4f), Offset(x + ts - 3f, y + ts - 4f), 5f)
+            drawKenneyTile(sheet, floorId, x, y, ts)
+        }
+    }
+
+    // 2) 소품 / 계단
+    for (r in 0 until map.rows) {
+        for (c in 0 until map.cols) {
+            val x = c * ts
+            val y = r * ts
+            when (map.tileAt(c, r)) {
+                DungeonTile.STAIRS_UP -> drawKenneyTile(sheet, DungeonTiles.LADDER_UP, x, y, ts)
+                DungeonTile.STAIRS_DOWN -> drawKenneyTile(sheet, DungeonTiles.LADDER_DOWN, x, y, ts)
+                DungeonTile.VAULT -> drawKenneyTile(
+                    sheet,
+                    if ((c + r) % 2 == 0) DungeonTiles.CHEST else DungeonTiles.CHEST_OPEN,
+                    x, y, ts
+                )
+                DungeonTile.SEWER -> drawKenneyTile(sheet, DungeonTiles.BARREL, x, y, ts)
+                DungeonTile.FLOOR -> {
+                    when {
+                        (c * 13 + r * 7) % 29 == 0 -> drawKenneyTile(sheet, DungeonTiles.PILLAR, x, y, ts)
+                        (c + r * 2) % 31 == 0 -> drawKenneyTile(sheet, DungeonTiles.TOMB, x, y, ts)
+                        (c * 11 + r * 5) % 37 == 0 -> drawKenneyTile(
+                            sheet,
+                            if ((c + r) % 2 == 0) DungeonTiles.POTION_R else DungeonTiles.POTION_B,
+                            x, y, ts
+                        )
+                        (c * 3 + r * 17) % 41 == 0 -> drawKenneyTile(sheet, DungeonTiles.DOOR_OPEN, x, y, ts)
+                    }
+                }
+                else -> Unit
             }
         }
     }
 }
 
-private fun DrawScope.drawZombie(art: CustomArt?, monster: DungeonMonster) {
+/** 타일시트 로드 실패 시 최소한의 폴백 */
+private fun DrawScope.drawDungeonFloorFallback(map: DungeonFloor) {
+    drawRect(Color(0xFFCDB892), size = Size(map.worldW, map.worldH))
+    val ts = map.tileSize
+    for (r in 0 until map.rows) {
+        for (c in 0 until map.cols) {
+            val x = c * ts
+            val y = r * ts
+            when (map.tileAt(c, r)) {
+                DungeonTile.WALL -> drawRect(Color(0xFF5A544C), Offset(x, y), Size(ts, ts))
+                DungeonTile.STAIRS_UP -> drawRect(Color(0xFF8FCF7A), Offset(x, y), Size(ts, ts))
+                DungeonTile.STAIRS_DOWN -> drawRect(Color(0xFFC0392B), Offset(x, y), Size(ts, ts))
+                DungeonTile.VAULT -> drawRect(Color(0xFFD9A441), Offset(x, y), Size(ts, ts))
+                else -> drawRect(
+                    if ((c + r) % 2 == 0) Color(0xFFC9A876) else Color(0xFFB8955F),
+                    Offset(x, y),
+                    Size(ts, ts)
+                )
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawDungeonMonster(atlas: KenneyAtlas?, art: CustomArt?, monster: DungeonMonster) {
     val x = monster.x
     val y = monster.y
     drawOval(Color(0x55000000), Offset(x - 22f, y - 4f), Size(44f, 14f))
-    val sprite = art?.zombieSpriteOrNull(monster.kind)
-    if (sprite != null) {
-        drawCustomSprite(
-            image = sprite,
-            cx = x,
-            footY = y,
-            worldHeight = 64f,
-        )
-    } else {
-        // 스프라이트 없이도 보이는 만화풍 슬라임/좀비 대체 표시
-        val body = Path().apply {
-            moveTo(x - 18f, y)
-            quadraticBezierTo(x - 20f, y - 34f, x, y - 38f)
-            quadraticBezierTo(x + 20f, y - 34f, x + 18f, y)
-            close()
-        }
-        drawPath(body, Color(0xFF6FBF5A))
-        drawPath(body, Color(0xFF2F5A28), style = Stroke(3f))
-        drawCircle(Color(0xFF1E2A18), 3f, Offset(x - 6f, y - 22f))
-        drawCircle(Color(0xFF1E2A18), 3f, Offset(x + 6f, y - 22f))
+
+    val kenneyId = when (monster.kind) {
+        "shambler", "bloater" -> DungeonTiles.SLIME
+        "runner" -> DungeonTiles.BAT
+        "armored", "blacksmith" -> DungeonTiles.ORC
+        "farmer" -> DungeonTiles.SPIDER
+        "golem" -> DungeonTiles.SKELETON
+        else -> DungeonTiles.SLIME
     }
-    drawLabel(monster.name, x - 48f, y + 14f, 13f, Color(0xFF5A4231))
+
+    if (atlas != null) {
+        drawKenneySprite(atlas.dungeon, kenneyId, x, y, size = 56f)
+    } else {
+        val sprite = art?.zombieSpriteOrNull(monster.kind)
+        if (sprite != null) {
+            drawCustomSprite(sprite, x, y, worldHeight = 64f)
+        } else {
+            val body = Path().apply {
+                moveTo(x - 18f, y)
+                quadraticBezierTo(x - 20f, y - 34f, x, y - 38f)
+                quadraticBezierTo(x + 20f, y - 34f, x + 18f, y)
+                close()
+            }
+            drawPath(body, Color(0xFF6FBF5A))
+            drawPath(body, Color(0xFF2F5A28), style = Stroke(3f))
+        }
+    }
+    drawLabel(monster.name, x - 48f, y + 14f, 13f, Color(0xFFE8D9B8))
 }
 
 private fun DrawScope.drawMinimap(

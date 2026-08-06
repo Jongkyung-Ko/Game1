@@ -29,7 +29,8 @@ class KenneyAtlas(
 
     companion object {
         const val TILE = 16
-        const val STRIDE = 17
+        /** 저장소의 tiny_*.png 는 1px 갭 없이 16px 타일이 밀집 패킹되어 있다. */
+        const val STRIDE = 16
         const val COLS = 12
         /** Precomposed sprites were exported at 8× native tile size. */
         const val SPRITE_SCALE = 8
@@ -96,6 +97,14 @@ class KenneyAtlas(
 fun rememberKenneyAtlas(): KenneyAtlas {
     val context = LocalContext.current
     return remember(context) { KenneyAtlas.load(context) }
+}
+
+@Composable
+fun rememberKenneyAtlasOrNull(): KenneyAtlas? {
+    val context = LocalContext.current
+    return remember(context) {
+        runCatching { KenneyAtlas.load(context) }.getOrNull()
+    }
 }
 
 fun DrawScope.drawKenneyTile(
@@ -205,11 +214,32 @@ object TownTiles {
     const val PATH_BR = 38
 }
 
+/**
+ * Kenney Tiny Dungeon 타일 인덱스 (12열 row-major).
+ * preview_kenney_dungeon.py / 타일시트 인덱싱 이미지와 맞춰 검증됨.
+ */
 object DungeonTiles {
     const val FLOOR = 0
-    const val WALL = 1
+    const val FLOOR_ALT = 2
+    const val FLOOR_ALT2 = 3
+    const val FLOOR_STONE = 12
+    const val WALL_TOP = 4
+    const val WALL_FILL = 5
+    const val WALL_MID = 16
+    const val WALL_BRICK = 17
+    const val WALL_WINDOW = 28
+    const val PILLAR = 7
+    const val DOOR_CLOSED = 10
+    const val DOOR_OPEN = 22
+    const val LADDER_UP = 63
+    const val LADDER_DOWN = 75
+    const val TOMB = 64
+    const val BARREL = 82
+    const val CHEST = 89
+    const val CHEST_OPEN = 91
+    const val POTION_R = 114
+    const val POTION_B = 116
     const val TABLE = 72
-    const val CHEST = 74
     const val MAGE = 84
     const val VILLAGER = 85
     const val HOODED = 86
@@ -220,4 +250,12 @@ object DungeonTiles {
     const val KNIGHT_RED = 98
     const val WOMAN = 99
     const val HERO = 100
+    const val SLIME = 108
+    const val ORC = 110
+    const val BAT = 120
+    const val SKELETON = 121
+    const val SPIDER = 122
+
+    /** 하위 호환 별칭 */
+    const val WALL = WALL_FILL
 }
