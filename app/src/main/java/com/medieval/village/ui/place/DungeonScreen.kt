@@ -24,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -81,7 +83,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "Kenney Tiny Dungeon — 화면을 눌러 이동",
+                    "하이브리드 던전 — 화면을 눌러 이동",
                     color = Palette.ParchmentDim,
                     fontSize = 10.sp
                 )
@@ -153,7 +155,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     translate(-camX, -camY)
                 }) {
                     if (atlas != null) {
-                        drawKenneyDungeonFloor(atlas, map)
+                        drawHybridDungeonFloor(atlas, map)
                     } else {
                         drawDungeonFloorFallback(map)
                     }
@@ -181,7 +183,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.3.4 Kenney dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.3.5 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             Box(
@@ -243,51 +245,124 @@ private fun cameraOffset(
     return camX to camY
 }
 
-/** Kenney Tiny Dungeon 타일시트로 층 맵을 그린다. */
-private fun DrawScope.drawKenneyDungeonFloor(atlas: KenneyAtlas, map: DungeonFloor) {
-    drawRect(Color(0xFF1A1410), size = Size(map.worldW, map.worldH))
+/**
+ * Style C — 하이브리드 던전.
+ * 페인티드 바닥/벽 + Kenney 소품·계단 + 횃불 글로우.
+ */
+private fun DrawScope.drawHybridDungeonFloor(atlas: KenneyAtlas, map: DungeonFloor) {
+    drawRect(Color(0xFF0E0A08), size = Size(map.worldW, map.worldH))
     val ts = map.tileSize
     val sheet = atlas.dungeon
+    val floorCr = CornerRadius(ts * 0.12f, ts * 0.12f)
+    val wallCr = CornerRadius(ts * 0.20f, ts * 0.20f)
 
     fun isWalk(c: Int, r: Int): Boolean = map.tileAt(c, r) != DungeonTile.WALL
 
-    fun wallTile(c: Int, r: Int): Int {
-        val below = isWalk(c, r + 1)
-        val above = isWalk(c, r - 1)
-        val side = isWalk(c - 1, r) || isWalk(c + 1, r)
-        return when {
-            below && !above -> DungeonTiles.WALL_TOP
-            side && !below -> DungeonTiles.WALL_MID
-            (c + r) % 5 == 0 -> DungeonTiles.WALL_WINDOW
-            (c * 3 + r) % 7 == 0 -> DungeonTiles.WALL_BRICK
-            else -> DungeonTiles.WALL_FILL
-        }
-    }
+    fun rgb(r: Int, g: Int, b: Int, a: Int = 255): Color =
+        Color(
+            red = r.coerceIn(0, 255) / 255f,
+            green = g.coerceIn(0, 255) / 255f,
+            blue = b.coerceIn(0, 255) / 255f,
+            alpha = a.coerceIn(0, 255) / 255f,
+        )
 
-    // 1) 바닥 / 벽
+    // 1) 페인티드 바닥 (베벨 돌판)
     for (r in 0 until map.rows) {
         for (c in 0 until map.cols) {
+            if (map.tileAt(c, r) == DungeonTile.WALL) continue
             val x = c * ts
             val y = r * ts
-            val cell = map.tileAt(c, r)
-            if (cell == DungeonTile.WALL) {
-                // 보이는 벽만 타일 (깊은 벽은 배경색)
-                val visible = isWalk(c, r - 1) || isWalk(c, r + 1) || isWalk(c - 1, r) || isWalk(c + 1, r)
-                if (visible) {
-                    drawKenneyTile(sheet, wallTile(c, r), x, y, ts)
-                }
-                continue
-            }
-            val floorId = when {
-                (c * 5 + r * 3) % 11 == 0 -> DungeonTiles.FLOOR_STONE
-                (c + r) % 2 == 0 -> DungeonTiles.FLOOR
-                else -> DungeonTiles.FLOOR_ALT
-            }
-            drawKenneyTile(sheet, floorId, x, y, ts)
+            val even = (c + r) % 2 == 0
+            val n = ((c * 17 + r * 31) % 17) - 8
+            val baseR = (if (even) 205 else 186) + n
+            val baseG = (if (even) 170 else 150) + n
+            val baseB = (if (even) 118 else 96) + n / 2
+            drawRoundRect(
+                rgb(baseR, baseG, baseB),
+                Offset(x + 1f, y + 1f),
+                Size(ts - 2f, ts - 2f),
+                floorCr,
+            )
+            // 하단 살짝 그림자
+            drawRoundRect(
+                rgb(40, 14, 8, 45),
+                Offset(x + 4f, y + ts * 0.72f),
+                Size(ts - 8f, ts * 0.18f),
+                CornerRadius(4f, 4f),
+            )
+            // 윗면 하이라이트
+            drawRoundRect(
+                rgb(255, 230, 180, 28),
+                Offset(x + 5f, y + 4f),
+                Size(ts - 10f, ts * 0.18f),
+                CornerRadius(3f, 3f),
+            )
         }
     }
 
-    // 2) 소품 / 계단
+    // 2) 페인티드 벽 (돌 블록)
+    for (r in 0 until map.rows) {
+        for (c in 0 until map.cols) {
+            if (map.tileAt(c, r) != DungeonTile.WALL) continue
+            val visible = isWalk(c, r - 1) || isWalk(c, r + 1) || isWalk(c - 1, r) || isWalk(c + 1, r)
+            if (!visible) continue
+            val x = c * ts
+            val y = r * ts
+            val tone = when {
+                (c + r) % 5 == 0 -> 98
+                (c * 3 + r) % 7 == 0 -> 82
+                else -> 88
+            }
+            drawRoundRect(
+                rgb(tone, tone - 6, tone - 14),
+                Offset(x + 1f, y + 1f),
+                Size(ts - 2f, ts - 2f),
+                wallCr,
+            )
+            drawRoundRect(
+                rgb(25, 20, 16),
+                Offset(x + 1f, y + 1f),
+                Size(ts - 2f, ts - 2f),
+                wallCr,
+                style = Stroke(2.2f),
+            )
+            // 돌 질감 점
+            drawOval(
+                rgb(130, 122, 112, 150),
+                Offset(x + ts * 0.18f, y + ts * 0.16f),
+                Size(ts * 0.22f, ts * 0.14f),
+            )
+            drawOval(
+                rgb(50, 46, 42, 140),
+                Offset(x + ts * 0.52f, y + ts * 0.48f),
+                Size(ts * 0.24f, ts * 0.16f),
+            )
+        }
+    }
+
+    // 3) 바닥–벽 경계 아웃라인
+    val edge = Color(0xE61C1814)
+    for (r in 0 until map.rows) {
+        for (c in 0 until map.cols) {
+            if (!isWalk(c, r)) continue
+            val x = c * ts
+            val y = r * ts
+            if (!isWalk(c, r - 1)) {
+                drawLine(edge, Offset(x + 2f, y + 2f), Offset(x + ts - 2f, y + 2f), strokeWidth = 3f)
+            }
+            if (!isWalk(c, r + 1)) {
+                drawLine(edge, Offset(x + 2f, y + ts - 2f), Offset(x + ts - 2f, y + ts - 2f), strokeWidth = 3f)
+            }
+            if (!isWalk(c - 1, r)) {
+                drawLine(edge, Offset(x + 2f, y + 2f), Offset(x + 2f, y + ts - 2f), strokeWidth = 3f)
+            }
+            if (!isWalk(c + 1, r)) {
+                drawLine(edge, Offset(x + ts - 2f, y + 2f), Offset(x + ts - 2f, y + ts - 2f), strokeWidth = 3f)
+            }
+        }
+    }
+
+    // 4) Kenney 소품 / 계단
     for (r in 0 until map.rows) {
         for (c in 0 until map.cols) {
             val x = c * ts
@@ -298,7 +373,7 @@ private fun DrawScope.drawKenneyDungeonFloor(atlas: KenneyAtlas, map: DungeonFlo
                 DungeonTile.VAULT -> drawKenneyTile(
                     sheet,
                     if ((c + r) % 2 == 0) DungeonTiles.CHEST else DungeonTiles.CHEST_OPEN,
-                    x, y, ts
+                    x, y, ts,
                 )
                 DungeonTile.SEWER -> drawKenneyTile(sheet, DungeonTiles.BARREL, x, y, ts)
                 DungeonTile.FLOOR -> {
@@ -308,7 +383,7 @@ private fun DrawScope.drawKenneyDungeonFloor(atlas: KenneyAtlas, map: DungeonFlo
                         (c * 11 + r * 5) % 37 == 0 -> drawKenneyTile(
                             sheet,
                             if ((c + r) % 2 == 0) DungeonTiles.POTION_R else DungeonTiles.POTION_B,
-                            x, y, ts
+                            x, y, ts,
                         )
                         (c * 3 + r * 17) % 41 == 0 -> drawKenneyTile(sheet, DungeonTiles.DOOR_OPEN, x, y, ts)
                     }
@@ -316,6 +391,47 @@ private fun DrawScope.drawKenneyDungeonFloor(atlas: KenneyAtlas, map: DungeonFlo
                 else -> Unit
             }
         }
+    }
+
+    // 5) 횃불 + 분위기 조명
+    val torchSpots = ArrayList<Offset>(24)
+    for (r in 0 until map.rows) {
+        for (c in 0 until map.cols) {
+            if (!isWalk(c, r)) continue
+            val nearWall = !isWalk(c, r - 1) || !isWalk(c, r + 1) || !isWalk(c - 1, r) || !isWalk(c + 1, r)
+            if (!nearWall || (c * 17 + r * 9) % 16 != 0) continue
+            val cx = c * ts + ts * 0.5f
+            val cy = r * ts + ts * 0.32f
+            torchSpots += Offset(cx, cy)
+            // 횃불 본체
+            drawRect(rgb(90, 58, 34), Offset(cx - 2.5f, cy), Size(5f, ts * 0.28f))
+            drawOval(rgb(232, 132, 58), Offset(cx - 7f, cy - 12f), Size(14f, 14f))
+            drawOval(rgb(249, 222, 133), Offset(cx - 4f, cy - 14f), Size(8f, 10f))
+            if (torchSpots.size >= 18) break
+        }
+        if (torchSpots.size >= 18) break
+    }
+
+    // 전체 살짝 어둡게
+    drawRect(rgb(8, 4, 2, 72), size = Size(map.worldW, map.worldH))
+
+    // 횃불 방사광
+    val glowR = ts * 3.2f
+    for (spot in torchSpots) {
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0x66E8843A),
+                    Color(0x33E8843A),
+                    Color(0x00E8843A),
+                ),
+                center = spot,
+                radius = glowR,
+            ),
+            radius = glowR,
+            center = spot,
+            blendMode = BlendMode.Screen,
+        )
     }
 }
 
