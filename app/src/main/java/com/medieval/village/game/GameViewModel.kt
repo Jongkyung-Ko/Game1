@@ -826,6 +826,8 @@ class GameViewModel : ViewModel() {
     fun approachDungeonMonster(monster: DungeonMonster) {
         if (!monster.alive || dungeonCombatLock) return
         pendingDungeonMonster = monster
+        pendingChestCol = null
+        pendingChestRow = null
         dungeonTarget = Waypoint(monster.x, monster.y)
     }
 
