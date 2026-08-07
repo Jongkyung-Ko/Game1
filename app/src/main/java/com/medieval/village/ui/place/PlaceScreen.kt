@@ -360,7 +360,7 @@ private fun ColumnScope.MagicSchoolActions(vm: GameViewModel) {
 @Composable
 private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
     SectionTitle("좀비 사냥 용병")
-    Text("용병은 여러 명 고용할 수 있고, Status에서 최대 2명을 원정대로 선택한다. 좀비 둥지 전투력에 반영된다.", color = Palette.ParchmentDim, fontSize = 12.sp)
+    Text("용병은 여러 명 고용할 수 있고, Status에서 최대 2명을 원정대로 선택한다. 던전 전투로 레벨업하며 Status에서 장비를 장착할 수 있다.", color = Palette.ParchmentDim, fontSize = 12.sp)
     Spacer(Modifier.height(8.dp))
 
     if (vm.party.isNotEmpty()) {

@@ -222,7 +222,7 @@ private fun ColumnScope.MercGearPanel(vm: GameViewModel, mercId: String) {
             }
         }
     }
-    Spacer(modifier.height(4.dp))
+    Spacer(Modifier = Modifier.height(4.dp))
     Text("가방에서 장착", color = Palette.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     val gear = vm.inventory.toList().filter { it.item.isEquipment }
     if (gear.isEmpty()) {
