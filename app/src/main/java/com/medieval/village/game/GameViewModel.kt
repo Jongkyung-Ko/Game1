@@ -482,8 +482,11 @@ class GameViewModel : ViewModel() {
         val col = (dungeonHeroX / map.tileSize).toInt()
         val row = (dungeonHeroY / map.tileSize).toInt()
         val cell = map.tileAt(col, row)
-        if (cell == DungeonTile.WALL) {
-            say("여기에는 포털을 열 수 없다.")
+        if (cell == DungeonTile.WALL ||
+            cell == DungeonTile.STAIRS_UP ||
+            cell == DungeonTile.STAIRS_DOWN
+        ) {
+            say("여기에는 포털을 열 수 없다. 평평한 바닥 위에서 쓰자.")
             return false
         }
         // 층당 포털은 하나만 — 이전 포털은 바닥으로 되돌린다.
