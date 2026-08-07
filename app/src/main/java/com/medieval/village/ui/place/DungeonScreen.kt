@@ -127,6 +127,12 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                                 ?.takeIf { hypot(worldX - it.x, worldY - it.y) < DungeonFactory.TILE * 0.9f }
                             if (zombie != null) {
                                 vm.approachDungeonMonster(zombie)
+                                return@detectTapGestures
+                            }
+                            val col = (worldX / map.tileSize).toInt()
+                            val row = (worldY / map.tileSize).toInt()
+                            if (map.tileAt(col, row) == DungeonTile.VAULT) {
+                                vm.openDungeonChest(col, row)
                             } else {
                                 vm.walkInDungeon(worldX, worldY)
                             }
@@ -184,7 +190,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.3.7 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.3.8 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             Box(
@@ -199,7 +205,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         "stairs_up" -> "↑ 지상 출구 — 아래에서 ‘탈출’"
                         "stairs_down" -> "↓ 더 깊은 층 — 아래에서 ‘내려가기’"
                         "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
-                        else -> "화면을 눌러 이동 · 좀비를 누르면 다가가 전투"
+                        "chest" -> "◆ 보물상자 — 아래에서 ‘열기’ 또는 상자를 탭"
+                        "chest_open" -> "이미 열어 본 보물상자"
+                        else -> "화면을 눌러 이동 · 상자를 탭해 열기 · 좀비는 전투"
                     },
                     color = Palette.Parchment,
                     fontSize = 11.sp
@@ -220,6 +228,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                     "portal" -> WoodButton("집으로", Modifier.weight(1f), highlight = true) {
                         vm.enterHomePortal()
+                    }
+                    "chest" -> WoodButton("열기", Modifier.weight(1f), highlight = true) {
+                        vm.openDungeonChest()
                     }
                     else -> WoodButton("탈출", Modifier.weight(1f)) { vm.escapeDungeon() }
                 }
@@ -384,11 +395,8 @@ private fun DrawScope.drawHybridDungeonFloor(atlas: KenneyAtlas, map: DungeonFlo
                 DungeonTile.STAIRS_UP -> drawKenneyTile(sheet, DungeonTiles.LADDER_UP, x, y, ts)
                 DungeonTile.STAIRS_DOWN -> drawKenneyTile(sheet, DungeonTiles.LADDER_DOWN, x, y, ts)
                 DungeonTile.PORTAL -> drawHomePortalTile(x, y, ts)
-                DungeonTile.VAULT -> drawKenneyTile(
-                    sheet,
-                    if ((c + r) % 2 == 0) DungeonTiles.CHEST else DungeonTiles.CHEST_OPEN,
-                    x, y, ts,
-                )
+                DungeonTile.VAULT -> drawKenneyTile(sheet, DungeonTiles.CHEST, x, y, ts)
+                DungeonTile.CHEST_OPEN -> drawKenneyTile(sheet, DungeonTiles.CHEST_OPEN, x, y, ts)
                 DungeonTile.SEWER -> drawKenneyTile(sheet, DungeonTiles.BARREL, x, y, ts)
                 DungeonTile.FLOOR -> {
                     when {
@@ -518,6 +526,7 @@ private fun DrawScope.drawDungeonFloorFallback(map: DungeonFloor) {
                 DungeonTile.STAIRS_DOWN -> drawRoundRect(Color(0xFFC0392B), Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), cr)
                 DungeonTile.PORTAL -> drawHomePortalTile(x, y, ts)
                 DungeonTile.VAULT -> drawRoundRect(Color(0xFFD9A441), Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), cr)
+                DungeonTile.CHEST_OPEN -> drawRoundRect(Color(0xFF8A7040), Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), cr)
                 else -> drawRoundRect(
                     if ((c + r) % 2 == 0) Color(0xFFCDAA76) else Color(0xFFBA965F),
                     Offset(x + 1f, y + 1f),
@@ -587,6 +596,7 @@ private fun DrawScope.drawMinimap(
                 DungeonTile.PORTAL -> Color(0xFF55C8E8)
                 DungeonTile.SEWER -> Color(0xFF6F9A54)
                 DungeonTile.VAULT -> Color(0xFFD9A441)
+                DungeonTile.CHEST_OPEN -> Color(0xFF8A7040)
                 else -> Color(0xFFC9A876)
             }
             drawRect(

@@ -130,6 +130,8 @@ class GameViewModel : ViewModel() {
     private var pendingPubNpc: PubNpc? = null
     private var dungeonTarget: Waypoint? = null
     private var pendingDungeonMonster: DungeonMonster? = null
+    private var pendingChestCol: Int? = null
+    private var pendingChestRow: Int? = null
     private var dungeonCombatLock = false
     private var monsterWanderAcc = 0f
 
@@ -484,7 +486,9 @@ class GameViewModel : ViewModel() {
         val cell = map.tileAt(col, row)
         if (cell == DungeonTile.WALL ||
             cell == DungeonTile.STAIRS_UP ||
-            cell == DungeonTile.STAIRS_DOWN
+            cell == DungeonTile.STAIRS_DOWN ||
+            cell == DungeonTile.VAULT ||
+            cell == DungeonTile.CHEST_OPEN
         ) {
             say("여기에는 포털을 열 수 없다. 평평한 바닥 위에서 쓰자.")
             return false
@@ -766,6 +770,8 @@ class GameViewModel : ViewModel() {
         dungeonHint = ""
         dungeonTarget = null
         pendingDungeonMonster = null
+        pendingChestCol = null
+        pendingChestRow = null
         dungeonCombatLock = false
         monsterWanderAcc = 0f
     }
@@ -785,6 +791,8 @@ class GameViewModel : ViewModel() {
         dungeonWalking = false
         dungeonTarget = null
         pendingDungeonMonster = null
+        pendingChestCol = null
+        pendingChestRow = null
         dungeonCombatLock = false
         dungeonHint = "stairs_up"
         if (floor > player.dungeonDepth) {
@@ -807,6 +815,8 @@ class GameViewModel : ViewModel() {
         val map = dungeonFloor ?: return
         if (dungeonCombatLock) return
         pendingDungeonMonster = null
+        pendingChestCol = null
+        pendingChestRow = null
         val tx = x.coerceIn(DungeonFactory.TILE, map.worldW - DungeonFactory.TILE)
         val ty = y.coerceIn(DungeonFactory.TILE, map.worldH - DungeonFactory.TILE)
         if (!map.isWalkable(tx, ty)) return
@@ -837,6 +847,63 @@ class GameViewModel : ViewModel() {
         say("지상의 공기가 폐를 채운다. 저주는 아직 지하에 웅크리고 있다.")
         emitSfx("door")
         leavePlace()
+    }
+
+    /** 발밑(또는 지정 칸)의 닫힌 보물상자를 연다. */
+    fun openDungeonChest(col: Int? = null, row: Int? = null) {
+        val map = dungeonFloor ?: return
+        val c = col ?: (dungeonHeroX / map.tileSize).toInt()
+        val r = row ?: (dungeonHeroY / map.tileSize).toInt()
+        if (map.tileAt(c, r) != DungeonTile.VAULT) {
+            say("열 수 있는 보물상자가 없다.")
+            return
+        }
+        val cx = c * map.tileSize + map.tileSize / 2f
+        val cy = r * map.tileSize + map.tileSize / 2f
+        if (hypot(dungeonHeroX - cx, dungeonHeroY - cy) > DungeonFactory.TILE * 0.85f) {
+            pendingDungeonMonster = null
+            pendingChestCol = c
+            pendingChestRow = r
+            dungeonTarget = Waypoint(cx, cy)
+            say("보물상자로 다가간다…")
+            return
+        }
+        pendingChestCol = null
+        pendingChestRow = null
+        map.setTile(c, r, DungeonTile.CHEST_OPEN)
+        refreshDungeonFloor()
+        emitSfx("click")
+        val floor = dungeonFloorNumber
+        val gold = 12 + floor * 10 + Random.nextInt(0, 16)
+        player = player.copy(gold = player.gold + gold)
+        val lootCount = if (Random.nextFloat() < 0.28f + floor * 0.04f) 2 else 1
+        val found = mutableListOf<Item>()
+        repeat(lootCount) {
+            val item = rollChestLoot(floor)
+            addItem(item)
+            found += item
+        }
+        say("보물상자를 열었다! (+${gold}G)")
+        found.forEach { say("상자 안에서 ${it.name}을(를) 얻었다.") }
+        dungeonHint = "chest_open"
+    }
+
+    private fun rollChestLoot(floor: Int): Item {
+        val deep = listOf(
+            ItemCatalog.hiPotion,
+            ItemCatalog.ironSword,
+            ItemCatalog.ironShield,
+            ItemCatalog.chainMail,
+            ItemCatalog.manaAmulet,
+            ItemCatalog.portalStone,
+            ItemCatalog.luckyRing,
+        )
+        val pool = if (floor >= 3 && Random.nextFloat() < 0.45f) {
+            deep + ItemCatalog.dungeonLoot
+        } else {
+            ItemCatalog.dungeonLoot
+        }
+        return pool.random()
     }
 
     /** 포털스톤으로 연 문을 타고 주인공 집(HOME)으로 귀환한다. */
@@ -889,6 +956,11 @@ class GameViewModel : ViewModel() {
             dungeonWalking = false
             pendingDungeonMonster?.let { fightDungeonMonster(it) }
             pendingDungeonMonster = null
+            val pc = pendingChestCol
+            val pr = pendingChestRow
+            if (pc != null && pr != null) {
+                openDungeonChest(pc, pr)
+            }
             return
         }
 
@@ -940,6 +1012,8 @@ class GameViewModel : ViewModel() {
             DungeonTile.STAIRS_UP -> "stairs_up"
             DungeonTile.STAIRS_DOWN -> "stairs_down"
             DungeonTile.PORTAL -> "portal"
+            DungeonTile.VAULT -> "chest"
+            DungeonTile.CHEST_OPEN -> "chest_open"
             else -> ""
         }
     }

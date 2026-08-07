@@ -9,7 +9,10 @@ enum class DungeonTile {
     STAIRS_UP,
     STAIRS_DOWN,
     SEWER,
+    /** 닫힌 보물상자 — 열면 아이템을 얻고 CHEST_OPEN 이 된다. */
     VAULT,
+    /** 이미 연 보물상자 */
+    CHEST_OPEN,
     /** 포털스톤으로 연 일시 포털 — 집(HOME)으로 귀환. 던전을 떠나면 사라진다. */
     PORTAL
 }
@@ -116,7 +119,6 @@ object DungeonFactory {
             rooms += cRange to rRange
             for (r in rRange) for (c in cRange) {
                 val kind = when {
-                    floor >= 3 && rng.nextFloat() < 0.08f -> DungeonTile.VAULT
                     rng.nextFloat() < 0.12f -> DungeonTile.SEWER
                     else -> DungeonTile.FLOOR
                 }
@@ -156,6 +158,27 @@ object DungeonFactory {
         val downX = endC * TILE + TILE / 2f
         val downY = endR * TILE + TILE / 2f
 
+        // 보물상자: 층마다 1~3개 정도, 계단에서 떨어진 바닥/하수도에 배치
+        val chestTarget = (1 + floor / 2).coerceAtMost(3) + if (rng.nextFloat() < 0.35f) 1 else 0
+        var chests = 0
+        var chestAttempts = 0
+        while (chests < chestTarget && chestAttempts < 120) {
+            chestAttempts++
+            val room = rooms[rng.nextInt(rooms.size)]
+            val c = room.first.random(rng)
+            val r = room.second.random(rng)
+            if (c == startC && r == startR) continue
+            if (c == endC && r == endR) continue
+            val cell = tiles[idx(c, r)]
+            if (cell != DungeonTile.FLOOR && cell != DungeonTile.SEWER) continue
+            val x = c * TILE + TILE / 2f
+            val y = r * TILE + TILE / 2f
+            if (hypot(x - spawnX, y - spawnY) < TILE * 2f) continue
+            if (hypot(x - downX, y - downY) < TILE * 1.5f) continue
+            tiles[idx(c, r)] = DungeonTile.VAULT
+            chests++
+        }
+
         val monsters = mutableListOf<DungeonMonster>()
         val monsterCount = 4 + floor + rng.nextInt(0, 3)
         var attempts = 0
@@ -163,7 +186,8 @@ object DungeonFactory {
             attempts++
             val c = rng.nextInt(1, COLS - 1)
             val r = rng.nextInt(1, ROWS - 1)
-            if (tiles[idx(c, r)] == DungeonTile.WALL) continue
+            val cell = tiles[idx(c, r)]
+            if (cell == DungeonTile.WALL || cell == DungeonTile.VAULT) continue
             if (c == startC && r == startR) continue
             if (c == endC && r == endR) continue
             val x = c * TILE + TILE / 2f
