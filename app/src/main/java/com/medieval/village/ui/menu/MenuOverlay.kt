@@ -160,30 +160,82 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
 
     Spacer(Modifier.height(10.dp))
     SectionTitle("용병 원정대 (${vm.activeParty.size}/${GameViewModel.MAX_ACTIVE_MERCENARY})")
+    var gearMercId by remember { mutableStateOf<String?>(null) }
     if (vm.party.isEmpty()) {
         Text("고용한 용병이 없다. 용병고용소를 찾아가자.", color = Palette.ParchmentDim, fontSize = 12.sp)
     } else {
         vm.party.forEach { m ->
             val active = m.id in vm.activeMercenaryIds
+            val selected = gearMercId == m.id
             ListRow(
-                "${m.name} (${m.role})",
-                "전투 기여 +${m.power} · ${if (active) "동행 중" else "대기 중"}"
+                "${m.name} (${m.role}) · Lv.${m.level}",
+                "기여 +${m.power} · EXP ${m.exp}/${m.expToNext} · ${if (active) "동행 중" else "대기 중"}"
             ) {
-                WoodButton(
-                    text = if (active) "선택 해제" else "선택",
-                    enabled = active || vm.activeParty.size < GameViewModel.MAX_ACTIVE_MERCENARY,
-                    highlight = active
-                ) {
-                    vm.toggleMercenaryActive(m)
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    WoodButton(
+                        text = if (active) "선택 해제" else "선택",
+                        enabled = active || vm.activeParty.size < GameViewModel.MAX_ACTIVE_MERCENARY,
+                        highlight = active
+                    ) {
+                        vm.toggleMercenaryActive(m)
+                    }
+                    WoodButton(
+                        text = if (selected) "장비 닫기" else "장비",
+                        highlight = selected
+                    ) {
+                        gearMercId = if (selected) null else m.id
+                    }
                 }
             }
+            StatBar("EXP", "${m.exp}/${m.expToNext}", m.expRatio, Palette.Gold, Modifier.fillMaxWidth())
+            if (selected) {
+                MercGearPanel(vm, m.id)
+            }
+            ThinDivider()
         }
         Text(
-            "선택한 최대 2명만 마을·장소 화면에 함께 나오고 좀비 둥지 전투에 참여합니다.",
+            "선택한 최대 2명만 동행하며 좀비 둥지에서 경험치를 얻고 레벨업합니다. 장비는 가방에서 나눠 줄 수 있습니다.",
             color = Palette.ParchmentDim,
             fontSize = 11.sp,
             modifier = Modifier.padding(top = 5.dp)
         )
+    }
+}
+
+@Composable
+private fun ColumnScope.MercGearPanel(vm: GameViewModel, mercId: String) {
+    val merc = vm.party.firstOrNull { it.id == mercId } ?: return
+    Text(
+        "${merc.name} 장비 · 기여 +${merc.power}",
+        color = Palette.Parchment,
+        fontSize = 11.sp,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
+    EQUIP_SLOTS.forEach { slot ->
+        val eq = merc.equipment[slot]
+        ListRow(
+            title = "[${slot.label}] ${eq?.displayName ?: "―"}",
+            subtitle = if (eq == null) "비어 있음" else "공격 ${eq.atk} · 방어 ${eq.def}"
+        ) {
+            if (eq != null) {
+                WoodButton("해제") { vm.unequipMerc(mercId, slot) }
+            }
+        }
+    }
+    Spacer(modifier.height(4.dp))
+    Text("가방에서 장착", color = Palette.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    val gear = vm.inventory.toList().filter { it.item.isEquipment }
+    if (gear.isEmpty()) {
+        Text("장착할 장비가 가방에 없다.", color = Palette.ParchmentDim, fontSize = 11.sp)
+    } else {
+        gear.forEach { entry ->
+            ListRow(
+                title = "${entry.item.name} x${entry.count}",
+                subtitle = "${entry.item.type.label} · 공격 ${entry.item.atk} · 방어 ${entry.item.def}"
+            ) {
+                WoodButton("장착", highlight = true) { vm.equipMerc(mercId, entry.item) }
+            }
+        }
     }
 }
 

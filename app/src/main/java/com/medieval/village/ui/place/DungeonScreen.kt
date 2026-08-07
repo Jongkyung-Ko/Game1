@@ -190,7 +190,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.3.8 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.3.9 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             Box(

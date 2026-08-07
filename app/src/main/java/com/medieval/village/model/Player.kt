@@ -51,9 +51,20 @@ data class Mercenary(
     val name: String,
     val role: String,
     val cost: Int,
-    val power: Int,
-    val desc: String
-)
+    /** 고용 시 기본 전투 기여 (레벨·장비로 증가) */
+    val basePower: Int,
+    val desc: String,
+    val level: Int = 1,
+    val exp: Int = 0,
+    val equipment: Map<ItemType, EquippedItem> = emptyMap(),
+) {
+    val expToNext: Int get() = 40 + (level - 1) * 30
+    val expRatio: Float get() = if (expToNext <= 0) 0f else exp.toFloat() / expToNext
+    val equipAtk: Int get() = equipment.values.sumOf { it.atk }
+    val equipDef: Int get() = equipment.values.sumOf { it.def }
+    /** 던전 전투에 합산되는 최종 기여치 */
+    val power: Int get() = basePower + (level - 1) * 2 + equipAtk + equipDef / 2
+}
 
 object MercenaryCatalog {
     val all = listOf(

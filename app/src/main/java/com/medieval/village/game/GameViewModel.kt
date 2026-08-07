@@ -701,7 +701,8 @@ class GameViewModel : ViewModel() {
             return
         }
         player = player.copy(gold = player.gold - merc.cost)
-        party.add(merc)
+        // 카탈로그 템플릿을 복사해 성장·장비를 개별 관리한다.
+        party.add(merc.copy(level = 1, exp = 0, equipment = emptyMap()))
         if (activeMercenaryIds.size < MAX_ACTIVE_MERCENARY) {
             activeMercenaryIds.add(merc.id)
             say("${merc.name}이(가) 동료가 되어 원정대에 합류했다! (-${merc.cost}G)")
@@ -711,9 +712,11 @@ class GameViewModel : ViewModel() {
     }
 
     fun dismiss(merc: Mercenary) {
+        val current = party.firstOrNull { it.id == merc.id } ?: return
+        current.equipment.values.forEach { addItem(it.item) }
         party.removeAll { it.id == merc.id }
         activeMercenaryIds.remove(merc.id)
-        say("${merc.name}과(와) 작별했다.")
+        say("${merc.name}과(와) 작별했다." + if (current.equipment.isNotEmpty()) " 착용 장비는 가방으로 돌아왔다." else "")
     }
 
     fun toggleMercenaryActive(merc: Mercenary) {
@@ -728,6 +731,72 @@ class GameViewModel : ViewModel() {
         }
         activeMercenaryIds.add(merc.id)
         say("${merc.name}이(가) 원정대에 합류했다.")
+    }
+
+    /** 용병에게 가방 장비를 장착한다. */
+    fun equipMerc(mercId: String, item: Item) {
+        if (!item.isEquipment) return
+        val idx = party.indexOfFirst { it.id == mercId }
+        if (idx < 0) {
+            say("그 용병을 찾을 수 없다.")
+            return
+        }
+        if (inventory.none { it.item.id == item.id && it.count > 0 }) {
+            say("가방에 ${item.name}이(가) 없다.")
+            return
+        }
+        val merc = party[idx]
+        val prev = merc.equipment[item.type]
+        removeItem(item)
+        val nextGear = merc.equipment.toMutableMap()
+        nextGear[item.type] = EquippedItem(item)
+        if (prev != null) addItem(prev.item)
+        party[idx] = merc.copy(equipment = nextGear)
+        say(
+            if (prev != null) {
+                "${merc.name}에게 ${prev.displayName}을(를) 벗기고 ${item.name}을(를) 장착했다. (기여 +${party[idx].power})"
+            } else {
+                "${merc.name}에게 ${item.name}을(를) 장착했다. (기여 +${party[idx].power})"
+            }
+        )
+    }
+
+    fun unequipMerc(mercId: String, type: ItemType) {
+        val idx = party.indexOfFirst { it.id == mercId }
+        if (idx < 0) return
+        val merc = party[idx]
+        val cur = merc.equipment[type] ?: return
+        val nextGear = merc.equipment.toMutableMap()
+        nextGear.remove(type)
+        party[idx] = merc.copy(equipment = nextGear)
+        addItem(cur.item)
+        say("${merc.name}의 ${cur.displayName}을(를) 가방으로 돌렸다.")
+    }
+
+    private fun gainMercExp(amount: Int) {
+        if (amount <= 0) return
+        val ids = activeMercenaryIds.toList()
+        if (ids.isEmpty()) return
+        ids.forEach { id ->
+            val idx = party.indexOfFirst { it.id == id }
+            if (idx < 0) return@forEach
+            var m = party[idx].copy(exp = party[idx].exp + amount)
+            var leveled = false
+            while (m.exp >= m.expToNext) {
+                val rest = m.exp - m.expToNext
+                m = m.copy(
+                    level = m.level + 1,
+                    exp = rest,
+                    basePower = m.basePower + 2,
+                )
+                leveled = true
+                say("${m.name} 레벨 업! Lv.${m.level} · 전투 기여 +${m.power}")
+            }
+            party[idx] = m
+            if (!leveled) {
+                // 스팸 방지: 상세 로그는 생략, 전투 로그에만 합산 표기
+            }
+        }
     }
 
     // ---------------------------------------------------------------- 대련소
@@ -1071,6 +1140,10 @@ class GameViewModel : ViewModel() {
             }
             if (applyDamage(takenHit)) return
             gainExp(exp)
+            gainMercExp(exp)
+            if (activeParty.isNotEmpty()) {
+                say("원정대 용병도 경험을 쌓았다. (+${exp} EXP)")
+            }
             if (Random.nextInt(100) < 40) {
                 val loot = ItemCatalog.dungeonLoot.random()
                 addItem(loot)
@@ -1083,6 +1156,7 @@ class GameViewModel : ViewModel() {
             say("${monster.name}의 이빨이 스쳤다! (HP -$dmg)")
             if (applyDamage(dmg)) return
             gainExp(6)
+            gainMercExp(3)
             // 밀려남
             val push = 40f
             val ang = Random.nextFloat() * (Math.PI * 2).toFloat()

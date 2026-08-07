@@ -367,7 +367,10 @@ private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
         SectionTitle("현재 동료")
         vm.party.toList().forEach { m ->
             val active = m.id in vm.activeMercenaryIds
-            ListRow("${m.name} (${m.role})", "전투 기여 +${m.power} · ${if (active) "원정대" else "대기 중"}") {
+            ListRow(
+                "${m.name} (${m.role}) · Lv.${m.level}",
+                "전투 기여 +${m.power} · EXP ${m.exp}/${m.expToNext} · ${if (active) "원정대" else "대기 중"}\n장비는 Status 메뉴에서 장착"
+            ) {
                 WoodButton("해고") { vm.dismiss(m) }
             }
         }
@@ -380,7 +383,7 @@ private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
         val hired = vm.party.any { it.id == m.id }
         ListRow(
             title = "${m.name} · ${m.role}",
-            subtitle = "${m.desc}\n전투 기여 +${m.power}"
+            subtitle = "${m.desc}\n기본 전투 기여 +${m.basePower} (레벨·장비로 성장)"
         ) {
             WoodButton(
                 text = if (hired) "고용함" else "${m.cost}G",
