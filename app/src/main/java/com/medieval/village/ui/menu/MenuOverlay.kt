@@ -204,6 +204,7 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.MercGearPanel(vm: GameViewModel, mercId: String) {
+    val modifier = Modifier
     val merc = vm.party.firstOrNull { it.id == mercId } ?: return
     Text(
         "${merc.name} 장비 · 기여 +${merc.power}",
