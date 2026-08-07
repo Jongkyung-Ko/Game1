@@ -204,7 +204,6 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.MercGearPanel(vm: GameViewModel, mercId: String) {
-    val modifier = Modifier
     val merc = vm.party.firstOrNull { it.id == mercId } ?: return
     Text(
         "${merc.name} 장비 · 기여 +${merc.power}",
@@ -216,15 +215,21 @@ private fun ColumnScope.MercGearPanel(vm: GameViewModel, mercId: String) {
         val eq = merc.equipment[slot]
         ListRow(
             title = "[${slot.label}] ${eq?.displayName ?: "―"}",
-            subtitle = if (eq == null) "비어 있음" else "공격 ${eq.atk} · 방어 ${eq.def}"
-        ) {
-            if (eq != null) {
-                WoodButton("해제") { vm.unequipMerc(mercId, slot) }
+            subtitle = if (eq == null) "비어 있음" else "공격 ${eq.atk} · 방어 ${eq.def}",
+            trailing = {
+                if (eq != null) {
+                    WoodButton("해제") { vm.unequipMerc(mercId, slot) }
+                }
             }
-        }
+        )
     }
-    Spacer(Modifier = Modifier.height(4.dp))
-    Text("가방에서 장착", color = Palette.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    Text(
+        "가방에서 장착",
+        color = Palette.Gold,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
+    )
     val gear = vm.inventory.toList().filter { it.item.isEquipment }
     if (gear.isEmpty()) {
         Text("장착할 장비가 가방에 없다.", color = Palette.ParchmentDim, fontSize = 11.sp)
@@ -232,10 +237,11 @@ private fun ColumnScope.MercGearPanel(vm: GameViewModel, mercId: String) {
         gear.forEach { entry ->
             ListRow(
                 title = "${entry.item.name} x${entry.count}",
-                subtitle = "${entry.item.type.label} · 공격 ${entry.item.atk} · 방어 ${entry.item.def}"
-            ) {
-                WoodButton("장착", highlight = true) { vm.equipMerc(mercId, entry.item) }
-            }
+                subtitle = "${entry.item.type.label} · 공격 ${entry.item.atk} · 방어 ${entry.item.def}",
+                trailing = {
+                    WoodButton("장착", highlight = true) { vm.equipMerc(mercId, entry.item) }
+                }
+            )
         }
     }
 }
