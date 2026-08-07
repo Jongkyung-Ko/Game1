@@ -9,7 +9,9 @@ enum class DungeonTile {
     STAIRS_UP,
     STAIRS_DOWN,
     SEWER,
-    VAULT
+    VAULT,
+    /** 포털스톤으로 연 일시 포털 — 집(HOME)으로 귀환. 던전을 떠나면 사라진다. */
+    PORTAL
 }
 
 data class DungeonMonster(
@@ -41,6 +43,17 @@ data class DungeonFloor(
     fun tileAt(col: Int, row: Int): DungeonTile {
         if (col !in 0 until cols || row !in 0 until rows) return DungeonTile.WALL
         return tiles[row * cols + col]
+    }
+
+    fun setTile(col: Int, row: Int, tile: DungeonTile) {
+        if (col !in 0 until cols || row !in 0 until rows) return
+        tiles[row * cols + col] = tile
+    }
+
+    fun clearPortals(replaceWith: DungeonTile = DungeonTile.FLOOR) {
+        for (i in tiles.indices) {
+            if (tiles[i] == DungeonTile.PORTAL) tiles[i] = replaceWith
+        }
     }
 
     fun isWalkable(x: Float, y: Float): Boolean {

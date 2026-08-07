@@ -441,6 +441,9 @@ class GameViewModel : ViewModel() {
 
     fun useItem(item: Item): Boolean {
         if (item.type != ItemType.CONSUMABLE) return false
+        if (item.id == ItemCatalog.portalStone.id) {
+            return usePortalStone()
+        }
         if (item.healHp == 0 && item.healMp == 0) {
             say("${item.name}은(는) 지금 쓸 수 없다.")
             return false
@@ -458,6 +461,40 @@ class GameViewModel : ViewModel() {
             if (dMp > 0) append("MP +$dMp")
             if (dHp == 0 && dMp == 0) append("효과가 없었다.")
         }.trim())
+        return true
+    }
+
+    /** 던전에서만 사용 — 발밑에 집으로 가는 포털을 연다. */
+    private fun usePortalStone(): Boolean {
+        if (currentPlace != PlaceId.DUNGEON) {
+            say("포털스톤은 던전에서만 사용할 수 있다.")
+            return false
+        }
+        val map = dungeonFloor
+        if (map == null) {
+            say("포털스톤은 던전에서만 사용할 수 있다.")
+            return false
+        }
+        if (inventory.none { it.item.id == ItemCatalog.portalStone.id && it.count > 0 }) {
+            say("포털스톤이 없다.")
+            return false
+        }
+        val col = (dungeonHeroX / map.tileSize).toInt()
+        val row = (dungeonHeroY / map.tileSize).toInt()
+        val cell = map.tileAt(col, row)
+        if (cell == DungeonTile.WALL) {
+            say("여기에는 포털을 열 수 없다.")
+            return false
+        }
+        // 층당 포털은 하나만 — 이전 포털은 바닥으로 되돌린다.
+        map.clearPortals(DungeonTile.FLOOR)
+        map.setTile(col, row, DungeonTile.PORTAL)
+        removeItem(ItemCatalog.portalStone)
+        dungeonHint = "portal"
+        refreshDungeonFloor()
+        emitSfx("door")
+        say("포털스톤이 갈라지며 집으로 이어지는 푸른 문이 열렸다.")
+        say("포털 위에서 ‘집으로’를 누르면 오두막으로 돌아간다. 던전을 떠나면 문은 사라진다.")
         return true
     }
 
@@ -799,6 +836,34 @@ class GameViewModel : ViewModel() {
         leavePlace()
     }
 
+    /** 포털스톤으로 연 문을 타고 주인공 집(HOME)으로 귀환한다. */
+    fun enterHomePortal() {
+        val map = dungeonFloor ?: return
+        if (map.tileKindAt(dungeonHeroX, dungeonHeroY) != DungeonTile.PORTAL) {
+            say("집으로 이어지는 포털 위에 서야 한다.")
+            return
+        }
+        say("포털이 빛나며 오두막으로 당신을 끌어당긴다.")
+        emitSfx("door")
+        clearDungeonState()
+        path.clear()
+        pendingEnter = null
+        pubTarget = null
+        pendingPubNpc = null
+        walking = false
+        pubWalking = false
+        interiorSpeech = null
+        interiorSpeakerId = null
+        val home = Village.of(PlaceId.HOME)
+        heroX = home.doorX
+        heroY = home.doorY
+        facing = Facing.DOWN
+        currentPlace = PlaceId.HOME
+        scene = Scene.INTERIOR
+        menuTab = MenuTab.NONE
+        say("익숙한 오두막의 공기가 폐를 채운다. 던전으로 돌아가면 그 포털은 이미 닫혀 있을 것이다.")
+    }
+
     private fun tickDungeon(dt: Float) {
         val map = dungeonFloor ?: return
         updateDungeonHint(map)
@@ -871,6 +936,7 @@ class GameViewModel : ViewModel() {
         dungeonHint = when (map.tileKindAt(dungeonHeroX, dungeonHeroY)) {
             DungeonTile.STAIRS_UP -> "stairs_up"
             DungeonTile.STAIRS_DOWN -> "stairs_down"
+            DungeonTile.PORTAL -> "portal"
             else -> ""
         }
     }

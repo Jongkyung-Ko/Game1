@@ -54,6 +54,13 @@ object ItemCatalog {
     val ether = Item("ether", "마나 물약", ItemType.CONSUMABLE, 45, healMp = 25, desc = "MP를 25 회복한다.")
     val bread = Item("bread", "호밀빵", ItemType.CONSUMABLE, 10, healHp = 12, desc = "소박하지만 든든하다. HP 12 회복.")
     val torch = Item("torch", "횃불", ItemType.CONSUMABLE, 20, desc = "오염된 하수도를 비춘다. 좀비 둥지 탐험의 필수품.")
+    val portalStone = Item(
+        "portal_stone",
+        "포털스톤",
+        ItemType.CONSUMABLE,
+        180,
+        desc = "던전에서만 쓸 수 있다. 집으로 이어지는 포털을 연다. 던전을 떠났다가 돌아오면 포털은 사라진다.",
+    )
 
     // 무기 - 무기점
     val rustySword = Item("rusty_sword", "낡은 검", ItemType.WEAPON, 80, atk = 5, desc = "아버지가 쓰던 검. 풍요의 마을이 웃던 시절의 유품.")
@@ -72,11 +79,11 @@ object ItemCatalog {
     val luckyRing = Item("lucky_ring", "행운의 반지", ItemType.ACCESSORY, 320, def = 2, desc = "행운이 조금 따른다.")
     val manaAmulet = Item("mana_amulet", "마나 부적", ItemType.ACCESSORY, 400, def = 1, desc = "마력이 흐르는 부적.")
 
-    val generalGoods = listOf(potion, hiPotion, ether, bread, torch, luckyRing)
+    val generalGoods = listOf(potion, hiPotion, ether, bread, torch, portalStone, luckyRing)
     val weaponGoods = listOf(rustySword, ironSword, battleAxe, knightSword, woodShield, ironShield, leatherArmor, chainMail, ironHelm)
 
     /** 던전에서 드랍될 수 있는 전리품 */
-    val dungeonLoot = listOf(potion, ether, bread, rustySword, woodShield, manaAmulet)
+    val dungeonLoot = listOf(potion, ether, bread, portalStone, rustySword, woodShield, manaAmulet)
 
     val all: List<Item> = (generalGoods + weaponGoods + dungeonLoot + manaAmulet).distinctBy { it.id }
 }

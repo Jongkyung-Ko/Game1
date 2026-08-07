@@ -43,6 +43,7 @@ import com.medieval.village.model.DungeonFactory
 import com.medieval.village.model.DungeonFloor
 import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
+import com.medieval.village.model.ItemCatalog
 import com.medieval.village.ui.Chip
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.WoodButton
@@ -183,7 +184,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.3.5 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.3.6 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             Box(
@@ -197,6 +198,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     when (vm.dungeonHint) {
                         "stairs_up" -> "↑ 지상 출구 — 아래에서 ‘탈출’"
                         "stairs_down" -> "↓ 더 깊은 층 — 아래에서 ‘내려가기’"
+                        "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
                         else -> "화면을 눌러 이동 · 좀비를 누르면 다가가 전투"
                     },
                     color = Palette.Parchment,
@@ -216,9 +218,20 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     "stairs_down" -> WoodButton("내려가기", Modifier.weight(1f), highlight = true) {
                         vm.descendDungeon()
                     }
+                    "portal" -> WoodButton("집으로", Modifier.weight(1f), highlight = true) {
+                        vm.enterHomePortal()
+                    }
                     else -> WoodButton("탈출", Modifier.weight(1f)) { vm.escapeDungeon() }
                 }
+                val portalStone = vm.inventory.toList().firstOrNull {
+                    it.item.id == ItemCatalog.portalStone.id && it.count > 0
+                }
                 val potion = vm.inventory.toList().firstOrNull { it.item.healHp > 0 }
+                if (portalStone != null) {
+                    WoodButton("포털스톤", Modifier.weight(1f), highlight = true) {
+                        vm.useItem(ItemCatalog.portalStone)
+                    }
+                }
                 WoodButton(
                     text = if (potion != null) "물약" else "물약 없음",
                     modifier = Modifier.weight(1f),
@@ -370,6 +383,7 @@ private fun DrawScope.drawHybridDungeonFloor(atlas: KenneyAtlas, map: DungeonFlo
             when (map.tileAt(c, r)) {
                 DungeonTile.STAIRS_UP -> drawKenneyTile(sheet, DungeonTiles.LADDER_UP, x, y, ts)
                 DungeonTile.STAIRS_DOWN -> drawKenneyTile(sheet, DungeonTiles.LADDER_DOWN, x, y, ts)
+                DungeonTile.PORTAL -> drawHomePortalTile(x, y, ts)
                 DungeonTile.VAULT -> drawKenneyTile(
                     sheet,
                     if ((c + r) % 2 == 0) DungeonTiles.CHEST else DungeonTiles.CHEST_OPEN,
@@ -433,25 +447,82 @@ private fun DrawScope.drawHybridDungeonFloor(atlas: KenneyAtlas, map: DungeonFlo
             blendMode = BlendMode.Screen,
         )
     }
+
+    // 집 포털 추가 글로우
+    for (r in 0 until map.rows) {
+        for (c in 0 until map.cols) {
+            if (map.tileAt(c, r) != DungeonTile.PORTAL) continue
+            val center = Offset(c * ts + ts * 0.5f, r * ts + ts * 0.5f)
+            val pr = ts * 2.4f
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0x8855C8E8),
+                        Color(0x4455A0E8),
+                        Color(0x0055A0E8),
+                    ),
+                    center = center,
+                    radius = pr,
+                ),
+                radius = pr,
+                center = center,
+                blendMode = BlendMode.Screen,
+            )
+        }
+    }
 }
 
-/** 타일시트 로드 실패 시 최소한의 폴백 */
+/** 집으로 이어지는 일시 포털 비주얼 */
+private fun DrawScope.drawHomePortalTile(x: Float, y: Float, ts: Float) {
+    val cx = x + ts * 0.5f
+    val cy = y + ts * 0.5f
+    drawOval(
+        Color(0x55203860),
+        Offset(x + ts * 0.12f, y + ts * 0.18f),
+        Size(ts * 0.76f, ts * 0.64f),
+    )
+    drawOval(
+        Color(0xAA3AB0E0),
+        Offset(x + ts * 0.22f, y + ts * 0.26f),
+        Size(ts * 0.56f, ts * 0.48f),
+        style = Stroke(3.5f),
+    )
+    drawOval(
+        Color(0xCC8FE8FF),
+        Offset(x + ts * 0.32f, y + ts * 0.34f),
+        Size(ts * 0.36f, ts * 0.32f),
+    )
+    drawCircle(Color(0xEEF4FFFF), radius = ts * 0.08f, center = Offset(cx, cy))
+}
+
+/** 타일시트 로드 실패 시 — 페인티드 바닥만이라도 보이게 */
 private fun DrawScope.drawDungeonFloorFallback(map: DungeonFloor) {
-    drawRect(Color(0xFFCDB892), size = Size(map.worldW, map.worldH))
+    drawRect(Color(0xFF0E0A08), size = Size(map.worldW, map.worldH))
     val ts = map.tileSize
+    val cr = CornerRadius(ts * 0.12f, ts * 0.12f)
     for (r in 0 until map.rows) {
         for (c in 0 until map.cols) {
             val x = c * ts
             val y = r * ts
             when (map.tileAt(c, r)) {
-                DungeonTile.WALL -> drawRect(Color(0xFF5A544C), Offset(x, y), Size(ts, ts))
-                DungeonTile.STAIRS_UP -> drawRect(Color(0xFF8FCF7A), Offset(x, y), Size(ts, ts))
-                DungeonTile.STAIRS_DOWN -> drawRect(Color(0xFFC0392B), Offset(x, y), Size(ts, ts))
-                DungeonTile.VAULT -> drawRect(Color(0xFFD9A441), Offset(x, y), Size(ts, ts))
-                else -> drawRect(
-                    if ((c + r) % 2 == 0) Color(0xFFC9A876) else Color(0xFFB8955F),
-                    Offset(x, y),
-                    Size(ts, ts)
+                DungeonTile.WALL -> {
+                    val visible = (c > 0 && map.tileAt(c - 1, r) != DungeonTile.WALL) ||
+                        (c < map.cols - 1 && map.tileAt(c + 1, r) != DungeonTile.WALL) ||
+                        (r > 0 && map.tileAt(c, r - 1) != DungeonTile.WALL) ||
+                        (r < map.rows - 1 && map.tileAt(c, r + 1) != DungeonTile.WALL)
+                    if (visible) {
+                        drawRoundRect(Color(0xFF58524A), Offset(x + 1f, y + 1f), Size(ts - 2f, ts - 2f), cr)
+                    }
+                }
+                DungeonTile.STAIRS_UP -> drawRoundRect(Color(0xFF8FCF7A), Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), cr)
+                DungeonTile.STAIRS_DOWN -> drawRoundRect(Color(0xFFC0392B), Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), cr)
+                DungeonTile.PORTAL -> drawHomePortalTile(x, y, ts)
+                DungeonTile.VAULT -> drawRoundRect(Color(0xFFD9A441), Offset(x + 2f, y + 2f), Size(ts - 4f, ts - 4f), cr)
+                else -> drawRoundRect(
+                    if ((c + r) % 2 == 0) Color(0xFFCDAA76) else Color(0xFFBA965F),
+                    Offset(x + 1f, y + 1f),
+                    Size(ts - 2f, ts - 2f),
+                    cr,
                 )
             }
         }
@@ -513,6 +584,7 @@ private fun DrawScope.drawMinimap(
             val color = when (tile) {
                 DungeonTile.STAIRS_UP -> Color(0xFF8FCF7A)
                 DungeonTile.STAIRS_DOWN -> Color(0xFFC0392B)
+                DungeonTile.PORTAL -> Color(0xFF55C8E8)
                 DungeonTile.SEWER -> Color(0xFF6F9A54)
                 DungeonTile.VAULT -> Color(0xFFD9A441)
                 else -> Color(0xFFC9A876)
