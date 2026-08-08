@@ -63,18 +63,19 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         DungeonScreen(vm = vm, modifier = modifier)
         return
     }
-    WalkableInteriorScreen(vm = vm, id = id, modifier = modifier)
+    WalkableInteriorScreen(vm = vm, id = id, rootModifier = modifier)
 }
 
 @Composable
-private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
+private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier: Modifier = Modifier) {
+    val modifier = Modifier
     val place = Village.of(id)
     val atlas = rememberKenneyAtlas()
     val art = rememberCustomArtOrNull()
     val npcs = remember(id) { InteriorNpcCatalog.forPlace(id) }
     val panelOpen = vm.interiorPanelOpen
 
-    Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
+    Column(modifier = rootModifier.fillMaxSize().background(Palette.WoodDark)) {
         Text(
             text = "${place.name} · ${place.subtitle}",
             color = Palette.Gold,
@@ -168,7 +169,7 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, modifier: Mod
                     WoodButton("닫기") { vm.closeInteriorPanel() }
                 }
                 ThinDivider()
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier.height(4.dp))
                 when (id) {
                     PlaceId.SHOP -> ShopSplitPanel(vm, ItemCatalog.generalGoods, "잡화 진열대")
                     PlaceId.WEAPON_SHOP -> ShopSplitPanel(vm, ItemCatalog.weaponGoods, "무기와 방어구")
@@ -177,7 +178,7 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, modifier: Mod
                         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                             PlaceServiceBody(vm, id)
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier.height(6.dp))
                         InventoryBottomPanel(vm, sellable = false)
                     }
                 }
@@ -189,9 +190,9 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, modifier: Mod
                     color = Palette.ParchmentDim,
                     fontSize = 11.sp
                 )
-                Spacer(modifier = Modifier.height(5.dp))
+                Spacer(modifier.height(5.dp))
                 MessageLog(vm.log, Modifier.height(72.dp))
-                Spacer(modifier = Modifier.height(7.dp))
+                Spacer(modifier.height(7.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     WoodButton("메뉴 열기", Modifier.weight(1f), highlight = true) {
                         vm.openInteriorPanel()
@@ -220,10 +221,11 @@ private fun panelTitle(id: PlaceId): String = when (id) {
 /** 상단: 구매 목록 / 하단: 내 가방 */
 @Composable
 private fun ColumnScope.ShopSplitPanel(vm: GameViewModel, goods: List<Item>, title: String) {
+    val modifier = Modifier
     Column(modifier = Modifier.weight(1f)) {
         Text(title, color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Text("구매할 물건을 고르세요", color = Palette.ParchmentDim, fontSize = 11.sp)
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier.height(4.dp))
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             goods.forEach { item ->
                 ListRow(
@@ -246,17 +248,18 @@ private fun ColumnScope.ShopSplitPanel(vm: GameViewModel, goods: List<Item>, tit
             }
         }
     }
-    Spacer(modifier = Modifier.height(6.dp))
+    Spacer(modifier.height(6.dp))
     ThinDivider()
-    Spacer(modifier = Modifier.height(4.dp))
+    Spacer(modifier.height(4.dp))
     InventoryBottomPanel(vm, sellable = true)
 }
 
 @Composable
 private fun ColumnScope.MagicSplitPanel(vm: GameViewModel) {
+    val modifier = Modifier
     Column(modifier = Modifier.weight(1f)) {
         Text("정화 마법 · 연구", color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier.height(4.dp))
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             val studyCost = 60 + vm.player.intel * 12
             ListRow("해독 고서 연구", "지능 +1 · ${studyCost}G", trailing = {
@@ -280,21 +283,22 @@ private fun ColumnScope.MagicSplitPanel(vm: GameViewModel) {
             }
         }
     }
-    Spacer(modifier = Modifier.height(6.dp))
+    Spacer(modifier.height(6.dp))
     ThinDivider()
-    Spacer(modifier = Modifier.height(4.dp))
+    Spacer(modifier.height(4.dp))
     InventoryBottomPanel(vm, sellable = false)
 }
 
 @Composable
 private fun ColumnScope.InventoryBottomPanel(vm: GameViewModel, sellable: Boolean) {
+    val modifier = Modifier
     Text("내 가방", color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     Text(
         if (sellable) "아래에서 아이템을 팔 수 있다" else "소지 중인 아이템",
         color = Palette.ParchmentDim,
         fontSize = 11.sp
     )
-    Spacer(modifier = Modifier.height(4.dp))
+    Spacer(modifier.height(4.dp))
     Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
         val bag = vm.inventory.toList()
         if (bag.isEmpty()) {
@@ -327,6 +331,7 @@ private fun ColumnScope.InventoryBottomPanel(vm: GameViewModel, sellable: Boolea
 
 @Composable
 private fun ColumnScope.PlaceServiceBody(vm: GameViewModel, id: PlaceId) {
+    val modifier = Modifier
     when (id) {
         PlaceId.HOME -> HomeActions(vm)
         PlaceId.HOSPITAL -> HospitalActions(vm)
@@ -343,17 +348,19 @@ private fun ColumnScope.PlaceServiceBody(vm: GameViewModel, id: PlaceId) {
 
 @Composable
 private fun ColumnScope.HomeActions(vm: GameViewModel) {
+    val modifier = Modifier
     SectionTitle("풍요의 마을 오두막")
     Text(
         "신성한 포도주의 향기가 희미한 작은 집. 저주가 스며든 밤에도 여기서 하루를 마무리할 수 있다.",
         color = Palette.ParchmentDim, fontSize = 12.sp
     )
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier.height(8.dp))
     WoodButton("잠자기 (무료 · 완전 회복)", highlight = true) { vm.sleepAtHome() }
 }
 
 @Composable
 private fun ColumnScope.HospitalActions(vm: GameViewModel) {
+    val modifier = Modifier
     SectionTitle("오염 상처를 돌보는 집")
     val cost = vm.hospitalHealCost()
     ListRow(
@@ -377,6 +384,7 @@ private fun ColumnScope.HospitalActions(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.ChurchActions(vm: GameViewModel) {
+    val modifier = Modifier
     SectionTitle("저주를 씻는 신전")
     ListRow("기도하기", "무료. 좀비석 기운을 밀어내며 MP를 회복한다.", trailing = {
         WoodButton("기도", highlight = true) { vm.pray() }
@@ -385,7 +393,7 @@ private fun ColumnScope.ChurchActions(vm: GameViewModel) {
     ListRow("헌금하기", "100G. 3일간 축복을 받아 좀비와의 싸움에서 유리해진다.", trailing = {
         WoodButton("100G 헌금", enabled = vm.player.gold >= 100) { vm.donate(100) }
     })
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier.height(8.dp))
     if (vm.player.blessing > 0) {
         Chip("현재 축복 ${vm.player.blessing}일 남음", Palette.Moss)
     }
@@ -393,6 +401,7 @@ private fun ColumnScope.ChurchActions(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.InnActions(vm: GameViewModel) {
+    val modifier = Modifier
     SectionTitle("여관 · 잠든 포도송이")
     ListRow("숙박하기", "60G. HP·MP를 모두 회복하고 하루가 지난다.", trailing = {
         WoodButton("60G 숙박", enabled = vm.player.gold >= 60, highlight = true) { vm.stayAtInn() }
@@ -405,13 +414,14 @@ private fun ColumnScope.InnActions(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.ArenaActions(vm: GameViewModel) {
+    val modifier = Modifier
     SectionTitle("지상의 칼날 연마터")
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Chip("${vm.arenaWins}승 ${vm.arenaLosses}패", Palette.WoodLight)
         Chip("공격 ${vm.totalAtk}", Palette.Blood)
         Chip("방어 ${vm.totalDef}", Palette.Sky)
     }
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier.height(8.dp))
     ListRow("대련 신청", "지하에 들어가기 전, 비슷한 상대와 겨룬다.", trailing = {
         WoodButton("대련", highlight = true) { vm.spar() }
     })
@@ -419,12 +429,13 @@ private fun ColumnScope.ArenaActions(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.BlacksmithActions(vm: GameViewModel) {
+    val modifier = Modifier
     SectionTitle("좀비 이빨을 부수는 모루")
     Text(
         "착용 장비를 강화한다. 좀비 둥지에서는 무딘 칼이 곧 죽음이다.",
         color = Palette.ParchmentDim, fontSize = 12.sp
     )
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier.height(8.dp))
     EQUIP_SLOTS.forEach { slot ->
         val eq = vm.equipment[slot]
         ListRow(
@@ -447,13 +458,14 @@ private fun ColumnScope.BlacksmithActions(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
+    val modifier = Modifier
     SectionTitle("좀비 사냥 용병")
     Text(
         "용병은 Status에서 최대 2명을 원정대로 선택한다. 장비·레벨업도 Status에서.",
         color = Palette.ParchmentDim,
         fontSize = 12.sp
     )
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier.height(8.dp))
     if (vm.party.isNotEmpty()) {
         SectionTitle("현재 동료")
         vm.party.toList().forEach { m ->
@@ -464,7 +476,7 @@ private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
                 trailing = { WoodButton("해고") { vm.dismiss(m) } }
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier.height(8.dp))
         ThinDivider()
     }
     SectionTitle("고용 가능")
