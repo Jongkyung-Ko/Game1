@@ -91,6 +91,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
     BackHandler(enabled = vm.menuTab != MenuTab.NONE || vm.scene == Scene.INTERIOR) {
         when {
             vm.menuTab != MenuTab.NONE -> vm.menuTab = MenuTab.NONE
+            vm.interiorPanelOpen -> vm.closeInteriorPanel()
             vm.scene == Scene.INTERIOR && vm.currentPlace == PlaceId.DUNGEON -> vm.escapeDungeon()
             vm.scene == Scene.INTERIOR -> vm.leavePlace()
         }

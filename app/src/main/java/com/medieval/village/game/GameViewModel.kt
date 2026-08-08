@@ -13,7 +13,10 @@ import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.EquippedItem
+import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
+import com.medieval.village.model.InteriorNpcKind
+import com.medieval.village.model.InteriorRoom
 import com.medieval.village.model.InventoryEntry
 import com.medieval.village.model.Item
 import com.medieval.village.model.ItemCatalog
@@ -99,6 +102,13 @@ class GameViewModel : ViewModel() {
         private set
     private var interiorSpeechUntil = 0f
 
+    /**
+     * 실내(상점·집 등) 서비스/구매 패널 표시.
+     * 주인(KEEPER)에게 다가가면 열린다.
+     */
+    var interiorPanelOpen by mutableStateOf(false)
+        private set
+
     /** 대련소 전적 */
     var arenaWins by mutableStateOf(0)
         private set
@@ -128,6 +138,8 @@ class GameViewModel : ViewModel() {
     private var pendingEnter: PlaceId? = null
     private var pubTarget: Waypoint? = null
     private var pendingPubNpc: PubNpc? = null
+    private var interiorTarget: Waypoint? = null
+    private var pendingInteriorNpc: InteriorNpc? = null
     private var dungeonTarget: Waypoint? = null
     private var pendingDungeonMonster: DungeonMonster? = null
     private var pendingChestCol: Int? = null
@@ -153,6 +165,9 @@ class GameViewModel : ViewModel() {
         pendingEnter = null
         pubTarget = null
         pendingPubNpc = null
+        interiorTarget = null
+        pendingInteriorNpc = null
+        interiorPanelOpen = false
         arenaWins = 0
         arenaLosses = 0
         clearDungeonState()
@@ -167,17 +182,18 @@ class GameViewModel : ViewModel() {
         heroY = home.doorY
         facing = Facing.DOWN
         walking = false
-        pubHeroX = 500f
-        pubHeroY = 610f
+        pubHeroX = InteriorRoom.SPAWN_X
+        pubHeroY = InteriorRoom.SPAWN_Y
         pubWalking = false
         pubDialogue = null
         pubSpeakerId = null
+        interiorPanelOpen = false
         scene = Scene.INTERIOR
         currentPlace = PlaceId.HOME
         menuTab = MenuTab.NONE
         say("풍요의 마을… 한때 '신성한 포도주'로 번영했던 이곳에 눈을 떴다.")
         say("몇 년 전 지하 최심부에서 검붉은 '좀비석'이 발굴된 뒤, 마을은 저주에 잠식되고 있다.")
-        say("문을 열고, 지상으로 스며드는 재앙의 근원을 마주하자.")
+        say("문을 열고, 지상으로 스며드는 재앙의 근원을 마주하자. 실내에서는 화면을 눌러 걸어 다닐 수 있다.")
     }
 
     // ---------------------------------------------------------------- 스탯 계산
@@ -206,6 +222,10 @@ class GameViewModel : ViewModel() {
         }
         if (scene == Scene.INTERIOR && currentPlace == PlaceId.DUNGEON) {
             tickDungeon(dt)
+            return
+        }
+        if (scene == Scene.INTERIOR && currentPlace != null) {
+            tickInteriorWalk(dt)
             return
         }
         if (scene != Scene.VILLAGE) return
@@ -300,6 +320,76 @@ class GameViewModel : ViewModel() {
         say("${npc.name}: ${pubDialogue}")
     }
 
+    /** 실내(상점·집 등)를 선술집처럼 걸어 다닌다. pubHero 좌표를 공유한다. */
+    private fun tickInteriorWalk(dt: Float) {
+        val target = interiorTarget
+        if (target == null) {
+            pubWalking = false
+            return
+        }
+        val dx = target.x - pubHeroX
+        val dy = target.y - pubHeroY
+        val dist = hypot(dx, dy)
+        val step = WALK_SPEED * dt
+        if (dist <= step || dist < 0.01f) {
+            pubHeroX = target.x
+            pubHeroY = target.y
+            interiorTarget = null
+            pubWalking = false
+            pendingInteriorNpc?.let { arriveInteriorNpc(it) }
+            pendingInteriorNpc = null
+        } else {
+            pubHeroX += dx / dist * step
+            pubHeroY += dy / dist * step
+            pubWalking = true
+            walkPhase += dt * 10f
+            facing = if (abs(dx) > abs(dy)) {
+                if (dx > 0) Facing.RIGHT else Facing.LEFT
+            } else {
+                if (dy > 0) Facing.DOWN else Facing.UP
+            }
+        }
+    }
+
+    fun walkInInterior(x: Float, y: Float) {
+        if (interiorPanelOpen) return
+        interiorSpeech = null
+        interiorSpeakerId = null
+        pendingInteriorNpc = null
+        interiorTarget = Waypoint(InteriorRoom.clampX(x), InteriorRoom.clampY(y))
+    }
+
+    fun approachInteriorNpc(npc: InteriorNpc) {
+        if (interiorPanelOpen) return
+        interiorSpeech = null
+        interiorSpeakerId = null
+        pendingInteriorNpc = npc
+        interiorTarget = Waypoint(
+            InteriorRoom.clampX(npc.worldX),
+            InteriorRoom.clampY(npc.worldY + 70f),
+        )
+    }
+
+    private fun arriveInteriorNpc(npc: InteriorNpc) {
+        talkToInteriorNpc(npc.id)
+        if (npc.kind == InteriorNpcKind.KEEPER) {
+            interiorPanelOpen = true
+            say("카운터에서 거래·서비스를 이용할 수 있다.")
+        }
+    }
+
+    fun openInteriorPanel() {
+        if (currentPlace == null || currentPlace == PlaceId.DUNGEON || currentPlace == PlaceId.PUB) return
+        interiorPanelOpen = true
+        interiorTarget = null
+        pendingInteriorNpc = null
+        pubWalking = false
+    }
+
+    fun closeInteriorPanel() {
+        interiorPanelOpen = false
+    }
+
     /** 빈 땅을 눌렀을 때: 길을 따라 그 지점까지 걸어간다. */
     fun walkTo(x: Float, y: Float) {
         pendingEnter = null
@@ -333,12 +423,22 @@ class GameViewModel : ViewModel() {
         log.clear()
         interiorSpeech = null
         interiorSpeakerId = null
+        interiorPanelOpen = false
+        interiorTarget = null
+        pendingInteriorNpc = null
+        pubWalking = false
         if (id == PlaceId.PUB) {
             pubHeroX = 500f
             pubHeroY = 610f
             pubTarget = null
             pendingPubNpc = null
-            pubWalking = false
+            pubDialogue = null
+            pubSpeakerId = null
+        } else if (id != PlaceId.DUNGEON) {
+            pubHeroX = InteriorRoom.SPAWN_X
+            pubHeroY = InteriorRoom.SPAWN_Y
+            pubTarget = null
+            pendingPubNpc = null
             pubDialogue = null
             pubSpeakerId = null
         }
@@ -359,6 +459,9 @@ class GameViewModel : ViewModel() {
         pendingEnter = null
         pubTarget = null
         pendingPubNpc = null
+        interiorTarget = null
+        pendingInteriorNpc = null
+        interiorPanelOpen = false
         walking = false
         pubWalking = false
         interiorSpeech = null

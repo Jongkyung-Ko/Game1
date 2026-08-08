@@ -12,11 +12,14 @@ data class InteriorNpc(
     val name: String,
     val role: String,
     val kind: InteriorNpcKind,
-    /** 실내 캔버스 상대 좌표 (0~1) */
+    /** 실내 캔버스 상대 좌표 (0~1) — 월드 좌표로도 변환한다. */
     val fx: Float,
     val fy: Float,
     val lines: List<String>
-)
+) {
+    val worldX: Float get() = fx * InteriorRoom.WORLD_W
+    val worldY: Float get() = fy * InteriorRoom.WORLD_H
+}
 
 object InteriorNpcCatalog {
 

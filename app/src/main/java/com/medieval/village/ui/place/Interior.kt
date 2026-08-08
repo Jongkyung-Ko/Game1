@@ -12,6 +12,7 @@ import com.medieval.village.game.Facing
 import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InteriorNpcKind
+import com.medieval.village.model.InteriorRoom
 import com.medieval.village.model.Mercenary
 import com.medieval.village.model.PlaceId
 import com.medieval.village.ui.village.CustomArt
@@ -24,57 +25,102 @@ import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.drawMercenary
 import kotlin.math.sin
 
-fun DrawScope.drawInterior(
+/**
+ * 걸어다니는 실내를 InteriorRoom 월드 좌표계로 그린다.
+ */
+fun DrawScope.drawWalkableInterior(
     atlas: KenneyAtlas,
     art: CustomArt?,
     id: PlaceId,
-    w: Float,
-    h: Float,
+    heroX: Float,
+    heroY: Float,
+    facing: Facing,
+    walking: Boolean,
+    walkPhase: Float,
     companions: List<Mercenary> = emptyList(),
     animTime: Float = 0f,
     speechNpcId: String? = null,
     speechText: String? = null,
 ) {
+    val w = InteriorRoom.WORLD_W
+    val h = InteriorRoom.WORLD_H
     drawInteriorBackground(atlas, id, w, h)
+    drawCounterAccent(id, w, h)
 
     InteriorNpcCatalog.forPlace(id).forEachIndexed { index, npc ->
         val bob = sin(animTime * 2.6f + index) * 2f
+        val cx = npc.worldX
+        val footY = npc.worldY + bob
         val sprite = art?.npcSpriteOrNull(npcSpriteKey(npc))
         if (sprite != null) {
             drawCustomSprite(
                 image = sprite,
-                cx = w * npc.fx,
-                footY = h * npc.fy + bob,
-                worldHeight = h * 0.55f,
+                cx = cx,
+                footY = footY,
+                worldHeight = 150f,
             )
         } else {
-            drawCircle(Color(0xFFE7B98F), h * 0.06f, Offset(w * npc.fx, h * npc.fy - h * 0.28f + bob))
-            drawRect(Color(0xFF3E6B8A), Offset(w * npc.fx - h * 0.05f, h * npc.fy - h * 0.22f + bob), Size(h * 0.10f, h * 0.22f))
+            drawCircle(Color(0xFFE7B98F), 22f, Offset(cx, footY - 95f))
+            drawRect(Color(0xFF3E6B8A), Offset(cx - 18f, footY - 78f), Size(36f, 78f))
+        }
+        drawLabelTiny("${npc.name} · ${npc.role}", cx - 55f, footY + 18f)
+        if (npc.kind == InteriorNpcKind.KEEPER) {
+            drawLabelTiny("거래", cx - 18f, footY - 130f)
         }
         if (speechNpcId == npc.id && !speechText.isNullOrBlank()) {
-            drawSpeechBubble(w * npc.fx, h * npc.fy - h * 0.34f, speechText, w)
+            drawSpeechBubble(cx, footY - 140f, speechText, w)
         }
     }
 
-    val heroScale = (h * 0.58f) / 108f
     companions.forEachIndexed { index, mercenary ->
         drawMercenary(
             mercenary = mercenary,
-            x = w * (0.30f + index * 0.12f),
-            y = h * 0.90f,
-            facing = Facing.RIGHT,
-            walking = false,
-            phase = animTime + index * 0.35f,
-            scale = heroScale * 0.9f,
+            x = heroX + if (index == 0) -52f else 52f,
+            y = heroY + 40f + index * 8f,
+            facing = facing,
+            walking = walking,
+            phase = walkPhase + index * 0.7f,
+            scale = 0.92f,
         )
     }
-    drawHero(
-        x = w * 0.18f,
-        y = h * 0.90f,
-        facing = Facing.RIGHT,
-        walking = false,
-        phase = animTime,
-        scale = heroScale,
+    drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.0f)
+}
+
+private fun DrawScope.drawLabelTiny(text: String, x: Float, y: Float) {
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#F3E4C5")
+        textSize = 16f
+        isFakeBoldText = true
+    }
+    drawContext.canvas.nativeCanvas.drawText(text, x, y, paint)
+}
+
+private fun DrawScope.drawCounterAccent(id: PlaceId, w: Float, h: Float) {
+    // 주인 쪽 카운터/책상 표시
+    val counterColor = when (id) {
+        PlaceId.SHOP, PlaceId.WEAPON_SHOP -> Color(0xFF8A5A32)
+        PlaceId.MAGIC_SCHOOL -> Color(0xFF4A3A6A)
+        PlaceId.BLACKSMITH -> Color(0xFF6A4030)
+        PlaceId.HOSPITAL -> Color(0xFF6A7A88)
+        PlaceId.CHURCH -> Color(0xFF8A7A50)
+        PlaceId.INN -> Color(0xFF7A5535)
+        PlaceId.ARENA -> Color(0xFF5A4030)
+        PlaceId.MERCENARY -> Color(0xFF4A5038)
+        PlaceId.HOME -> Color(0xFF7A6040)
+        else -> Color(0xFF6A5040)
+    }
+    drawRoundRect(
+        counterColor,
+        Offset(w * 0.55f, h * 0.52f),
+        Size(w * 0.38f, h * 0.12f),
+        CornerRadius(10f, 10f),
+    )
+    drawRoundRect(
+        Color(0xFF3A2818),
+        Offset(w * 0.55f, h * 0.52f),
+        Size(w * 0.38f, h * 0.12f),
+        CornerRadius(10f, 10f),
+        style = Stroke(3f),
     )
 }
 
@@ -94,19 +140,19 @@ private fun npcSpriteKey(npc: InteriorNpc): String = when (npc.placeId) {
 }
 
 private fun DrawScope.drawInteriorBackground(atlas: KenneyAtlas, id: PlaceId, w: Float, h: Float) {
-    val tile = minOf(w, h) / 8f
+    val tile = 80f
     drawRect(Color(0xFF2B1C12), Offset.Zero, Size(w, h))
     drawRect(Color(0xFF3E2A1C), Offset(0f, 0f), Size(w, h * 0.36f))
-    for (c in 0 until 12) {
-        drawKenneyTile(atlas.dungeon, DungeonTiles.WALL, c * tile - tile * 0.2f, h * 0.30f, tile)
+    for (c in 0 until 14) {
+        drawKenneyTile(atlas.dungeon, DungeonTiles.WALL, c * tile - tile * 0.2f, h * 0.28f, tile)
     }
-    for (r in 0 until 6) {
-        for (c in 0 until 12) {
+    for (r in 0 until 7) {
+        for (c in 0 until 14) {
             drawKenneyTile(
                 atlas.town,
                 TownTiles.PATH,
                 c * tile - tile * 0.1f,
-                h * 0.42f + r * tile * 0.85f,
+                h * 0.40f + r * tile * 0.85f,
                 tile
             )
         }
@@ -124,7 +170,7 @@ private fun DrawScope.drawInteriorBackground(atlas: KenneyAtlas, id: PlaceId, w:
 private fun DrawScope.drawSpeechBubble(cx: Float, top: Float, text: String, roomW: Float) {
     val paint = android.graphics.Paint().apply {
         color = android.graphics.Color.WHITE
-        textSize = (roomW * 0.045f).coerceIn(22f, 34f)
+        textSize = 24f
         isAntiAlias = true
         textAlign = android.graphics.Paint.Align.CENTER
     }
