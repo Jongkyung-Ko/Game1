@@ -165,7 +165,6 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
                 ) {
                     SectionTitle(panelTitle(id), Modifier.weight(1f))
                     Chip("${vm.player.gold}G", Palette.WoodLight)
-                    Spacer(Modifier = Modifier.padding(4.dp))
                     WoodButton("닫기") { vm.closeInteriorPanel() }
                 }
                 ThinDivider()
