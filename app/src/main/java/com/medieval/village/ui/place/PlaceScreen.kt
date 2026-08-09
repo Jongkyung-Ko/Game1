@@ -143,7 +143,7 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
             ) {
                 Text(
                     if (panelOpen) "거래 창이 열려 있다"
-                    else "화면을 눌러 이동 · 주인에게 다가가면 구매 메뉴",
+                    else "탭으로 이동 · 손님과 대화 · 주인에게 다가가면 구매 메뉴",
                     color = Palette.Parchment,
                     fontSize = 11.sp
                 )
@@ -185,7 +185,7 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
         } else {
             Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
                 Text(
-                    "주인(거래)을 탭하거나 아래 버튼으로 메뉴를 연다.",
+                    "여행객·손님을 탭하면 대화, 주인을 탭하면 거래. 아래 버튼으로도 메뉴를 연다.",
                     color = Palette.ParchmentDim,
                     fontSize = 11.sp
                 )

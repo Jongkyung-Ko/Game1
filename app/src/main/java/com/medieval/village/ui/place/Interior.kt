@@ -45,7 +45,7 @@ fun DrawScope.drawWalkableInterior(
     val w = InteriorRoom.WORLD_W
     val h = InteriorRoom.WORLD_H
     drawInteriorBackground(atlas, id, w, h)
-    drawCounterAccent(id, w, h)
+    drawInteriorFurniture(id)
 
     InteriorNpcCatalog.forPlace(id).forEachIndexed { index, npc ->
         val bob = sin(animTime * 2.6f + index) * 2f
@@ -64,8 +64,10 @@ fun DrawScope.drawWalkableInterior(
             drawRect(Color(0xFF3E6B8A), Offset(cx - 18f, footY - 78f), Size(36f, 78f))
         }
         drawLabelTiny("${npc.name} · ${npc.role}", cx - 55f, footY + 18f)
-        if (npc.kind == InteriorNpcKind.KEEPER) {
-            drawLabelTiny("거래", cx - 18f, footY - 130f)
+        when (npc.kind) {
+            InteriorNpcKind.KEEPER -> drawLabelTiny("거래", cx - 18f, footY - 130f)
+            InteriorNpcKind.VISITOR, InteriorNpcKind.HELPER ->
+                drawLabelTiny("대화", cx - 18f, footY - 130f)
         }
         if (speechNpcId == npc.id && !speechText.isNullOrBlank()) {
             drawSpeechBubble(cx, footY - 140f, speechText, w)
@@ -95,49 +97,21 @@ private fun DrawScope.drawLabelTiny(text: String, x: Float, y: Float) {
     drawContext.canvas.nativeCanvas.drawText(text, x, y, paint)
 }
 
-private fun DrawScope.drawCounterAccent(id: PlaceId, w: Float, h: Float) {
-    // 주인 쪽 카운터/책상 표시
-    val counterColor = when (id) {
-        PlaceId.SHOP, PlaceId.WEAPON_SHOP -> Color(0xFF8A5A32)
-        PlaceId.MAGIC_SCHOOL -> Color(0xFF4A3A6A)
-        PlaceId.BLACKSMITH -> Color(0xFF6A4030)
-        PlaceId.HOSPITAL -> Color(0xFF6A7A88)
-        PlaceId.CHURCH -> Color(0xFF8A7A50)
-        PlaceId.INN -> Color(0xFF7A5535)
-        PlaceId.ARENA -> Color(0xFF5A4030)
-        PlaceId.MERCENARY -> Color(0xFF4A5038)
-        PlaceId.HOME -> Color(0xFF7A6040)
-        else -> Color(0xFF6A5040)
+private fun npcSpriteKey(npc: InteriorNpc): String =
+    npc.spriteKey ?: when (npc.placeId) {
+        PlaceId.SHOP -> if (npc.kind == InteriorNpcKind.KEEPER) "shopkeeper" else "merchant"
+        PlaceId.WEAPON_SHOP -> "blacksmith"
+        PlaceId.HOSPITAL -> if (npc.kind == InteriorNpcKind.KEEPER) "doctor" else "teacher"
+        PlaceId.CHURCH -> if (npc.kind == InteriorNpcKind.KEEPER) "mage" else "paladin"
+        PlaceId.INN -> if (npc.kind == InteriorNpcKind.KEEPER) "merchant" else "chef"
+        PlaceId.ARENA -> "warrior"
+        PlaceId.BLACKSMITH -> "blacksmith"
+        PlaceId.MAGIC_SCHOOL -> if (npc.kind == InteriorNpcKind.KEEPER) "mage" else "teacher"
+        PlaceId.MERCENARY -> if (npc.kind == InteriorNpcKind.KEEPER) "warrior" else "rogue"
+        PlaceId.HOME -> "farmer"
+        PlaceId.PUB -> "merchant"
+        PlaceId.DUNGEON -> "warrior"
     }
-    drawRoundRect(
-        counterColor,
-        Offset(w * 0.55f, h * 0.52f),
-        Size(w * 0.38f, h * 0.12f),
-        CornerRadius(10f, 10f),
-    )
-    drawRoundRect(
-        Color(0xFF3A2818),
-        Offset(w * 0.55f, h * 0.52f),
-        Size(w * 0.38f, h * 0.12f),
-        CornerRadius(10f, 10f),
-        style = Stroke(3f),
-    )
-}
-
-private fun npcSpriteKey(npc: InteriorNpc): String = when (npc.placeId) {
-    PlaceId.SHOP -> if (npc.kind == InteriorNpcKind.KEEPER) "shopkeeper" else "merchant"
-    PlaceId.WEAPON_SHOP -> "blacksmith"
-    PlaceId.HOSPITAL -> if (npc.kind == InteriorNpcKind.KEEPER) "doctor" else "teacher"
-    PlaceId.CHURCH -> if (npc.kind == InteriorNpcKind.KEEPER) "mage" else "paladin"
-    PlaceId.INN -> if (npc.kind == InteriorNpcKind.KEEPER) "merchant" else "chef"
-    PlaceId.ARENA -> "warrior"
-    PlaceId.BLACKSMITH -> "blacksmith"
-    PlaceId.MAGIC_SCHOOL -> if (npc.kind == InteriorNpcKind.KEEPER) "mage" else "teacher"
-    PlaceId.MERCENARY -> if (npc.kind == InteriorNpcKind.KEEPER) "warrior" else "rogue"
-    PlaceId.HOME -> "farmer"
-    PlaceId.PUB -> "merchant"
-    PlaceId.DUNGEON -> "warrior"
-}
 
 private fun DrawScope.drawInteriorBackground(atlas: KenneyAtlas, id: PlaceId, w: Float, h: Float) {
     val tile = 80f
