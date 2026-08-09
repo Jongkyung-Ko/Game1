@@ -42,6 +42,7 @@ import com.medieval.village.model.PlaceId
 import com.medieval.village.model.SkillCatalog
 import com.medieval.village.model.Village
 import com.medieval.village.ui.Chip
+import com.medieval.village.ui.ItemIcon
 import com.medieval.village.ui.ListRow
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.SectionTitle
@@ -235,6 +236,7 @@ private fun ColumnScope.ShopSplitPanel(vm: GameViewModel, goods: List<Item>, tit
                         if (item.def != 0) append(" · 방어 ${item.def}")
                         if (item.desc.isNotEmpty()) append("\n${item.desc}")
                     },
+                    leading = { ItemIcon(item) },
                     trailing = {
                         WoodButton(
                             text = "${item.price}G",
@@ -311,6 +313,7 @@ private fun ColumnScope.InventoryBottomPanel(vm: GameViewModel, sellable: Boolea
                         if (e.item.atk != 0) append(" · 공격 ${e.item.atk}")
                         if (e.item.def != 0) append(" · 방어 ${e.item.def}")
                     },
+                    leading = { ItemIcon(e.item) },
                     trailing = {
                         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                             if (e.item.healHp > 0 || e.item.healMp > 0) {
@@ -441,6 +444,7 @@ private fun ColumnScope.BlacksmithActions(vm: GameViewModel) {
             title = "[${slot.label}] ${eq?.displayName ?: "―"}",
             subtitle = if (eq == null) "착용한 장비가 없다." else
                 "공격 ${eq.atk} · 방어 ${eq.def} · 강화비 ${eq.upgradeCost}G",
+            leading = { ItemIcon(eq?.item) },
             trailing = {
                 if (eq != null) {
                     WoodButton(

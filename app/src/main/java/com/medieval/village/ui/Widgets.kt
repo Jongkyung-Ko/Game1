@@ -98,11 +98,12 @@ fun MessageLog(lines: List<String>, modifier: Modifier = Modifier) {
     }
 }
 
-/** 좌: 이름/설명, 우: 버튼 형태의 목록 한 줄 */
+/** 좌: (선택)아이콘 + 이름/설명, 우: 버튼 형태의 목록 한 줄 */
 @Composable
 fun ListRow(
     title: String,
     subtitle: String? = null,
+    leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null
 ) {
     Row(
@@ -111,6 +112,9 @@ fun ListRow(
             .padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (leading != null) {
+            Box(modifier = Modifier.padding(end = 8.dp)) { leading() }
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = Palette.Parchment, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             if (subtitle != null) {

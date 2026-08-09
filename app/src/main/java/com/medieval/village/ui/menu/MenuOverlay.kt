@@ -35,6 +35,8 @@ import com.medieval.village.game.MenuTab
 import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.ItemType
 import com.medieval.village.ui.Chip
+import com.medieval.village.ui.EquipmentDoll
+import com.medieval.village.ui.ItemIcon
 import com.medieval.village.ui.ListRow
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.ParchmentPanel
@@ -211,18 +213,11 @@ private fun ColumnScope.MercGearPanel(vm: GameViewModel, mercId: String) {
         fontSize = 11.sp,
         modifier = Modifier.padding(bottom = 4.dp)
     )
-    EQUIP_SLOTS.forEach { slot ->
-        val eq = merc.equipment[slot]
-        ListRow(
-            title = "[${slot.label}] ${eq?.displayName ?: "―"}",
-            subtitle = if (eq == null) "비어 있음" else "공격 ${eq.atk} · 방어 ${eq.def}",
-            trailing = {
-                if (eq != null) {
-                    WoodButton("해제") { vm.unequipMerc(mercId, slot) }
-                }
-            }
-        )
-    }
+    EquipmentDoll(
+        equipment = merc.equipment,
+        onSlotClick = { slot -> vm.unequipMerc(mercId, slot) },
+        modifier = Modifier.padding(bottom = 6.dp)
+    )
     Text(
         "가방에서 장착",
         color = Palette.Gold,
@@ -238,6 +233,7 @@ private fun ColumnScope.MercGearPanel(vm: GameViewModel, mercId: String) {
             ListRow(
                 title = "${entry.item.name} x${entry.count}",
                 subtitle = "${entry.item.type.label} · 공격 ${entry.item.atk} · 방어 ${entry.item.def}",
+                leading = { ItemIcon(entry.item) },
                 trailing = {
                     WoodButton("장착", highlight = true) { vm.equipMerc(mercId, entry.item) }
                 }
@@ -262,16 +258,18 @@ private fun ColumnScope.InventoryTab(vm: GameViewModel) {
                 if (entry.item.atk != 0) append(" · 공격 ${entry.item.atk}")
                 if (entry.item.def != 0) append(" · 방어 ${entry.item.def}")
                 if (entry.item.desc.isNotEmpty()) append("\n${entry.item.desc}")
-            }
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                if (entry.item.type == ItemType.CONSUMABLE) {
-                    WoodButton("사용", highlight = true) { vm.useItem(entry.item) }
-                } else {
-                    WoodButton("장착", highlight = true) { vm.equip(entry.item) }
+            },
+            leading = { ItemIcon(entry.item) },
+            trailing = {
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    if (entry.item.type == ItemType.CONSUMABLE) {
+                        WoodButton("사용", highlight = true) { vm.useItem(entry.item) }
+                    } else {
+                        WoodButton("장착", highlight = true) { vm.equip(entry.item) }
+                    }
                 }
             }
-        }
+        )
         ThinDivider()
     }
     Spacer(Modifier.height(8.dp))
@@ -281,14 +279,27 @@ private fun ColumnScope.InventoryTab(vm: GameViewModel) {
 @Composable
 private fun ColumnScope.EquipmentTab(vm: GameViewModel) {
     SectionTitle("착용 중")
+    Text(
+        "사람 윤곽 옆 상자에 장착 장비가 표시됩니다. 상자를 누르면 해제합니다.",
+        color = Palette.ParchmentDim,
+        fontSize = 11.sp
+    )
+    Spacer(Modifier.height(6.dp))
+    EquipmentDoll(
+        equipment = vm.equipment,
+        onSlotClick = { slot -> vm.unequip(slot) }
+    )
+    Spacer(Modifier.height(8.dp))
     EQUIP_SLOTS.forEach { slot ->
         val eq = vm.equipment[slot]
         ListRow(
             title = "[${slot.label}] ${eq?.displayName ?: "―"}",
-            subtitle = if (eq == null) "비어 있음" else "공격 ${eq.atk} · 방어 ${eq.def}"
-        ) {
-            if (eq != null) WoodButton("해제") { vm.unequip(slot) }
-        }
+            subtitle = if (eq == null) "비어 있음" else "공격 ${eq.atk} · 방어 ${eq.def}",
+            leading = { ItemIcon(eq?.item) },
+            trailing = {
+                if (eq != null) WoodButton("해제") { vm.unequip(slot) }
+            }
+        )
         ThinDivider()
     }
 
@@ -301,10 +312,12 @@ private fun ColumnScope.EquipmentTab(vm: GameViewModel) {
         gear.forEach { entry ->
             ListRow(
                 title = "${entry.item.name} x${entry.count}",
-                subtitle = "${entry.item.type.label} · 공격 ${entry.item.atk} · 방어 ${entry.item.def}"
-            ) {
-                WoodButton("장착", highlight = true) { vm.equip(entry.item) }
-            }
+                subtitle = "${entry.item.type.label} · 공격 ${entry.item.atk} · 방어 ${entry.item.def}",
+                leading = { ItemIcon(entry.item) },
+                trailing = {
+                    WoodButton("장착", highlight = true) { vm.equip(entry.item) }
+                }
+            )
         }
     }
 
