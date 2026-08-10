@@ -79,6 +79,8 @@ class KenneyAtlas(
             BuildingStyle.TOWER -> "tower"
             BuildingStyle.CAVE -> "cave"
             BuildingStyle.FOREST -> "tree_g"
+            BuildingStyle.DESERT -> "mushroom"
+            BuildingStyle.GLACIER -> "well"
             BuildingStyle.ARENA -> "arena"
             BuildingStyle.CAMP -> "camp"
             BuildingStyle.FORGE -> "forge"

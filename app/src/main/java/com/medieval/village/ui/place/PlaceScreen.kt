@@ -68,6 +68,14 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         ForestScreen(vm = vm, modifier = modifier)
         return
     }
+    if (id == PlaceId.SOUTH_DESERT) {
+        DesertScreen(vm = vm, modifier = modifier)
+        return
+    }
+    if (id == PlaceId.NORTH_GLACIER) {
+        GlacierScreen(vm = vm, modifier = modifier)
+        return
+    }
     WalkableInteriorScreen(vm = vm, id = id, rootModifier = modifier)
 }
 

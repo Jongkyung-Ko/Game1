@@ -29,6 +29,14 @@ object BuildingRecipes {
             arrayOf(63, 65, 67),
             arrayOf(1, 25, 2),
         )
+        BuildingStyle.DESERT -> arrayOf(
+            arrayOf(0, 1, 0),
+            arrayOf(25, 25, 25),
+        )
+        BuildingStyle.GLACIER -> arrayOf(
+            arrayOf(13, 13, 13),
+            arrayOf(25, 25, 25),
+        )
         BuildingStyle.ARENA -> arrayOf(
             arrayOf(40, 41, 40),
             arrayOf(null, 95, null),

@@ -88,5 +88,12 @@ object ItemCatalog {
     /** 동쪽 숲 동물·은닉 상자 전리품 */
     val forestLoot = listOf(potion, bread, ether, torch, woodShield, leatherArmor, luckyRing, rustySword)
 
-    val all: List<Item> = (generalGoods + weaponGoods + dungeonLoot + forestLoot + manaAmulet).distinctBy { it.id }
+    /** 남쪽 사막 전리품 */
+    val desertLoot = listOf(potion, hiPotion, ether, torch, woodShield, ironShield, leatherArmor, rustySword)
+
+    /** 북쪽 빙하 전리품 */
+    val glacierLoot = listOf(potion, hiPotion, ether, portalStone, ironSword, chainMail, manaAmulet, luckyRing)
+
+    val all: List<Item> = (generalGoods + weaponGoods + dungeonLoot + forestLoot + desertLoot + glacierLoot)
+        .distinctBy { it.id }
 }

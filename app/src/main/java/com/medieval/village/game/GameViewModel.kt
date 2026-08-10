@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.medieval.village.model.DesertFactory
 import com.medieval.village.model.DungeonFactory
 import com.medieval.village.model.DungeonFloor
 import com.medieval.village.model.DungeonMonster
@@ -14,6 +15,7 @@ import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.EquippedItem
 import com.medieval.village.model.ForestFactory
+import com.medieval.village.model.GlacierFactory
 import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InteriorNpcKind
@@ -40,11 +42,21 @@ enum class Scene { VILLAGE, INTERIOR }
 
 enum class MenuTab { NONE, STATUS, INVENTORY, EQUIPMENT, SYSTEM }
 
+/** 도보 탐험 바이옴 */
+enum class ExploreBiome { DUNGEON, FOREST, DESERT, GLACIER }
+
 private data class Waypoint(val x: Float, val y: Float)
 
-/** 도보 탐험 지역(던전·동쪽 숲) 여부 */
-fun PlaceId?.isExplorePlace(): Boolean =
-    this == PlaceId.DUNGEON || this == PlaceId.EAST_FOREST
+fun PlaceId?.exploreBiome(): ExploreBiome? = when (this) {
+    PlaceId.DUNGEON -> ExploreBiome.DUNGEON
+    PlaceId.EAST_FOREST -> ExploreBiome.FOREST
+    PlaceId.SOUTH_DESERT -> ExploreBiome.DESERT
+    PlaceId.NORTH_GLACIER -> ExploreBiome.GLACIER
+    else -> null
+}
+
+/** 도보 탐험 지역(던전·숲·사막·빙하) 여부 */
+fun PlaceId?.isExplorePlace(): Boolean = exploreBiome() != null
 
 class GameViewModel : ViewModel() {
 
@@ -517,6 +529,8 @@ class GameViewModel : ViewModel() {
         PlaceId.ARENA -> "\"지상에서라도 칼날을 갈아야지. 지하에선 실수가 곧 죽음이야.\""
         PlaceId.DUNGEON -> "축축한 하수도 바람이 얼굴을 스친다. 저주의 둥지가 발밑에서 숨 쉰다."
         PlaceId.EAST_FOREST -> "나뭇잎 사이로 바람이 스친다. 동쪽으로 갈수록 짐승의 울음이 가까워진다."
+        PlaceId.SOUTH_DESERT -> "뜨거운 모래바람이 얼굴을 때린다. 전갈과 낙타거미가 모래 아래 숨는다."
+        PlaceId.NORTH_GLACIER -> "칼바람과 함께 하얀 침묵이 내려앉는다. 북극의 짐승들이 얼음 너머에서 지켜본다."
         PlaceId.BLACKSMITH -> "\"좀비 이빨에 안 깨지려면, 쇠는 더 두들겨야지.\""
         PlaceId.MAGIC_SCHOOL -> "\"연금술사들이 손을 댄 그 돌… 우리는 이제 해독만 연구한다네.\""
         PlaceId.MERCENARY -> "\"좀비 둥지 안내라면 돈만 주면 붙여주지. 목숨값은 별도야.\""
@@ -578,12 +592,12 @@ class GameViewModel : ViewModel() {
     /** 탐험 지역(던전·숲)에서만 사용 — 발밑에 집으로 가는 포털을 연다. */
     private fun usePortalStone(): Boolean {
         if (!currentPlace.isExplorePlace()) {
-            say("포털스톤은 던전이나 동쪽 숲에서만 사용할 수 있다.")
+            say("포털스톤은 탐험 지역(던전·숲·사막·빙하)에서만 사용할 수 있다.")
             return false
         }
         val map = dungeonFloor
         if (map == null) {
-            say("포털스톤은 던전이나 동쪽 숲에서만 사용할 수 있다.")
+            say("포털스톤은 탐험 지역(던전·숲·사막·빙하)에서만 사용할 수 있다.")
             return false
         }
         if (inventory.none { it.item.id == ItemCatalog.portalStone.id && it.count > 0 }) {
@@ -614,7 +628,7 @@ class GameViewModel : ViewModel() {
         return true
     }
 
-    private fun inForest(): Boolean = currentPlace == PlaceId.EAST_FOREST
+    private fun currentBiome(): ExploreBiome = currentPlace.exploreBiome() ?: ExploreBiome.DUNGEON
 
     fun equip(item: Item) {
         if (!item.isEquipment) return
@@ -963,8 +977,13 @@ class GameViewModel : ViewModel() {
     }
 
     private fun enterExploreFloor(floor: Int) {
-        val forest = inForest()
-        val map = if (forest) ForestFactory.generate(floor) else DungeonFactory.generate(floor)
+        val biome = currentBiome()
+        val map = when (biome) {
+            ExploreBiome.FOREST -> ForestFactory.generate(floor)
+            ExploreBiome.DESERT -> DesertFactory.generate(floor)
+            ExploreBiome.GLACIER -> GlacierFactory.generate(floor)
+            ExploreBiome.DUNGEON -> DungeonFactory.generate(floor)
+        }
         dungeonFloor = map
         dungeonFloorNumber = floor
         dungeonHeroX = map.spawnX
@@ -976,25 +995,38 @@ class GameViewModel : ViewModel() {
         pendingChestRow = null
         dungeonCombatLock = false
         dungeonHint = "stairs_up"
-        if (forest) {
-            if (floor > player.forestDepth) {
-                player = player.copy(forestDepth = floor)
+        when (biome) {
+            ExploreBiome.FOREST -> {
+                if (floor > player.forestDepth) player = player.copy(forestDepth = floor)
+                say("─── 동쪽 숲 · ${floor}지대 ───")
+                say(
+                    if (floor == 1) "마을 동쪽 숲길이 열린다. 토끼와 여우가 덤불 사이로 스친다."
+                    else "숲이 더 짙어진다. 발밑 낙엽이 축축하고, 짐승의 숨결이 가까워진다."
+                )
             }
-            say("─── 동쪽 숲 · ${floor}지대 ───")
-            if (floor == 1) {
-                say("마을 동쪽 숲길이 열린다. 토끼와 여우가 덤불 사이로 스친다.")
-            } else {
-                say("숲이 더 짙어진다. 발밑 낙엽이 축축하고, 짐승의 숨결이 가까워진다.")
+            ExploreBiome.DESERT -> {
+                if (floor > player.desertDepth) player = player.copy(desertDepth = floor)
+                say("─── 남쪽 사막 · ${floor}지대 ───")
+                say(
+                    if (floor == 1) "모래언덕 사이로 길이 열린다. 전갈과 사막여우의 기척이 느껴진다."
+                    else "모래바람이 거세진다. 낙타거미와 거대전갈이 더 깊은 모래 아래 숨는다."
+                )
             }
-        } else {
-            if (floor > player.dungeonDepth) {
-                player = player.copy(dungeonDepth = floor)
+            ExploreBiome.GLACIER -> {
+                if (floor > player.glacierDepth) player = player.copy(glacierDepth = floor)
+                say("─── 북쪽 빙하 · ${floor}지대 ───")
+                say(
+                    if (floor == 1) "하얀 빙판이 이어진다. 펭귄 떼와 눈여우가 얼음 사이를 누빈다."
+                    else "칼바람이 살을 에는다. 북극곰과 설인의 발자국이 눈 위에 선명하다."
+                )
             }
-            say("─── 지하 ${floor}층 · 오염된 통로 ───")
-            if (floor == 1) {
-                say("한때 포도주 보관소와 하수도였던 길이 좀비의 숨결로 가득하다.")
-            } else {
-                say("더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다.")
+            ExploreBiome.DUNGEON -> {
+                if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
+                say("─── 지하 ${floor}층 · 오염된 통로 ───")
+                say(
+                    if (floor == 1) "한때 포도주 보관소와 하수도였던 길이 좀비의 숨결로 가득하다."
+                    else "더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다."
+                )
             }
         }
     }
@@ -1027,7 +1059,14 @@ class GameViewModel : ViewModel() {
     fun descendDungeon() {
         val map = dungeonFloor ?: return
         if (map.tileKindAt(dungeonHeroX, dungeonHeroY) != DungeonTile.STAIRS_DOWN) {
-            say(if (inForest()) "더 깊은 숲길로 이어지는 표식 위에 서야 한다." else "아래층으로 이어지는 계단 위에 서야 한다.")
+            say(
+                when (currentBiome()) {
+                    ExploreBiome.FOREST -> "더 깊은 숲길로 이어지는 표식 위에 서야 한다."
+                    ExploreBiome.DESERT -> "더 깊은 사막길로 이어지는 표식 위에 서야 한다."
+                    ExploreBiome.GLACIER -> "더 깊은 빙하로 이어지는 표식 위에 서야 한다."
+                    ExploreBiome.DUNGEON -> "아래층으로 이어지는 계단 위에 서야 한다."
+                }
+            )
             return
         }
         if (player.hp <= player.maxHp * 0.15f) {
@@ -1040,8 +1079,12 @@ class GameViewModel : ViewModel() {
 
     fun escapeDungeon() {
         say(
-            if (inForest()) "마을 쪽 바람이 폐를 채운다. 숲속 짐승들은 여전히 깊은 곳에서 숨 쉰다."
-            else "지상의 공기가 폐를 채운다. 저주는 아직 지하에 웅크리고 있다."
+            when (currentBiome()) {
+                ExploreBiome.FOREST -> "마을 쪽 바람이 폐를 채운다. 숲속 짐승들은 여전히 깊은 곳에서 숨 쉰다."
+                ExploreBiome.DESERT -> "마을 쪽 공기가 폐를 채운다. 모래 아래 괴물들은 여전히 숨 쉰다."
+                ExploreBiome.GLACIER -> "마을 쪽 온기가 손을 녹인다. 극지의 짐승들은 여전히 얼음 너머에 있다."
+                ExploreBiome.DUNGEON -> "지상의 공기가 폐를 채운다. 저주는 아직 지하에 웅크리고 있다."
+            }
         )
         emitSfx("door")
         leavePlace()
@@ -1087,20 +1130,11 @@ class GameViewModel : ViewModel() {
     }
 
     private fun rollChestLoot(floor: Int): Item {
-        if (inForest()) {
-            val deep = listOf(
-                ItemCatalog.hiPotion,
-                ItemCatalog.ironSword,
-                ItemCatalog.leatherArmor,
-                ItemCatalog.luckyRing,
-                ItemCatalog.portalStone,
-            )
-            val pool = if (floor >= 3 && Random.nextFloat() < 0.4f) {
-                deep + ItemCatalog.forestLoot
-            } else {
-                ItemCatalog.forestLoot
-            }
-            return pool.random()
+        val base = when (currentBiome()) {
+            ExploreBiome.FOREST -> ItemCatalog.forestLoot
+            ExploreBiome.DESERT -> ItemCatalog.desertLoot
+            ExploreBiome.GLACIER -> ItemCatalog.glacierLoot
+            ExploreBiome.DUNGEON -> ItemCatalog.dungeonLoot
         }
         val deep = listOf(
             ItemCatalog.hiPotion,
@@ -1111,11 +1145,7 @@ class GameViewModel : ViewModel() {
             ItemCatalog.portalStone,
             ItemCatalog.luckyRing,
         )
-        val pool = if (floor >= 3 && Random.nextFloat() < 0.45f) {
-            deep + ItemCatalog.dungeonLoot
-        } else {
-            ItemCatalog.dungeonLoot
-        }
+        val pool = if (floor >= 3 && Random.nextFloat() < 0.42f) deep + base else base
         return pool.random()
     }
 
@@ -1263,28 +1293,34 @@ class GameViewModel : ViewModel() {
         dungeonCombatLock = true
         emitSfx("hit")
         val floor = dungeonFloorNumber
-        val forest = inForest()
+        val biome = currentBiome()
         say(
-            if (forest) "${monster.name}이(가) 덤불에서 튀어나와 덤벼든다!"
-            else "${monster.name}이(가) 생살 허기를 드러내며 덤벼든다!"
+            when (biome) {
+                ExploreBiome.FOREST -> "${monster.name}이(가) 덤불에서 튀어나와 덤벼든다!"
+                ExploreBiome.DESERT -> "${monster.name}이(가) 모래 아래에서 튀어나와 덤벼든다!"
+                ExploreBiome.GLACIER -> "${monster.name}이(가) 얼음 너머에서 덤벼든다!"
+                ExploreBiome.DUNGEON -> "${monster.name}이(가) 생살 허기를 드러내며 덤벼든다!"
+            }
         )
 
         val myPower = totalAtk + partyPower + blessBonus() + Random.nextInt(0, 10)
         val enemyPower = monster.power + Random.nextInt(0, 8)
         val dmg = (enemyPower - totalDef).coerceAtLeast(2) + Random.nextInt(0, 6)
+        val wild = biome != ExploreBiome.DUNGEON
 
         if (myPower >= enemyPower) {
             monster.alive = false
             refreshDungeonFloor()
-            val gold = (if (forest) 14 else 18) + floor * (if (forest) 11 else 14) + Random.nextInt(0, 16)
-            val exp = (if (forest) 16 else 20) + floor * (if (forest) 10 else 12)
+            val gold = (if (wild) 14 else 18) + floor * (if (wild) 11 else 14) + Random.nextInt(0, 16)
+            val exp = (if (wild) 16 else 20) + floor * (if (wild) 10 else 12)
             val takenHit = (dmg / 2).coerceAtLeast(1)
             say("${monster.name}을(를) 쓰러뜨렸다! (HP -$takenHit, +${gold}G, EXP +$exp)")
             player = player.copy(gold = player.gold + gold)
-            if (forest) {
-                if (floor > player.forestDepth) player = player.copy(forestDepth = floor)
-            } else if (floor > player.dungeonDepth) {
-                player = player.copy(dungeonDepth = floor)
+            when (biome) {
+                ExploreBiome.FOREST -> if (floor > player.forestDepth) player = player.copy(forestDepth = floor)
+                ExploreBiome.DESERT -> if (floor > player.desertDepth) player = player.copy(desertDepth = floor)
+                ExploreBiome.GLACIER -> if (floor > player.glacierDepth) player = player.copy(glacierDepth = floor)
+                ExploreBiome.DUNGEON -> if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
             }
             if (applyDamage(takenHit)) return
             gainExp(exp)
@@ -1293,23 +1329,40 @@ class GameViewModel : ViewModel() {
                 say("원정대 용병도 경험을 쌓았다. (+${exp} EXP)")
             }
             if (Random.nextInt(100) < 40) {
-                val loot = if (forest) ItemCatalog.forestLoot.random() else ItemCatalog.dungeonLoot.random()
+                val loot = when (biome) {
+                    ExploreBiome.FOREST -> ItemCatalog.forestLoot.random()
+                    ExploreBiome.DESERT -> ItemCatalog.desertLoot.random()
+                    ExploreBiome.GLACIER -> ItemCatalog.glacierLoot.random()
+                    ExploreBiome.DUNGEON -> ItemCatalog.dungeonLoot.random()
+                }
                 addItem(loot)
                 say(
-                    if (forest) "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
-                    else "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
+                    when (biome) {
+                        ExploreBiome.FOREST -> "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
+                        ExploreBiome.DESERT -> "모래 속에서 ${loot.name}을(를) 주웠다."
+                        ExploreBiome.GLACIER -> "얼음 틈에서 ${loot.name}을(를) 챙겼다."
+                        ExploreBiome.DUNGEON -> "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
+                    }
                 )
             }
             if (mapCleared()) {
                 say(
-                    if (forest) "이 지대의 짐승이 잠잠해졌다. 더 깊은 숲길을 찾아보자."
-                    else "이 층의 좀비가 잠잠해졌다. 심층의 계단을 찾아보자."
+                    when (biome) {
+                        ExploreBiome.FOREST -> "이 지대의 짐승이 잠잠해졌다. 더 깊은 숲길을 찾아보자."
+                        ExploreBiome.DESERT -> "이 지대의 괴물이 잠잠해졌다. 더 깊은 모래길을 찾아보자."
+                        ExploreBiome.GLACIER -> "이 지대의 극지 짐승이 잠잠해졌다. 더 깊은 빙하를 찾아보자."
+                        ExploreBiome.DUNGEON -> "이 층의 좀비가 잠잠해졌다. 심층의 계단을 찾아보자."
+                    }
                 )
             }
         } else {
             say(
-                if (forest) "${monster.name}의 발톱이 스쳤다! (HP -$dmg)"
-                else "${monster.name}의 이빨이 스쳤다! (HP -$dmg)"
+                when (biome) {
+                    ExploreBiome.FOREST -> "${monster.name}의 발톱이 스쳤다! (HP -$dmg)"
+                    ExploreBiome.DESERT -> "${monster.name}의 독침이 스쳤다! (HP -$dmg)"
+                    ExploreBiome.GLACIER -> "${monster.name}의 얼음 발톱이 스쳤다! (HP -$dmg)"
+                    ExploreBiome.DUNGEON -> "${monster.name}의 이빨이 스쳤다! (HP -$dmg)"
+                }
             )
             if (applyDamage(dmg)) return
             gainExp(6)

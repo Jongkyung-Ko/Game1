@@ -22,7 +22,11 @@ data class Player(
     /** 도달한 던전 최고 층 */
     val dungeonDepth: Int = 0,
     /** 도달한 동쪽 숲 최고 지대 */
-    val forestDepth: Int = 0
+    val forestDepth: Int = 0,
+    /** 도달한 남쪽 사막 최고 지대 */
+    val desertDepth: Int = 0,
+    /** 도달한 북쪽 빙하 최고 지대 */
+    val glacierDepth: Int = 0
 ) {
     val expToNext: Int get() = 60 + (level - 1) * 45
     val hpRatio: Float get() = if (maxHp <= 0) 0f else hp.toFloat() / maxHp

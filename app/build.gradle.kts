@@ -10,11 +10,11 @@ android {
 
     defaultConfig {
         // 새 패키지로 설치해 예전 APK와 섞이지 않게 한다.
-        applicationId = "com.medieval.village.v043"
+        applicationId = "com.medieval.village.v044"
         minSdk = 24
         targetSdk = 34
-        versionCode = 43
-        versionName = "0.4.3"
+        versionCode = 44
+        versionName = "0.4.4"
     }
 
     buildTypes {

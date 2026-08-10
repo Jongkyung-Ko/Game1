@@ -112,6 +112,8 @@ private fun npcSpriteKey(npc: InteriorNpc): String =
         PlaceId.PUB -> "merchant"
         PlaceId.DUNGEON -> "warrior"
         PlaceId.EAST_FOREST -> "rogue"
+        PlaceId.SOUTH_DESERT -> "rogue"
+        PlaceId.NORTH_GLACIER -> "mage"
     }
 
 private fun DrawScope.drawInteriorBackground(atlas: KenneyAtlas, id: PlaceId, w: Float, h: Float) {

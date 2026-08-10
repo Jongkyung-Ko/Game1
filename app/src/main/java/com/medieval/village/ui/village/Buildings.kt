@@ -26,6 +26,8 @@ fun DrawScope.drawPlace(p: Place) {
     when (p.style) {
         BuildingStyle.CAVE -> drawCave(p)
         BuildingStyle.FOREST -> drawForestGate(p)
+        BuildingStyle.DESERT -> drawDesertGate(p)
+        BuildingStyle.GLACIER -> drawGlacierGate(p)
         BuildingStyle.ARENA -> drawArenaGround(p)
         BuildingStyle.CAMP -> drawCamp(p)
         BuildingStyle.TOWER -> drawTower(p)
@@ -249,7 +251,6 @@ private fun DrawScope.drawForge(p: Place) {
 private fun DrawScope.drawForestGate(p: Place) {
     val canopy = Color(p.wall)
     val trunk = Color(0xFF5A3A22)
-    // 세 그루의 나무로 숲 입구 표현
     fun tree(cx: Float, baseY: Float, scale: Float) {
         drawRect(trunk, Offset(cx - 6f * scale, baseY - 40f * scale), Size(12f * scale, 44f * scale))
         drawCircle(canopy, 28f * scale, Offset(cx, baseY - 55f * scale))
@@ -259,7 +260,6 @@ private fun DrawScope.drawForestGate(p: Place) {
     tree(p.left + p.w * 0.22f, p.bottom, 1.0f)
     tree(p.cx, p.bottom, 1.25f)
     tree(p.right - p.w * 0.20f, p.bottom, 0.95f)
-    // 오솔길
     val path = Path().apply {
         moveTo(p.cx - p.w * 0.12f, p.bottom)
         quadraticBezierTo(p.cx, p.cy + p.h * 0.1f, p.cx + p.w * 0.08f, p.bottom - p.h * 0.15f)
@@ -268,6 +268,46 @@ private fun DrawScope.drawForestGate(p: Place) {
         close()
     }
     drawPath(path, Color(0xFF8A6A3A))
+}
+
+private fun DrawScope.drawDesertGate(p: Place) {
+    val sand = Color(p.wall)
+    val dune = Path().apply {
+        moveTo(p.left - 10f, p.bottom)
+        quadraticBezierTo(p.left + p.w * 0.25f, p.top + p.h * 0.2f, p.cx, p.bottom - p.h * 0.15f)
+        quadraticBezierTo(p.right - p.w * 0.2f, p.top, p.right + 10f, p.bottom)
+        close()
+    }
+    drawPath(dune, sand)
+    drawPath(dune, Color(0xFF8A5A28), style = Stroke(3f))
+    // 선인장 두 그루
+    fun cactus(cx: Float) {
+        drawRoundRect(Color(0xFF5A8A3A), Offset(cx - 7f, p.bottom - 70f), Size(14f, 70f), CornerRadius(4f, 4f))
+        drawRoundRect(Color(0xFF5A8A3A), Offset(cx - 22f, p.bottom - 50f), Size(18f, 12f), CornerRadius(4f, 4f))
+        drawRoundRect(Color(0xFF5A8A3A), Offset(cx + 6f, p.bottom - 58f), Size(18f, 12f), CornerRadius(4f, 4f))
+    }
+    cactus(p.left + p.w * 0.28f)
+    cactus(p.right - p.w * 0.25f)
+    drawOval(Color(0xFFC9A050), Offset(p.cx - 28f, p.bottom - 18f), Size(56f, 16f))
+}
+
+private fun DrawScope.drawGlacierGate(p: Place) {
+    val ice = Color(p.wall)
+    fun peak(left: Float, tipY: Float, width: Float) {
+        val path = Path().apply {
+            moveTo(left, p.bottom)
+            lineTo(left + width / 2f, tipY)
+            lineTo(left + width, p.bottom)
+            close()
+        }
+        drawPath(path, ice)
+        drawPath(path, Color(0xFF4A7088), style = Stroke(2.5f))
+        drawPath(path, Color(0x66FFFFFF))
+    }
+    peak(p.left - 4f, p.top + 8f, p.w * 0.45f)
+    peak(p.cx - p.w * 0.1f, p.top - 4f, p.w * 0.55f)
+    peak(p.right - p.w * 0.4f, p.top + 16f, p.w * 0.42f)
+    drawOval(Color(0xCCE8F4FF), Offset(p.cx - 36f, p.bottom - 14f), Size(72f, 14f))
 }
 
 private fun DrawScope.drawCave(p: Place) {
@@ -382,7 +422,10 @@ private fun DrawScope.drawCamp(p: Place) {
 
 /** 문 위 간판 - 장소별 상징 */
 private fun DrawScope.drawEmblem(p: Place) {
-    if (p.style == BuildingStyle.CAVE || p.style == BuildingStyle.FOREST || p.style == BuildingStyle.ARENA) return
+    if (p.style == BuildingStyle.CAVE || p.style == BuildingStyle.FOREST ||
+        p.style == BuildingStyle.DESERT || p.style == BuildingStyle.GLACIER ||
+        p.style == BuildingStyle.ARENA
+    ) return
 
     val cx = p.cx + p.w * 0.30f
     val cy = p.top + p.h * 0.62f

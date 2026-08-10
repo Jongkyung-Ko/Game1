@@ -147,6 +147,8 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Chip("좀비 둥지 ${p.dungeonDepth}층")
         Chip("동쪽 숲 ${p.forestDepth}지대")
+        Chip("남쪽 사막 ${p.desertDepth}지대")
+        Chip("북쪽 빙하 ${p.glacierDepth}지대")
         Chip("대련 ${vm.arenaWins}승 ${vm.arenaLosses}패")
         Chip(if (p.blessing > 0) "축복 ${p.blessing}일 남음" else "축복 없음")
     }

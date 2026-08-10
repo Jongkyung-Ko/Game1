@@ -2,12 +2,13 @@ package com.medieval.village.model
 
 enum class PlaceId {
     HOME, SHOP, WEAPON_SHOP, HOSPITAL, CHURCH, INN,
-    PUB, ARENA, DUNGEON, EAST_FOREST, BLACKSMITH, MAGIC_SCHOOL, MERCENARY
+    PUB, ARENA, DUNGEON, EAST_FOREST, SOUTH_DESERT, NORTH_GLACIER,
+    BLACKSMITH, MAGIC_SCHOOL, MERCENARY
 }
 
 /** 건물 외형 종류 (Canvas 렌더링 분기용) */
 enum class BuildingStyle {
-    HOUSE, STORE, ARMORY, CLINIC, CHURCH, INN, PUB, ARENA, CAVE, FOREST, FORGE, TOWER, CAMP
+    HOUSE, STORE, ARMORY, CLINIC, CHURCH, INN, PUB, ARENA, CAVE, FOREST, DESERT, GLACIER, FORGE, TOWER, CAMP
 }
 
 data class Place(
@@ -70,6 +71,11 @@ object Village {
             PlaceId.MAGIC_SCHOOL, "마법학교", "오크헤이븐 연금 탑",
             500f, 190f, 110f, 150f, BuildingStyle.TOWER, 0xFF4B3B8F, 0xFFCFC7E8
         ),
+        // 북쪽 빙하 입구
+        Place(
+            PlaceId.NORTH_GLACIER, "북쪽 빙하", "극지의 길 · Northern Glacier",
+            780f, 90f, 150f, 110f, BuildingStyle.GLACIER, 0xFF6A90B0, 0xFFE0F0F8
+        ),
         // 성당 + 공동묘지
         Place(
             PlaceId.CHURCH, "교회", "성 알라릭 예배당",
@@ -113,6 +119,11 @@ object Village {
         Place(
             PlaceId.ARENA, "대련소", "말뚝 울타리 훈련장",
             400f, 880f, 180f, 120f, BuildingStyle.ARENA, 0xFF7A5230, 0xFFC9A87C
+        ),
+        // 남쪽 사막 입구
+        Place(
+            PlaceId.SOUTH_DESERT, "남쪽 사막", "모래바람 · Southern Desert",
+            900f, 930f, 160f, 110f, BuildingStyle.DESERT, 0xFFA07030, 0xFFE8C878
         ),
         // 합성 용병 야영지
         Place(
