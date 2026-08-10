@@ -25,6 +25,7 @@ fun DrawScope.drawPlace(p: Place) {
 
     when (p.style) {
         BuildingStyle.CAVE -> drawCave(p)
+        BuildingStyle.FOREST -> drawForestGate(p)
         BuildingStyle.ARENA -> drawArenaGround(p)
         BuildingStyle.CAMP -> drawCamp(p)
         BuildingStyle.TOWER -> drawTower(p)
@@ -245,6 +246,30 @@ private fun DrawScope.drawForge(p: Place) {
 }
 
 /** 던전 입구: 바위 언덕과 동굴 아치 */
+private fun DrawScope.drawForestGate(p: Place) {
+    val canopy = Color(p.wall)
+    val trunk = Color(0xFF5A3A22)
+    // 세 그루의 나무로 숲 입구 표현
+    fun tree(cx: Float, baseY: Float, scale: Float) {
+        drawRect(trunk, Offset(cx - 6f * scale, baseY - 40f * scale), Size(12f * scale, 44f * scale))
+        drawCircle(canopy, 28f * scale, Offset(cx, baseY - 55f * scale))
+        drawCircle(Color(p.roof), 20f * scale, Offset(cx - 12f * scale, baseY - 48f * scale))
+        drawCircle(canopy.copy(alpha = 0.85f), 18f * scale, Offset(cx + 14f * scale, baseY - 50f * scale))
+    }
+    tree(p.left + p.w * 0.22f, p.bottom, 1.0f)
+    tree(p.cx, p.bottom, 1.25f)
+    tree(p.right - p.w * 0.20f, p.bottom, 0.95f)
+    // 오솔길
+    val path = Path().apply {
+        moveTo(p.cx - p.w * 0.12f, p.bottom)
+        quadraticBezierTo(p.cx, p.cy + p.h * 0.1f, p.cx + p.w * 0.08f, p.bottom - p.h * 0.15f)
+        lineTo(p.cx - p.w * 0.02f, p.bottom - p.h * 0.15f)
+        quadraticBezierTo(p.cx - p.w * 0.06f, p.cy + p.h * 0.1f, p.cx - p.w * 0.18f, p.bottom)
+        close()
+    }
+    drawPath(path, Color(0xFF8A6A3A))
+}
+
 private fun DrawScope.drawCave(p: Place) {
     val rock = Color(p.wall)
     val rockDark = Color(p.roof)
@@ -357,7 +382,7 @@ private fun DrawScope.drawCamp(p: Place) {
 
 /** 문 위 간판 - 장소별 상징 */
 private fun DrawScope.drawEmblem(p: Place) {
-    if (p.style == BuildingStyle.CAVE || p.style == BuildingStyle.ARENA) return
+    if (p.style == BuildingStyle.CAVE || p.style == BuildingStyle.FOREST || p.style == BuildingStyle.ARENA) return
 
     val cx = p.cx + p.w * 0.30f
     val cy = p.top + p.h * 0.62f

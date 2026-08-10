@@ -23,6 +23,7 @@ import com.medieval.village.audio.Sfx
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
 import com.medieval.village.game.Scene
+import com.medieval.village.game.isExplorePlace
 import com.medieval.village.model.PlaceId
 import com.medieval.village.ui.menu.MenuOverlay
 import com.medieval.village.ui.place.PlaceScreen
@@ -55,7 +56,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
         val mood = when {
             vm.scene == Scene.VILLAGE -> MusicMood.VILLAGE
             vm.currentPlace in setOf(PlaceId.HOME, PlaceId.INN, PlaceId.PUB) -> MusicMood.COZY
-            vm.currentPlace in setOf(PlaceId.DUNGEON, PlaceId.ARENA) -> MusicMood.TENSE
+            vm.currentPlace.isExplorePlace() || vm.currentPlace == PlaceId.ARENA -> MusicMood.TENSE
             else -> MusicMood.VILLAGE
         }
         audio.playMusic(mood)
@@ -92,7 +93,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
         when {
             vm.menuTab != MenuTab.NONE -> vm.menuTab = MenuTab.NONE
             vm.interiorPanelOpen -> vm.closeInteriorPanel()
-            vm.scene == Scene.INTERIOR && vm.currentPlace == PlaceId.DUNGEON -> vm.escapeDungeon()
+            vm.scene == Scene.INTERIOR && vm.currentPlace.isExplorePlace() -> vm.escapeDungeon()
             vm.scene == Scene.INTERIOR -> vm.leavePlace()
         }
     }

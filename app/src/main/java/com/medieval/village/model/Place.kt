@@ -2,12 +2,12 @@ package com.medieval.village.model
 
 enum class PlaceId {
     HOME, SHOP, WEAPON_SHOP, HOSPITAL, CHURCH, INN,
-    PUB, ARENA, DUNGEON, BLACKSMITH, MAGIC_SCHOOL, MERCENARY
+    PUB, ARENA, DUNGEON, EAST_FOREST, BLACKSMITH, MAGIC_SCHOOL, MERCENARY
 }
 
 /** 건물 외형 종류 (Canvas 렌더링 분기용) */
 enum class BuildingStyle {
-    HOUSE, STORE, ARMORY, CLINIC, CHURCH, INN, PUB, ARENA, CAVE, FORGE, TOWER, CAMP
+    HOUSE, STORE, ARMORY, CLINIC, CHURCH, INN, PUB, ARENA, CAVE, FOREST, FORGE, TOWER, CAMP
 }
 
 data class Place(
@@ -79,6 +79,11 @@ object Village {
         Place(
             PlaceId.DUNGEON, "던전입구", "저주받은 동굴 · 지하묘소",
             1380f, 200f, 130f, 110f, BuildingStyle.CAVE, 0xFF3B3630, 0xFF56504A
+        ),
+        // 동부 숲 입구 (우측 중하단)
+        Place(
+            PlaceId.EAST_FOREST, "동쪽 숲", "야생의 길 · Eastern Forest",
+            1420f, 560f, 150f, 130f, BuildingStyle.FOREST, 0xFF2F4A28, 0xFF6B8F4E
         ),
         // 광장 시장 포장
         Place(

@@ -27,6 +27,8 @@ class KenneyAtlas(
     fun sprite(name: String): ImageBitmap =
         sprites[name] ?: error("Missing kenney sprite: $name")
 
+    fun spriteOrNull(name: String): ImageBitmap? = sprites[name]
+
     companion object {
         const val TILE = 16
         /** 저장소의 tiny_*.png 는 1px 갭 없이 16px 타일이 밀집 패킹되어 있다. */
@@ -76,6 +78,7 @@ class KenneyAtlas(
             BuildingStyle.CHURCH -> "church"
             BuildingStyle.TOWER -> "tower"
             BuildingStyle.CAVE -> "cave"
+            BuildingStyle.FOREST -> "tree_g"
             BuildingStyle.ARENA -> "arena"
             BuildingStyle.CAMP -> "camp"
             BuildingStyle.FORGE -> "forge"
@@ -84,8 +87,7 @@ class KenneyAtlas(
             BuildingStyle.PUB -> "pub"
             BuildingStyle.CLINIC -> "clinic"
             BuildingStyle.ARMORY -> "armory"
-            BuildingStyle.HOUSE -> "house_red"
-            else -> when (id) {
+            BuildingStyle.HOUSE -> when (id) {
                 PlaceId.HOME -> "house_red5"
                 else -> "house_red"
             }

@@ -64,6 +64,10 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         DungeonScreen(vm = vm, modifier = modifier)
         return
     }
+    if (id == PlaceId.EAST_FOREST) {
+        ForestScreen(vm = vm, modifier = modifier)
+        return
+    }
     WalkableInteriorScreen(vm = vm, id = id, rootModifier = modifier)
 }
 

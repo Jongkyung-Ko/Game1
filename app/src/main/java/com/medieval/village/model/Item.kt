@@ -85,5 +85,8 @@ object ItemCatalog {
     /** 던전에서 드랍될 수 있는 전리품 */
     val dungeonLoot = listOf(potion, ether, bread, portalStone, rustySword, woodShield, manaAmulet)
 
-    val all: List<Item> = (generalGoods + weaponGoods + dungeonLoot + manaAmulet).distinctBy { it.id }
+    /** 동쪽 숲 동물·은닉 상자 전리품 */
+    val forestLoot = listOf(potion, bread, ether, torch, woodShield, leatherArmor, luckyRing, rustySword)
+
+    val all: List<Item> = (generalGoods + weaponGoods + dungeonLoot + forestLoot + manaAmulet).distinctBy { it.id }
 }

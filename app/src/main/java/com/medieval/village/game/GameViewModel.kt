@@ -13,6 +13,7 @@ import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.EquippedItem
+import com.medieval.village.model.ForestFactory
 import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InteriorNpcKind
@@ -40,6 +41,10 @@ enum class Scene { VILLAGE, INTERIOR }
 enum class MenuTab { NONE, STATUS, INVENTORY, EQUIPMENT, SYSTEM }
 
 private data class Waypoint(val x: Float, val y: Float)
+
+/** 도보 탐험 지역(던전·동쪽 숲) 여부 */
+fun PlaceId?.isExplorePlace(): Boolean =
+    this == PlaceId.DUNGEON || this == PlaceId.EAST_FOREST
 
 class GameViewModel : ViewModel() {
 
@@ -220,7 +225,7 @@ class GameViewModel : ViewModel() {
             tickPub(dt)
             return
         }
-        if (scene == Scene.INTERIOR && currentPlace == PlaceId.DUNGEON) {
+        if (scene == Scene.INTERIOR && currentPlace.isExplorePlace()) {
             tickDungeon(dt)
             return
         }
@@ -379,7 +384,7 @@ class GameViewModel : ViewModel() {
     }
 
     fun openInteriorPanel() {
-        if (currentPlace == null || currentPlace == PlaceId.DUNGEON || currentPlace == PlaceId.PUB) return
+        if (currentPlace == null || currentPlace.isExplorePlace() || currentPlace == PlaceId.PUB) return
         interiorPanelOpen = true
         interiorTarget = null
         pendingInteriorNpc = null
@@ -434,7 +439,7 @@ class GameViewModel : ViewModel() {
             pendingPubNpc = null
             pubDialogue = null
             pubSpeakerId = null
-        } else if (id != PlaceId.DUNGEON) {
+        } else if (!id.isExplorePlace()) {
             pubHeroX = InteriorRoom.SPAWN_X
             pubHeroY = InteriorRoom.SPAWN_Y
             pubTarget = null
@@ -442,8 +447,8 @@ class GameViewModel : ViewModel() {
             pubDialogue = null
             pubSpeakerId = null
         }
-        if (id == PlaceId.DUNGEON) {
-            enterDungeonFloor(1)
+        if (id.isExplorePlace()) {
+            enterExploreFloor(1)
         }
         emitSfx("door")
         greetInteriorNpcs(id)
@@ -466,7 +471,7 @@ class GameViewModel : ViewModel() {
         pubWalking = false
         interiorSpeech = null
         interiorSpeakerId = null
-        if (id == PlaceId.DUNGEON) clearDungeonState()
+        if (id.isExplorePlace()) clearDungeonState()
         scene = Scene.VILLAGE
         currentPlace = null
         menuTab = MenuTab.NONE
@@ -511,6 +516,7 @@ class GameViewModel : ViewModel() {
         PlaceId.PUB -> "포도주 향 사이로, 좀비석과 영주를 향한 낮은 원성이 섞여 들린다."
         PlaceId.ARENA -> "\"지상에서라도 칼날을 갈아야지. 지하에선 실수가 곧 죽음이야.\""
         PlaceId.DUNGEON -> "축축한 하수도 바람이 얼굴을 스친다. 저주의 둥지가 발밑에서 숨 쉰다."
+        PlaceId.EAST_FOREST -> "나뭇잎 사이로 바람이 스친다. 동쪽으로 갈수록 짐승의 울음이 가까워진다."
         PlaceId.BLACKSMITH -> "\"좀비 이빨에 안 깨지려면, 쇠는 더 두들겨야지.\""
         PlaceId.MAGIC_SCHOOL -> "\"연금술사들이 손을 댄 그 돌… 우리는 이제 해독만 연구한다네.\""
         PlaceId.MERCENARY -> "\"좀비 둥지 안내라면 돈만 주면 붙여주지. 목숨값은 별도야.\""
@@ -569,15 +575,15 @@ class GameViewModel : ViewModel() {
         return true
     }
 
-    /** 던전에서만 사용 — 발밑에 집으로 가는 포털을 연다. */
+    /** 탐험 지역(던전·숲)에서만 사용 — 발밑에 집으로 가는 포털을 연다. */
     private fun usePortalStone(): Boolean {
-        if (currentPlace != PlaceId.DUNGEON) {
-            say("포털스톤은 던전에서만 사용할 수 있다.")
+        if (!currentPlace.isExplorePlace()) {
+            say("포털스톤은 던전이나 동쪽 숲에서만 사용할 수 있다.")
             return false
         }
         val map = dungeonFloor
         if (map == null) {
-            say("포털스톤은 던전에서만 사용할 수 있다.")
+            say("포털스톤은 던전이나 동쪽 숲에서만 사용할 수 있다.")
             return false
         }
         if (inventory.none { it.item.id == ItemCatalog.portalStone.id && it.count > 0 }) {
@@ -604,9 +610,11 @@ class GameViewModel : ViewModel() {
         refreshDungeonFloor()
         emitSfx("door")
         say("포털스톤이 갈라지며 집으로 이어지는 푸른 문이 열렸다.")
-        say("포털 위에서 ‘집으로’를 누르면 오두막으로 돌아간다. 던전을 떠나면 문은 사라진다.")
+        say("포털 위에서 ‘집으로’를 누르면 오두막으로 돌아간다. 탐험을 떠나면 문은 사라진다.")
         return true
     }
+
+    private fun inForest(): Boolean = currentPlace == PlaceId.EAST_FOREST
 
     fun equip(item: Item) {
         if (!item.isEquipment) return
@@ -954,8 +962,9 @@ class GameViewModel : ViewModel() {
         dungeonFloor = map.copy(monsters = map.monsters.toMutableList())
     }
 
-    private fun enterDungeonFloor(floor: Int) {
-        val map = DungeonFactory.generate(floor)
+    private fun enterExploreFloor(floor: Int) {
+        val forest = inForest()
+        val map = if (forest) ForestFactory.generate(floor) else DungeonFactory.generate(floor)
         dungeonFloor = map
         dungeonFloorNumber = floor
         dungeonHeroX = map.spawnX
@@ -967,20 +976,32 @@ class GameViewModel : ViewModel() {
         pendingChestRow = null
         dungeonCombatLock = false
         dungeonHint = "stairs_up"
-        if (floor > player.dungeonDepth) {
-            player = player.copy(dungeonDepth = floor)
-        }
-        say("─── 지하 ${floor}층 · 오염된 통로 ───")
-        if (floor == 1) {
-            say("한때 포도주 보관소와 하수도였던 길이 좀비의 숨결로 가득하다.")
+        if (forest) {
+            if (floor > player.forestDepth) {
+                player = player.copy(forestDepth = floor)
+            }
+            say("─── 동쪽 숲 · ${floor}지대 ───")
+            if (floor == 1) {
+                say("마을 동쪽 숲길이 열린다. 토끼와 여우가 덤불 사이로 스친다.")
+            } else {
+                say("숲이 더 짙어진다. 발밑 낙엽이 축축하고, 짐승의 숨결이 가까워진다.")
+            }
         } else {
-            say("더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다.")
+            if (floor > player.dungeonDepth) {
+                player = player.copy(dungeonDepth = floor)
+            }
+            say("─── 지하 ${floor}층 · 오염된 통로 ───")
+            if (floor == 1) {
+                say("한때 포도주 보관소와 하수도였던 길이 좀비의 숨결로 가득하다.")
+            } else {
+                say("더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다.")
+            }
         }
     }
 
-    /** 던전 화면 진입 시 맵이 없으면 즉시 생성한다. */
+    /** 탐험 화면 진입 시 맵이 없으면 즉시 생성한다. */
     fun ensureDungeonLoaded() {
-        if (dungeonFloor == null) enterDungeonFloor(1)
+        if (dungeonFloor == null) enterExploreFloor(1)
     }
 
     fun walkInDungeon(x: Float, y: Float) {
@@ -1006,19 +1027,22 @@ class GameViewModel : ViewModel() {
     fun descendDungeon() {
         val map = dungeonFloor ?: return
         if (map.tileKindAt(dungeonHeroX, dungeonHeroY) != DungeonTile.STAIRS_DOWN) {
-            say("아래층으로 이어지는 계단 위에 서야 한다.")
+            say(if (inForest()) "더 깊은 숲길로 이어지는 표식 위에 서야 한다." else "아래층으로 이어지는 계단 위에 서야 한다.")
             return
         }
         if (player.hp <= player.maxHp * 0.15f) {
-            say("몸 상태로는 더 내려갈 수 없다. 물약을 쓰거나 지상으로 돌아가자.")
+            say("몸 상태로는 더 들어갈 수 없다. 물약을 쓰거나 마을로 돌아가자.")
             return
         }
         emitSfx("door")
-        enterDungeonFloor(dungeonFloorNumber + 1)
+        enterExploreFloor(dungeonFloorNumber + 1)
     }
 
     fun escapeDungeon() {
-        say("지상의 공기가 폐를 채운다. 저주는 아직 지하에 웅크리고 있다.")
+        say(
+            if (inForest()) "마을 쪽 바람이 폐를 채운다. 숲속 짐승들은 여전히 깊은 곳에서 숨 쉰다."
+            else "지상의 공기가 폐를 채운다. 저주는 아직 지하에 웅크리고 있다."
+        )
         emitSfx("door")
         leavePlace()
     }
@@ -1063,6 +1087,21 @@ class GameViewModel : ViewModel() {
     }
 
     private fun rollChestLoot(floor: Int): Item {
+        if (inForest()) {
+            val deep = listOf(
+                ItemCatalog.hiPotion,
+                ItemCatalog.ironSword,
+                ItemCatalog.leatherArmor,
+                ItemCatalog.luckyRing,
+                ItemCatalog.portalStone,
+            )
+            val pool = if (floor >= 3 && Random.nextFloat() < 0.4f) {
+                deep + ItemCatalog.forestLoot
+            } else {
+                ItemCatalog.forestLoot
+            }
+            return pool.random()
+        }
         val deep = listOf(
             ItemCatalog.hiPotion,
             ItemCatalog.ironSword,
@@ -1224,7 +1263,11 @@ class GameViewModel : ViewModel() {
         dungeonCombatLock = true
         emitSfx("hit")
         val floor = dungeonFloorNumber
-        say("${monster.name}이(가) 생살 허기를 드러내며 덤벼든다!")
+        val forest = inForest()
+        say(
+            if (forest) "${monster.name}이(가) 덤불에서 튀어나와 덤벼든다!"
+            else "${monster.name}이(가) 생살 허기를 드러내며 덤벼든다!"
+        )
 
         val myPower = totalAtk + partyPower + blessBonus() + Random.nextInt(0, 10)
         val enemyPower = monster.power + Random.nextInt(0, 8)
@@ -1233,12 +1276,14 @@ class GameViewModel : ViewModel() {
         if (myPower >= enemyPower) {
             monster.alive = false
             refreshDungeonFloor()
-            val gold = 18 + floor * 14 + Random.nextInt(0, 18)
-            val exp = 20 + floor * 12
+            val gold = (if (forest) 14 else 18) + floor * (if (forest) 11 else 14) + Random.nextInt(0, 16)
+            val exp = (if (forest) 16 else 20) + floor * (if (forest) 10 else 12)
             val takenHit = (dmg / 2).coerceAtLeast(1)
             say("${monster.name}을(를) 쓰러뜨렸다! (HP -$takenHit, +${gold}G, EXP +$exp)")
             player = player.copy(gold = player.gold + gold)
-            if (floor > player.dungeonDepth) {
+            if (forest) {
+                if (floor > player.forestDepth) player = player.copy(forestDepth = floor)
+            } else if (floor > player.dungeonDepth) {
                 player = player.copy(dungeonDepth = floor)
             }
             if (applyDamage(takenHit)) return
@@ -1248,19 +1293,27 @@ class GameViewModel : ViewModel() {
                 say("원정대 용병도 경험을 쌓았다. (+${exp} EXP)")
             }
             if (Random.nextInt(100) < 40) {
-                val loot = ItemCatalog.dungeonLoot.random()
+                val loot = if (forest) ItemCatalog.forestLoot.random() else ItemCatalog.dungeonLoot.random()
                 addItem(loot)
-                say("썩은 옷자락에서 ${loot.name}을(를) 챙겼다.")
+                say(
+                    if (forest) "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
+                    else "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
+                )
             }
             if (mapCleared()) {
-                say("이 층의 좀비가 잠잠해졌다. 심층의 계단을 찾아보자.")
+                say(
+                    if (forest) "이 지대의 짐승이 잠잠해졌다. 더 깊은 숲길을 찾아보자."
+                    else "이 층의 좀비가 잠잠해졌다. 심층의 계단을 찾아보자."
+                )
             }
         } else {
-            say("${monster.name}의 이빨이 스쳤다! (HP -$dmg)")
+            say(
+                if (forest) "${monster.name}의 발톱이 스쳤다! (HP -$dmg)"
+                else "${monster.name}의 이빨이 스쳤다! (HP -$dmg)"
+            )
             if (applyDamage(dmg)) return
             gainExp(6)
             gainMercExp(3)
-            // 밀려남
             val push = 40f
             val ang = Random.nextFloat() * (Math.PI * 2).toFloat()
             tryMoveDungeon(
