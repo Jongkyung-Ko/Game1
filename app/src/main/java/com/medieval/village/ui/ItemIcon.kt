@@ -74,6 +74,9 @@ private fun DrawScope.drawItemGlyph(id: String, type: ItemType) {
         "iron_sword" -> drawSword(Color(0xFFC0C8D0), Color(0xFF6A7078))
         "knight_sword" -> drawSword(Color(0xFFE8D9A0), Color(0xFFD4AF37))
         "battle_axe" -> drawAxe()
+        "short_bow", "hunter_bow" -> drawBow()
+        "oak_staff" -> drawStaff(Color(0xFF8A5A32), Color(0xFF7AD0FF))
+        "flame_wand" -> drawStaff(Color(0xFF6B3A28), Color(0xFFE8582C))
         "wood_shield" -> drawShield(Color(0xFF8A5A32), Color(0xFFD9B15D))
         "iron_shield" -> drawShield(Color(0xFF7A8490), Color(0xFFD9C8A4))
         "leather_armor" -> drawArmor(Color(0xFF8A5A32))
@@ -182,6 +185,26 @@ private fun DrawScope.drawAxe() {
     }
     drawPath(blade, Color(0xFFAAB0B8))
     drawPath(blade, Color(0xFF3A2818), style = Stroke(1.5f))
+}
+
+private fun DrawScope.drawBow() {
+    val w = size.width
+    val h = size.height
+    val arc = Path().apply {
+        moveTo(w * 0.28f, h * 0.18f)
+        quadraticBezierTo(w * 0.78f, h * 0.50f, w * 0.28f, h * 0.82f)
+    }
+    drawPath(arc, Color(0xFF8A5A32), style = Stroke(w * 0.08f, cap = StrokeCap.Round))
+    drawLine(Color(0xFFE8D9B8), Offset(w * 0.30f, h * 0.20f), Offset(w * 0.30f, h * 0.80f), 2f)
+    drawLine(Color(0xFFD8C49A), Offset(w * 0.32f, h * 0.50f), Offset(w * 0.78f, h * 0.50f), 2.5f, StrokeCap.Round)
+}
+
+private fun DrawScope.drawStaff(wood: Color, gem: Color) {
+    val w = size.width
+    val h = size.height
+    drawLine(wood, Offset(w * 0.32f, h * 0.82f), Offset(w * 0.68f, h * 0.22f), w * 0.09f, StrokeCap.Round)
+    drawCircle(gem, w * 0.12f, Offset(w * 0.70f, h * 0.20f))
+    drawCircle(Color(0x66FFFFFF), w * 0.05f, Offset(w * 0.67f, h * 0.17f))
 }
 
 private fun DrawScope.drawShield(body: Color, boss: Color) {

@@ -25,7 +25,9 @@ data class DungeonMonster(
     var x: Float,
     var y: Float,
     val power: Int,
-    var alive: Boolean = true
+    var alive: Boolean = true,
+    var hp: Int = (power * 4).coerceAtLeast(24),
+    val maxHp: Int = (power * 4).coerceAtLeast(24),
 )
 
 data class DungeonFloor(

@@ -41,7 +41,6 @@ import com.medieval.village.model.DungeonFloor
 import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.ItemCatalog
-import com.medieval.village.model.WildZoneGenerator
 import com.medieval.village.ui.Chip
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.WoodButton
@@ -56,7 +55,6 @@ import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.drawMercenary
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
-import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
@@ -84,7 +82,7 @@ private data class WildThemeUi(
 private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): WildThemeUi = when (theme) {
     WildTheme.FOREST -> WildThemeUi(
         title = "동쪽 숲 · ${zone}지대",
-        subtitle = "깊을수록 강한 짐승 — 화면을 눌러 이동",
+        subtitle = "깊을수록 강한 짐승 — 패드 이동 · 공격",
         recordLabel = { "기록 ${it}지대" },
         foeLabel = "짐승 $foeCount",
         foeChip = Color(0xFF4A7A38),
@@ -92,15 +90,15 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.6 Eastern forest",
+        watermark = "v0.4.7 Eastern forest",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
-        moveHint = "화면을 눌러 이동 · 상자를 탭해 열기 · 짐승은 전투",
+        moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
         deepButton = "들어가기",
     )
     WildTheme.DESERT -> WildThemeUi(
         title = "남쪽 사막 · ${zone}지대",
-        subtitle = "모래바람 너머 괴물들 — 화면을 눌러 이동",
+        subtitle = "모래바람 너머 괴물들 — 패드 이동 · 공격",
         recordLabel = { "기록 ${it}지대" },
         foeLabel = "괴물 $foeCount",
         foeChip = Color(0xFFC07828),
@@ -108,15 +106,15 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.6 Southern desert",
+        watermark = "v0.4.7 Southern desert",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
-        moveHint = "화면을 눌러 이동 · 상자를 탭해 열기 · 사막 괴물은 전투",
+        moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
         deepButton = "들어가기",
     )
     WildTheme.GLACIER -> WildThemeUi(
         title = "북쪽 빙하 · ${zone}지대",
-        subtitle = "얼음 너머 극지 짐승 — 화면을 눌러 이동",
+        subtitle = "얼음 너머 극지 짐승 — 패드 이동 · 공격",
         recordLabel = { "기록 ${it}지대" },
         foeLabel = "극지 $foeCount",
         foeChip = Color(0xFF4A7A9A),
@@ -124,10 +122,10 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.6 Northern glacier",
+        watermark = "v0.4.7 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
-        moveHint = "화면을 눌러 이동 · 상자를 탭해 열기 · 극지 짐승은 전투",
+        moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
         deepButton = "들어가기",
     )
 }
@@ -181,6 +179,9 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
             val heroX = vm.dungeonHeroX
             val heroY = vm.dungeonHeroY
             val party = vm.activeParty
+            val slashFx = vm.meleeSlashFx
+            val projectiles = vm.dungeonProjectiles.toList()
+            val combatFrame = vm.dungeonCombatFrame
 
             Canvas(
                 modifier = Modifier
@@ -191,24 +192,17 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                             val cam = wildCamera(map, vm.dungeonHeroX, vm.dungeonHeroY, widthPx, heightPx)
                             val worldX = tap.x + cam.first
                             val worldY = tap.y + cam.second
-                            val foe = map.monsters
-                                .filter { it.alive }
-                                .minByOrNull { hypot(worldX - it.x, worldY - it.y) }
-                                ?.takeIf { hypot(worldX - it.x, worldY - it.y) < WildZoneGenerator.TILE * 0.9f }
-                            if (foe != null) {
-                                vm.approachDungeonMonster(foe)
-                                return@detectTapGestures
-                            }
                             val col = (worldX / map.tileSize).toInt()
                             val row = (worldY / map.tileSize).toInt()
                             if (map.tileAt(col, row) == DungeonTile.VAULT) {
                                 vm.openDungeonChest(col, row)
-                            } else {
-                                vm.walkInDungeon(worldX, worldY)
                             }
                         }
                     }
             ) {
+                @Suppress("UNUSED_EXPRESSION")
+                combatFrame
+
                 drawRect(ui.canvasBg, size = size)
                 drawRoundRect(
                     ui.border,
@@ -234,6 +228,8 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                     map.monsters.filter { it.alive }.forEach { monster ->
                         drawWildBeast(atlas, theme, monster)
                     }
+                    projectiles.forEach { drawDungeonProjectile(it) }
+                    slashFx?.let { drawMeleeSlashFx(it) }
                     party.forEachIndexed { index, mercenary ->
                         drawMercenary(
                             mercenary = mercenary,
@@ -252,10 +248,18 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 wildLabel(ui.watermark, 14f, 28f, 18f, ui.border)
             }
 
+            DungeonCombatHud(
+                attackLabel = vm.attackLabel(),
+                attackEnabled = vm.attackReady && vm.dungeonFloor != null,
+                onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
+                onPadRelease = { vm.clearDungeonPad() },
+                onAttack = { vm.dungeonAttack() },
+            )
+
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(8.dp)
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp)
                     .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 5.dp)
             ) {

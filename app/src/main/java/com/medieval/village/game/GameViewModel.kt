@@ -2,6 +2,7 @@ package com.medieval.village.game
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,8 +33,11 @@ import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.model.Skill
 import com.medieval.village.model.Village
+import com.medieval.village.model.WeaponStyle
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.sin
 import kotlin.random.Random
 
 enum class Facing { DOWN, UP, LEFT, RIGHT }
@@ -63,7 +67,13 @@ class GameViewModel : ViewModel() {
     companion object {
         private const val WALK_SPEED = 360f
         private const val DUNGEON_WALK_SPEED = 280f
-        private const val DUNGEON_TOUCH_RANGE = 52f
+        private const val DUNGEON_TOUCH_RANGE = 44f
+        private const val MELEE_RANGE = 78f
+        private const val MELEE_CONE_DOT = 0.35f // ~70° 전방
+        private const val ATTACK_COOLDOWN = 0.42f
+        private const val MAGIC_MP_COST = 6
+        private const val PROJECTILE_SPEED = 420f
+        private const val CONTACT_DAMAGE_INTERVAL = 0.75f
         const val MAX_ACTIVE_MERCENARY = 2
     }
 
@@ -151,6 +161,23 @@ class GameViewModel : ViewModel() {
     var lastSfx by mutableStateOf<String?>(null)
         private set
 
+    /** 던전 가상 패드 입력 (-1..1). 0이면 정지. */
+    var dungeonPadX by mutableFloatStateOf(0f)
+        private set
+    var dungeonPadY by mutableFloatStateOf(0f)
+        private set
+    /** 근접 초승달 참격 연출 */
+    var meleeSlashFx by mutableStateOf<MeleeSlashFx?>(null)
+        private set
+    /** 화살·마법 탄환 */
+    val dungeonProjectiles = mutableStateListOf<DungeonProjectile>()
+    /** 탄환/참격 프레임 갱신용 (Canvas 리컴포즈) */
+    var dungeonCombatFrame by mutableIntStateOf(0)
+        private set
+    /** 공격 버튼 활성 여부 (쿨다운/마나) */
+    var attackReady by mutableStateOf(true)
+        private set
+
     private val path = ArrayDeque<Waypoint>()
     private var pendingEnter: PlaceId? = null
     private var pubTarget: Waypoint? = null
@@ -163,6 +190,8 @@ class GameViewModel : ViewModel() {
     private var pendingChestRow: Int? = null
     private var dungeonCombatLock = false
     private var monsterWanderAcc = 0f
+    private var attackCooldown = 0f
+    private var contactDamageAcc = 0f
 
     init {
         newGame()
@@ -968,6 +997,188 @@ class GameViewModel : ViewModel() {
         pendingChestRow = null
         dungeonCombatLock = false
         monsterWanderAcc = 0f
+        dungeonPadX = 0f
+        dungeonPadY = 0f
+        meleeSlashFx = null
+        dungeonProjectiles.clear()
+        attackCooldown = 0f
+        contactDamageAcc = 0f
+        dungeonCombatFrame = 0
+        attackReady = true
+    }
+
+    fun setDungeonPad(dx: Float, dy: Float) {
+        val len = hypot(dx, dy)
+        if (len < 0.12f) {
+            dungeonPadX = 0f
+            dungeonPadY = 0f
+            return
+        }
+        dungeonPadX = (dx / len).coerceIn(-1f, 1f)
+        dungeonPadY = (dy / len).coerceIn(-1f, 1f)
+        // 패드로 움직이면 자동 걷기 목표는 취소
+        dungeonTarget = null
+        pendingDungeonMonster = null
+    }
+
+    fun clearDungeonPad() {
+        dungeonPadX = 0f
+        dungeonPadY = 0f
+    }
+
+    /** 장착 무기의 공격 방식 (미장착 시 맨손 근접) */
+    fun currentWeaponStyle(): WeaponStyle =
+        equipment[ItemType.WEAPON]?.item?.weaponStyle ?: WeaponStyle.MELEE
+
+    fun attackLabel(): String = when (currentWeaponStyle()) {
+        WeaponStyle.MELEE -> "휘두르기"
+        WeaponStyle.BOW -> "발사"
+        WeaponStyle.MAGIC -> "시전"
+    }
+
+    fun canDungeonAttack(): Boolean = attackReady && dungeonFloor != null && !dungeonCombatLock
+
+    private fun refreshAttackReady() {
+        attackReady = attackCooldown <= 0f &&
+            (currentWeaponStyle() != WeaponStyle.MAGIC || player.mp >= MAGIC_MP_COST)
+    }
+
+    /** 공격 버튼 — 근접 참격 또는 화살/마법 발사 */
+    fun dungeonAttack() {
+        val map = dungeonFloor ?: return
+        if (dungeonCombatLock || attackCooldown > 0f) return
+        val style = currentWeaponStyle()
+        if (style == WeaponStyle.MAGIC && player.mp < MAGIC_MP_COST) {
+            say("마나가 부족하다.")
+            refreshAttackReady()
+            return
+        }
+        attackCooldown = ATTACK_COOLDOWN
+        refreshAttackReady()
+        val dmg = (totalAtk + partyPower / 2 + blessBonus() / 2 + Random.nextInt(0, 5))
+            .coerceAtLeast(4)
+        emitSfx("hit")
+        when (style) {
+            WeaponStyle.MELEE -> performMeleeSlash(map, dmg)
+            WeaponStyle.BOW -> spawnProjectile(WeaponStyle.BOW, dmg, life = 1.15f)
+            WeaponStyle.MAGIC -> {
+                player = player.copy(mp = player.mp - MAGIC_MP_COST)
+                spawnProjectile(WeaponStyle.MAGIC, dmg + 3, life = 1.25f)
+            }
+        }
+        refreshAttackReady()
+    }
+
+    private fun performMeleeSlash(map: DungeonFloor, damage: Int) {
+        val origin = slashFxOrigin()
+        meleeSlashFx = MeleeSlashFx(origin.first, origin.second, facing)
+        val fx = facing.dirX()
+        val fy = facing.dirY()
+        val hits = map.monsters.filter { monster ->
+            if (!monster.alive) return@filter false
+            val dx = monster.x - dungeonHeroX
+            val dy = monster.y - dungeonHeroY
+            val dist = hypot(dx, dy)
+            if (dist > MELEE_RANGE || dist < 1f) return@filter false
+            val dot = (dx * fx + dy * fy) / dist
+            dot >= MELEE_CONE_DOT
+        }
+        if (hits.isEmpty()) {
+            say("칼날이 허공을 가른다.")
+            return
+        }
+        hits.forEach { damageMonster(it, damage) }
+    }
+
+    private fun slashFxOrigin(): Pair<Float, Float> =
+        dungeonHeroX + facing.dirX() * 18f to dungeonHeroY + facing.dirY() * 10f - 28f
+
+    private fun spawnProjectile(style: WeaponStyle, damage: Int, life: Float) {
+        val fx = facing.dirX()
+        val fy = facing.dirY()
+        // 대각 패드 입력 중이면 그 방향으로도 보정
+        val px = if (abs(dungeonPadX) + abs(dungeonPadY) > 0.2f) dungeonPadX else fx
+        val py = if (abs(dungeonPadX) + abs(dungeonPadY) > 0.2f) dungeonPadY else fy
+        val len = hypot(px, py).coerceAtLeast(0.01f)
+        val nx = px / len
+        val ny = py / len
+        facing = if (abs(nx) > abs(ny)) {
+            if (nx > 0) Facing.RIGHT else Facing.LEFT
+        } else {
+            if (ny > 0) Facing.DOWN else Facing.UP
+        }
+        dungeonProjectiles += DungeonProjectile(
+            x = dungeonHeroX + nx * 22f,
+            y = dungeonHeroY + ny * 10f - 30f,
+            vx = nx * PROJECTILE_SPEED,
+            vy = ny * PROJECTILE_SPEED,
+            style = style,
+            damage = damage,
+            life = life,
+        )
+        say(if (style == WeaponStyle.BOW) "화살을 날렸다!" else "마력을 쏘아냈다!")
+    }
+
+    private fun damageMonster(monster: DungeonMonster, damage: Int) {
+        if (!monster.alive) return
+        monster.hp -= damage
+        if (monster.hp > 0) {
+            say("${monster.name}에게 ${damage} 피해! (HP ${monster.hp}/${monster.maxHp})")
+            refreshDungeonFloor()
+            return
+        }
+        monster.alive = false
+        monster.hp = 0
+        refreshDungeonFloor()
+        rewardMonsterKill(monster)
+    }
+
+    private fun rewardMonsterKill(monster: DungeonMonster) {
+        val floor = dungeonFloorNumber
+        val biome = currentBiome()
+        val wild = biome != ExploreBiome.DUNGEON
+        val gold = (if (wild) 14 else 18) + floor * (if (wild) 11 else 14) + Random.nextInt(0, 16)
+        val exp = (if (wild) 16 else 20) + floor * (if (wild) 10 else 12)
+        say("${monster.name}을(를) 쓰러뜨렸다! (+${gold}G, EXP +$exp)")
+        player = player.copy(gold = player.gold + gold)
+        when (biome) {
+            ExploreBiome.FOREST -> if (floor > player.forestDepth) player = player.copy(forestDepth = floor)
+            ExploreBiome.DESERT -> if (floor > player.desertDepth) player = player.copy(desertDepth = floor)
+            ExploreBiome.GLACIER -> if (floor > player.glacierDepth) player = player.copy(glacierDepth = floor)
+            ExploreBiome.DUNGEON -> if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
+        }
+        gainExp(exp)
+        gainMercExp(exp)
+        if (activeParty.isNotEmpty()) {
+            say("원정대 용병도 경험을 쌓았다. (+${exp} EXP)")
+        }
+        if (Random.nextInt(100) < 40) {
+            val loot = when (biome) {
+                ExploreBiome.FOREST -> ItemCatalog.forestLoot.random()
+                ExploreBiome.DESERT -> ItemCatalog.desertLoot.random()
+                ExploreBiome.GLACIER -> ItemCatalog.glacierLoot.random()
+                ExploreBiome.DUNGEON -> ItemCatalog.dungeonLoot.random()
+            }
+            addItem(loot)
+            say(
+                when (biome) {
+                    ExploreBiome.FOREST -> "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
+                    ExploreBiome.DESERT -> "모래 속에서 ${loot.name}을(를) 주웠다."
+                    ExploreBiome.GLACIER -> "얼음 틈에서 ${loot.name}을(를) 챙겼다."
+                    ExploreBiome.DUNGEON -> "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
+                }
+            )
+        }
+        if (mapCleared()) {
+            say(
+                when (biome) {
+                    ExploreBiome.FOREST -> "이 지대의 짐승이 잠잠해졌다. 더 깊은 숲길을 찾아보자."
+                    ExploreBiome.DESERT -> "이 지대의 괴물이 잠잠해졌다. 더 깊은 모래길을 찾아보자."
+                    ExploreBiome.GLACIER -> "이 지대의 극지 짐승이 잠잠해졌다. 더 깊은 빙하를 찾아보자."
+                    ExploreBiome.DUNGEON -> "이 층의 좀비가 잠잠해졌다. 심층의 계단을 찾아보자."
+                }
+            )
+        }
     }
 
     /** 몬스터 위치/사망 등 내부 변이 후 Compose 재구성을 유도한다. */
@@ -994,6 +1205,13 @@ class GameViewModel : ViewModel() {
         pendingChestCol = null
         pendingChestRow = null
         dungeonCombatLock = false
+        dungeonPadX = 0f
+        dungeonPadY = 0f
+        meleeSlashFx = null
+        dungeonProjectiles.clear()
+        attackCooldown = 0f
+        contactDamageAcc = 0f
+        attackReady = true
         dungeonHint = "stairs_up"
         when (biome) {
             ExploreBiome.FOREST -> {
@@ -1049,11 +1267,9 @@ class GameViewModel : ViewModel() {
     }
 
     fun approachDungeonMonster(monster: DungeonMonster) {
-        if (!monster.alive || dungeonCombatLock) return
-        pendingDungeonMonster = monster
-        pendingChestCol = null
-        pendingChestRow = null
-        dungeonTarget = Waypoint(monster.x, monster.y)
+        // 패드 전투로 전환 — 탭으로 자동 접근/전투하지 않는다.
+        if (!monster.alive) return
+        say("${monster.name} — 왼쪽 패드로 다가가 오른쪽 공격 버튼으로 맞서자.")
     }
 
     fun descendDungeon() {
@@ -1181,8 +1397,41 @@ class GameViewModel : ViewModel() {
         val map = dungeonFloor ?: return
         updateDungeonHint(map)
         wanderMonsters(map, dt)
-        checkDungeonContact(map)
+        tickAttackFx(dt)
+        tickProjectiles(map, dt)
+        applyContactThreat(map, dt)
 
+        if (attackCooldown > 0f) {
+            attackCooldown = (attackCooldown - dt).coerceAtLeast(0f)
+            if (attackCooldown <= 0f) refreshAttackReady()
+        }
+
+        // 1) 가상 패드 우선 이동
+        val padLen = hypot(dungeonPadX, dungeonPadY)
+        if (padLen > 0.05f) {
+            val step = DUNGEON_WALK_SPEED * dt
+            val nx = dungeonHeroX + dungeonPadX * step
+            val ny = dungeonHeroY + dungeonPadY * step
+            val moved = tryMoveDungeon(map, nx, ny)
+            if (!moved) {
+                val movedX = tryMoveDungeon(map, nx, dungeonHeroY)
+                val movedY = tryMoveDungeon(map, dungeonHeroX, ny)
+                dungeonWalking = movedX || movedY
+            } else {
+                dungeonWalking = true
+            }
+            if (dungeonWalking) {
+                walkPhase += dt * 10f
+                facing = if (abs(dungeonPadX) > abs(dungeonPadY)) {
+                    if (dungeonPadX > 0) Facing.RIGHT else Facing.LEFT
+                } else {
+                    if (dungeonPadY > 0) Facing.DOWN else Facing.UP
+                }
+            }
+            return
+        }
+
+        // 2) 보물상자 등 자동 접근 목표
         val target = dungeonTarget
         if (target == null) {
             dungeonWalking = false
@@ -1197,7 +1446,6 @@ class GameViewModel : ViewModel() {
             tryMoveDungeon(map, target.x, target.y)
             dungeonTarget = null
             dungeonWalking = false
-            pendingDungeonMonster?.let { fightDungeonMonster(it) }
             pendingDungeonMonster = null
             val pc = pendingChestCol
             val pr = pendingChestRow
@@ -1211,7 +1459,6 @@ class GameViewModel : ViewModel() {
         val ny = dungeonHeroY + dy / dist * step
         val moved = tryMoveDungeon(map, nx, ny)
         if (!moved) {
-            // 벽에 막히면 축 분리 시도 (라그나로크식 미끄러짐)
             val movedX = tryMoveDungeon(map, nx, dungeonHeroY)
             val movedY = tryMoveDungeon(map, dungeonHeroX, ny)
             if (!movedX && !movedY) {
@@ -1228,14 +1475,47 @@ class GameViewModel : ViewModel() {
         } else {
             if (dy > 0) Facing.DOWN else Facing.UP
         }
-        pendingDungeonMonster?.let { monster ->
-            if (monster.alive && hypot(dungeonHeroX - monster.x, dungeonHeroY - monster.y) < DUNGEON_TOUCH_RANGE) {
-                dungeonTarget = null
-                dungeonWalking = false
-                fightDungeonMonster(monster)
-                pendingDungeonMonster = null
+    }
+
+    private fun tickAttackFx(dt: Float) {
+        val fx = meleeSlashFx ?: return
+        fx.age += dt
+        if (!fx.alive) meleeSlashFx = null
+        else {
+            meleeSlashFx = fx.copy(age = fx.age)
+            dungeonCombatFrame++
+        }
+    }
+
+    private fun tickProjectiles(map: DungeonFloor, dt: Float) {
+        if (dungeonProjectiles.isEmpty()) return
+        val doomed = mutableListOf<DungeonProjectile>()
+        dungeonProjectiles.forEach { p ->
+            p.life -= dt
+            if (p.life <= 0f) {
+                doomed += p
+                return@forEach
+            }
+            val nx = p.x + p.vx * dt
+            val ny = p.y + p.vy * dt
+            if (!map.isWalkable(nx, ny)) {
+                doomed += p
+                return@forEach
+            }
+            p.x = nx
+            p.y = ny
+            val hit = map.monsters.firstOrNull {
+                it.alive && hypot(it.x - p.x, it.y - p.y) < p.radius + 30f
+            }
+            if (hit != null) {
+                damageMonster(hit, p.damage)
+                doomed += p
             }
         }
+        if (doomed.isNotEmpty()) {
+            dungeonProjectiles.removeAll(doomed.toSet())
+        }
+        dungeonCombatFrame++
     }
 
     private fun tryMoveDungeon(map: DungeonFloor, x: Float, y: Float): Boolean {
@@ -1278,104 +1558,37 @@ class GameViewModel : ViewModel() {
         refreshDungeonFloor()
     }
 
-    private fun checkDungeonContact(map: DungeonFloor) {
+    /** 적과 겹치면 주기적으로 피해 (자동 전투 대신 위협만 유지) */
+    private fun applyContactThreat(map: DungeonFloor, dt: Float) {
         if (dungeonCombatLock) return
-        val hit = map.monsters.firstOrNull {
+        val foe = map.monsters.firstOrNull {
             it.alive && hypot(dungeonHeroX - it.x, dungeonHeroY - it.y) < DUNGEON_TOUCH_RANGE
-        } ?: return
-        dungeonTarget = null
-        dungeonWalking = false
-        fightDungeonMonster(hit)
-    }
-
-    private fun fightDungeonMonster(monster: DungeonMonster) {
-        if (!monster.alive || dungeonCombatLock) return
-        dungeonCombatLock = true
-        emitSfx("hit")
-        val floor = dungeonFloorNumber
+        }
+        if (foe == null) {
+            contactDamageAcc = 0f
+            return
+        }
+        contactDamageAcc += dt
+        if (contactDamageAcc < CONTACT_DAMAGE_INTERVAL) return
+        contactDamageAcc = 0f
+        val dmg = (foe.power - totalDef).coerceAtLeast(2) / 2 + Random.nextInt(0, 3)
         val biome = currentBiome()
         say(
             when (biome) {
-                ExploreBiome.FOREST -> "${monster.name}이(가) 덤불에서 튀어나와 덤벼든다!"
-                ExploreBiome.DESERT -> "${monster.name}이(가) 모래 아래에서 튀어나와 덤벼든다!"
-                ExploreBiome.GLACIER -> "${monster.name}이(가) 얼음 너머에서 덤벼든다!"
-                ExploreBiome.DUNGEON -> "${monster.name}이(가) 생살 허기를 드러내며 덤벼든다!"
+                ExploreBiome.FOREST -> "${foe.name}의 발톱이 스친다! (HP -$dmg)"
+                ExploreBiome.DESERT -> "${foe.name}의 독침이 스친다! (HP -$dmg)"
+                ExploreBiome.GLACIER -> "${foe.name}의 한기가 스친다! (HP -$dmg)"
+                ExploreBiome.DUNGEON -> "${foe.name}의 이빨이 스친다! (HP -$dmg)"
             }
         )
-
-        val myPower = totalAtk + partyPower + blessBonus() + Random.nextInt(0, 10)
-        val enemyPower = monster.power + Random.nextInt(0, 8)
-        val dmg = (enemyPower - totalDef).coerceAtLeast(2) + Random.nextInt(0, 6)
-        val wild = biome != ExploreBiome.DUNGEON
-
-        if (myPower >= enemyPower) {
-            monster.alive = false
-            refreshDungeonFloor()
-            val gold = (if (wild) 14 else 18) + floor * (if (wild) 11 else 14) + Random.nextInt(0, 16)
-            val exp = (if (wild) 16 else 20) + floor * (if (wild) 10 else 12)
-            val takenHit = (dmg / 2).coerceAtLeast(1)
-            say("${monster.name}을(를) 쓰러뜨렸다! (HP -$takenHit, +${gold}G, EXP +$exp)")
-            player = player.copy(gold = player.gold + gold)
-            when (biome) {
-                ExploreBiome.FOREST -> if (floor > player.forestDepth) player = player.copy(forestDepth = floor)
-                ExploreBiome.DESERT -> if (floor > player.desertDepth) player = player.copy(desertDepth = floor)
-                ExploreBiome.GLACIER -> if (floor > player.glacierDepth) player = player.copy(glacierDepth = floor)
-                ExploreBiome.DUNGEON -> if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
-            }
-            if (applyDamage(takenHit)) return
-            gainExp(exp)
-            gainMercExp(exp)
-            if (activeParty.isNotEmpty()) {
-                say("원정대 용병도 경험을 쌓았다. (+${exp} EXP)")
-            }
-            if (Random.nextInt(100) < 40) {
-                val loot = when (biome) {
-                    ExploreBiome.FOREST -> ItemCatalog.forestLoot.random()
-                    ExploreBiome.DESERT -> ItemCatalog.desertLoot.random()
-                    ExploreBiome.GLACIER -> ItemCatalog.glacierLoot.random()
-                    ExploreBiome.DUNGEON -> ItemCatalog.dungeonLoot.random()
-                }
-                addItem(loot)
-                say(
-                    when (biome) {
-                        ExploreBiome.FOREST -> "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
-                        ExploreBiome.DESERT -> "모래 속에서 ${loot.name}을(를) 주웠다."
-                        ExploreBiome.GLACIER -> "얼음 틈에서 ${loot.name}을(를) 챙겼다."
-                        ExploreBiome.DUNGEON -> "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
-                    }
-                )
-            }
-            if (mapCleared()) {
-                say(
-                    when (biome) {
-                        ExploreBiome.FOREST -> "이 지대의 짐승이 잠잠해졌다. 더 깊은 숲길을 찾아보자."
-                        ExploreBiome.DESERT -> "이 지대의 괴물이 잠잠해졌다. 더 깊은 모래길을 찾아보자."
-                        ExploreBiome.GLACIER -> "이 지대의 극지 짐승이 잠잠해졌다. 더 깊은 빙하를 찾아보자."
-                        ExploreBiome.DUNGEON -> "이 층의 좀비가 잠잠해졌다. 심층의 계단을 찾아보자."
-                    }
-                )
-            }
-        } else {
-            say(
-                when (biome) {
-                    ExploreBiome.FOREST -> "${monster.name}의 발톱이 스쳤다! (HP -$dmg)"
-                    ExploreBiome.DESERT -> "${monster.name}의 독침이 스쳤다! (HP -$dmg)"
-                    ExploreBiome.GLACIER -> "${monster.name}의 얼음 발톱이 스쳤다! (HP -$dmg)"
-                    ExploreBiome.DUNGEON -> "${monster.name}의 이빨이 스쳤다! (HP -$dmg)"
-                }
-            )
-            if (applyDamage(dmg)) return
-            gainExp(6)
-            gainMercExp(3)
-            val push = 40f
-            val ang = Random.nextFloat() * (Math.PI * 2).toFloat()
-            tryMoveDungeon(
-                dungeonFloor!!,
-                dungeonHeroX + kotlin.math.cos(ang) * push,
-                dungeonHeroY + kotlin.math.sin(ang) * push
-            )
-        }
-        dungeonCombatLock = false
+        applyDamage(dmg)
+        val push = 28f
+        val ang = Random.nextFloat() * (Math.PI * 2).toFloat()
+        tryMoveDungeon(
+            map,
+            dungeonHeroX + cos(ang) * push,
+            dungeonHeroY + sin(ang) * push
+        )
     }
 
     private fun mapCleared(): Boolean =
@@ -1387,8 +1600,11 @@ class GameViewModel : ViewModel() {
             enterPlace(PlaceId.DUNGEON)
             return
         }
-        say("화면을 눌러 통로를 걸어 다니며 좀비와 싸우자.")
+        say("왼쪽 패드로 이동하고, 오른쪽 버튼으로 공격하며 좀비와 싸우자.")
     }
+
+    fun dungeonMoveHint(): String =
+        "왼쪽 패드로 이동 · 오른쪽 ${attackLabel()} · 상자는 탭"
 
     private fun blessBonus(): Int = if (player.blessing > 0) 9 else 0
 

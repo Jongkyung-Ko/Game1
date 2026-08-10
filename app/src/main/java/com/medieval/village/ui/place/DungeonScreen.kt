@@ -58,7 +58,6 @@ import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.drawMercenary
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
-import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 
@@ -84,7 +83,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "하이브리드 던전 — 화면을 눌러 이동",
+                    "왼쪽 패드 이동 · 오른쪽 공격",
                     color = Palette.ParchmentDim,
                     fontSize = 10.sp
                 )
@@ -111,6 +110,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val heroX = vm.dungeonHeroX
             val heroY = vm.dungeonHeroY
             val party = vm.activeParty
+            val slashFx = vm.meleeSlashFx
+            val projectiles = vm.dungeonProjectiles.toList()
+            val combatFrame = vm.dungeonCombatFrame
 
             Canvas(
                 modifier = Modifier
@@ -121,25 +123,19 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             val cam = cameraOffset(map, vm.dungeonHeroX, vm.dungeonHeroY, widthPx, heightPx)
                             val worldX = tap.x + cam.first
                             val worldY = tap.y + cam.second
-                            val zombie = map.monsters
-                                .filter { it.alive }
-                                .minByOrNull { hypot(worldX - it.x, worldY - it.y) }
-                                ?.takeIf { hypot(worldX - it.x, worldY - it.y) < DungeonFactory.TILE * 0.9f }
-                            if (zombie != null) {
-                                vm.approachDungeonMonster(zombie)
-                                return@detectTapGestures
-                            }
                             val col = (worldX / map.tileSize).toInt()
                             val row = (worldY / map.tileSize).toInt()
+                            // 터치 이동은 끄고, 보물상자 탭만 허용
                             if (map.tileAt(col, row) == DungeonTile.VAULT) {
                                 vm.openDungeonChest(col, row)
-                            } else {
-                                vm.walkInDungeon(worldX, worldY)
                             }
                         }
                     }
             ) {
-                // 화면 좌표계 배경 — 변환 실패해도 빈 화면이 되지 않게
+                // combatFrame 구독 — 탄환/참격 갱신
+                @Suppress("UNUSED_EXPRESSION")
+                combatFrame
+
                 drawRect(Color(0xFFEFE0C0), size = size)
                 drawRoundRect(
                     Color(0xFF4A3524),
@@ -169,6 +165,8 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     map.monsters.filter { it.alive }.forEach { monster ->
                         drawDungeonMonster(atlas, art, monster)
                     }
+                    projectiles.forEach { drawDungeonProjectile(it) }
+                    slashFx?.let { drawMeleeSlashFx(it) }
                     party.forEachIndexed { index, mercenary ->
                         drawMercenary(
                             mercenary = mercenary,
@@ -192,13 +190,21 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.6 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.7 Pad combat", 14f, 28f, 18f, Color(0xFF5A4231))
             }
+
+            DungeonCombatHud(
+                attackLabel = vm.attackLabel(),
+                attackEnabled = vm.attackReady && vm.dungeonFloor != null,
+                onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
+                onPadRelease = { vm.clearDungeonPad() },
+                onAttack = { vm.dungeonAttack() },
+            )
 
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(8.dp)
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp)
                     .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 5.dp)
             ) {
@@ -209,7 +215,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
                         "chest" -> "◆ 보물상자 — 아래에서 ‘열기’ 또는 상자를 탭"
                         "chest_open" -> "이미 열어 본 보물상자"
-                        else -> "화면을 눌러 이동 · 상자를 탭해 열기 · 좀비는 전투"
+                        else -> vm.dungeonMoveHint()
                     },
                     color = Palette.Parchment,
                     fontSize = 11.sp

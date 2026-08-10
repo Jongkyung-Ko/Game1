@@ -9,6 +9,16 @@ enum class ItemType(val label: String) {
     CONSUMABLE("소모품")
 }
 
+/** 무기 공격 방식 — 던전 패드 전투에서 사용 */
+enum class WeaponStyle {
+    /** 검·도끼 등 전방 초승달 휘두르기 */
+    MELEE,
+    /** 화살 발사 */
+    BOW,
+    /** 마법 탄환 발사 (MP 소모) */
+    MAGIC,
+}
+
 /** 장비 슬롯 순서 (Equipment 화면 표시 순서) */
 val EQUIP_SLOTS = listOf(
     ItemType.WEAPON,
@@ -27,7 +37,8 @@ data class Item(
     val def: Int = 0,
     val healHp: Int = 0,
     val healMp: Int = 0,
-    val desc: String = ""
+    val desc: String = "",
+    val weaponStyle: WeaponStyle = WeaponStyle.MELEE,
 ) {
     val isEquipment: Boolean get() = type != ItemType.CONSUMABLE
     /** 되팔 때 가격 */
@@ -62,11 +73,49 @@ object ItemCatalog {
         desc = "던전에서만 쓸 수 있다. 집으로 이어지는 포털을 연다. 던전을 떠났다가 돌아오면 포털은 사라진다.",
     )
 
-    // 무기 - 무기점
-    val rustySword = Item("rusty_sword", "낡은 검", ItemType.WEAPON, 80, atk = 5, desc = "아버지가 쓰던 검. 풍요의 마을이 웃던 시절의 유품.")
-    val ironSword = Item("iron_sword", "강철 장검", ItemType.WEAPON, 280, atk = 13, desc = "좀비 뼈를 가르라고 다듬은 대장장이의 역작.")
-    val knightSword = Item("knight_sword", "기사의 검", ItemType.WEAPON, 760, atk = 24, desc = "저주가 퍼지기 전, 영주 경호대가 쓰던 제식 검.")
-    val battleAxe = Item("battle_axe", "전투 도끼", ItemType.WEAPON, 520, atk = 20, def = -2, desc = "무겁지만 부패한 육체를 부수는 데 좋다.")
+    // 무기 - 무기점 (근접)
+    val rustySword = Item(
+        "rusty_sword", "낡은 검", ItemType.WEAPON, 80, atk = 5,
+        desc = "아버지가 쓰던 검. 전방에 초승달 참격을 가한다.",
+        weaponStyle = WeaponStyle.MELEE,
+    )
+    val ironSword = Item(
+        "iron_sword", "강철 장검", ItemType.WEAPON, 280, atk = 13,
+        desc = "좀비 뼈를 가르라고 다듬은 대장장이의 역작.",
+        weaponStyle = WeaponStyle.MELEE,
+    )
+    val knightSword = Item(
+        "knight_sword", "기사의 검", ItemType.WEAPON, 760, atk = 24,
+        desc = "저주가 퍼지기 전, 영주 경호대가 쓰던 제식 검.",
+        weaponStyle = WeaponStyle.MELEE,
+    )
+    val battleAxe = Item(
+        "battle_axe", "전투 도끼", ItemType.WEAPON, 520, atk = 20, def = -2,
+        desc = "무겁지만 부패한 육체를 부수는 데 좋다.",
+        weaponStyle = WeaponStyle.MELEE,
+    )
+    // 원거리
+    val shortBow = Item(
+        "short_bow", "짧은 활", ItemType.WEAPON, 220, atk = 11,
+        desc = "화살을 발사해 먼 적을 맞춘다.",
+        weaponStyle = WeaponStyle.BOW,
+    )
+    val hunterBow = Item(
+        "hunter_bow", "사냥꾼의 활", ItemType.WEAPON, 580, atk = 18,
+        desc = "숲길을 누비던 사냥꾼의 활. 화살이 빠르다.",
+        weaponStyle = WeaponStyle.BOW,
+    )
+    // 마법
+    val oakStaff = Item(
+        "oak_staff", "참나무 지팡이", ItemType.WEAPON, 240, atk = 10,
+        desc = "마력 탄환을 쏘아낸다. 공격 시 MP를 소모한다.",
+        weaponStyle = WeaponStyle.MAGIC,
+    )
+    val flameWand = Item(
+        "flame_wand", "화염 지팡이", ItemType.WEAPON, 640, atk = 19,
+        desc = "불꽃 탄환을 발사한다. 공격 시 MP를 소모한다.",
+        weaponStyle = WeaponStyle.MAGIC,
+    )
 
     // 방어구 - 무기점
     val woodShield = Item("wood_shield", "나무 방패", ItemType.SHIELD, 70, def = 4, desc = "가볍고 값싸다.")
@@ -80,19 +129,23 @@ object ItemCatalog {
     val manaAmulet = Item("mana_amulet", "마나 부적", ItemType.ACCESSORY, 400, def = 1, desc = "마력이 흐르는 부적.")
 
     val generalGoods = listOf(potion, hiPotion, ether, bread, torch, portalStone, luckyRing)
-    val weaponGoods = listOf(rustySword, ironSword, battleAxe, knightSword, woodShield, ironShield, leatherArmor, chainMail, ironHelm)
+    val weaponGoods = listOf(
+        rustySword, ironSword, battleAxe, knightSword,
+        shortBow, hunterBow, oakStaff, flameWand,
+        woodShield, ironShield, leatherArmor, chainMail, ironHelm,
+    )
 
     /** 던전에서 드랍될 수 있는 전리품 */
-    val dungeonLoot = listOf(potion, ether, bread, portalStone, rustySword, woodShield, manaAmulet)
+    val dungeonLoot = listOf(potion, ether, bread, portalStone, rustySword, shortBow, woodShield, manaAmulet)
 
     /** 동쪽 숲 동물·은닉 상자 전리품 */
-    val forestLoot = listOf(potion, bread, ether, torch, woodShield, leatherArmor, luckyRing, rustySword)
+    val forestLoot = listOf(potion, bread, ether, torch, woodShield, leatherArmor, luckyRing, rustySword, shortBow)
 
     /** 남쪽 사막 전리품 */
-    val desertLoot = listOf(potion, hiPotion, ether, torch, woodShield, ironShield, leatherArmor, rustySword)
+    val desertLoot = listOf(potion, hiPotion, ether, torch, woodShield, ironShield, leatherArmor, rustySword, oakStaff)
 
     /** 북쪽 빙하 전리품 */
-    val glacierLoot = listOf(potion, hiPotion, ether, portalStone, ironSword, chainMail, manaAmulet, luckyRing)
+    val glacierLoot = listOf(potion, hiPotion, ether, portalStone, ironSword, hunterBow, chainMail, manaAmulet, luckyRing)
 
     val all: List<Item> = (generalGoods + weaponGoods + dungeonLoot + forestLoot + desertLoot + glacierLoot)
         .distinctBy { it.id }
