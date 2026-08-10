@@ -100,9 +100,10 @@ fun VirtualMovePad(
             },
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier = Modifier.size(124.dp)) {
-            drawCircle(Color(0x44FFE29A), radius = size.minDimension * 0.48f, style = Stroke(3f))
-            drawCircle(Color(0x33FFFFFF), radius = size.minDimension * 0.18f)
+        Canvas(modifier = Modifier.size(124.dp)) {
+            val dim = this.size.minDimension
+            drawCircle(Color(0x44FFE29A), radius = dim * 0.48f, style = Stroke(3f))
+            drawCircle(Color(0x33FFFFFF), radius = dim * 0.18f)
         }
         Box(
             modifier = Modifier
