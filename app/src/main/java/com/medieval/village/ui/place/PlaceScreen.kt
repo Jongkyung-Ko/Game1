@@ -44,6 +44,7 @@ import com.medieval.village.model.Village
 import com.medieval.village.ui.Chip
 import com.medieval.village.ui.ItemIcon
 import com.medieval.village.ui.ListRow
+import com.medieval.village.ui.MercPortrait
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.SectionTitle
 import com.medieval.village.ui.ThinDivider
@@ -486,8 +487,9 @@ private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
         vm.party.toList().forEach { m ->
             val active = m.id in vm.activeMercenaryIds
             ListRow(
-                "${m.name} (${m.role}) · Lv.${m.level}",
-                "기여 +${m.power} · ${if (active) "원정대" else "대기"}",
+                title = "${m.name} (${m.role}) · Lv.${m.level}",
+                subtitle = "기여 +${m.power} · ${if (active) "원정대" else "대기"}",
+                leading = { MercPortrait(m, size = 48.dp) },
                 trailing = { WoodButton("해고") { vm.dismiss(m) } }
             )
         }
@@ -500,6 +502,7 @@ private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
         ListRow(
             title = "${m.name} · ${m.role}",
             subtitle = "${m.desc}\n기본 기여 +${m.basePower}",
+            leading = { MercPortrait(m, size = 52.dp) },
             trailing = {
                 WoodButton(
                     text = if (hired) "고용함" else "${m.cost}G",

@@ -83,6 +83,7 @@ fun DrawScope.drawWalkableInterior(
             walking = walking,
             phase = walkPhase + index * 0.7f,
             scale = 0.92f,
+            art = art,
         )
     }
     drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.0f)

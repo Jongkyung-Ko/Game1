@@ -60,6 +60,8 @@ data class Mercenary(
     /** 고용 시 기본 전투 기여 (레벨·장비로 증가) */
     val basePower: Int,
     val desc: String,
+    /** custom/chars 스프라이트 키 (얼굴·전신) */
+    val spriteKey: String,
     val level: Int = 1,
     val exp: Int = 0,
     val equipment: Map<ItemType, EquippedItem> = emptyMap(),
@@ -74,9 +76,9 @@ data class Mercenary(
 
 object MercenaryCatalog {
     val all = listOf(
-        Mercenary("bern", "베른", "전사", 250, 12, "방패와 검으로 앞장서는 베테랑 전사."),
-        Mercenary("shade", "셰이드", "도적", 320, 14, "그림자처럼 파고드는 쌍단검 도적."),
-        Mercenary("elara", "엘라라", "성기사", 420, 18, "태양의 방패를 든 성기사."),
-        Mercenary("aldric", "알드릭", "마법사", 560, 22, "해독과 화염을 다루는 노련한 마법사.")
+        Mercenary("bern", "베른", "전사", 250, 12, "방패와 검으로 앞장서는 베테랑 전사.", "warrior"),
+        Mercenary("shade", "셰이드", "도적", 320, 14, "그림자처럼 파고드는 쌍단검 도적.", "rogue"),
+        Mercenary("elara", "엘라라", "성기사", 420, 18, "태양의 방패를 든 성기사.", "paladin"),
+        Mercenary("aldric", "알드릭", "마법사", 560, 22, "해독과 화염을 다루는 노련한 마법사.", "mage"),
     )
 }

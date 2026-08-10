@@ -41,11 +41,13 @@ import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.rememberCustomArtOrNull
 import kotlin.math.hypot
 import kotlin.math.min
 
 @Composable
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
+    val art = rememberCustomArtOrNull()
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
         Text(
             text = "PUB · 신성한 잔 선술집",
@@ -103,6 +105,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             walking = walking,
                             phase = walkPhase + index * 0.7f,
                             scale = 0.95f,
+                            art = art,
                         )
                     }
                     drawHero(vm.pubHeroX, vm.pubHeroY, facing, walking, walkPhase, scale = 1.05f)

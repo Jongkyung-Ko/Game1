@@ -38,6 +38,7 @@ import com.medieval.village.ui.Chip
 import com.medieval.village.ui.EquipmentDoll
 import com.medieval.village.ui.ItemIcon
 import com.medieval.village.ui.ListRow
+import com.medieval.village.ui.MercPortrait
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.ParchmentPanel
 import com.medieval.village.ui.SectionTitle
@@ -173,25 +174,27 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
             val active = m.id in vm.activeMercenaryIds
             val selected = gearMercId == m.id
             ListRow(
-                "${m.name} (${m.role}) · Lv.${m.level}",
-                "기여 +${m.power} · EXP ${m.exp}/${m.expToNext} · ${if (active) "동행 중" else "대기 중"}"
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    WoodButton(
-                        text = if (active) "선택 해제" else "선택",
-                        enabled = active || vm.activeParty.size < GameViewModel.MAX_ACTIVE_MERCENARY,
-                        highlight = active
-                    ) {
-                        vm.toggleMercenaryActive(m)
-                    }
-                    WoodButton(
-                        text = if (selected) "장비 닫기" else "장비",
-                        highlight = selected
-                    ) {
-                        gearMercId = if (selected) null else m.id
+                title = "${m.name} (${m.role}) · Lv.${m.level}",
+                subtitle = "기여 +${m.power} · EXP ${m.exp}/${m.expToNext} · ${if (active) "동행 중" else "대기 중"}",
+                leading = { MercPortrait(m, size = 52.dp) },
+                trailing = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        WoodButton(
+                            text = if (active) "선택 해제" else "선택",
+                            enabled = active || vm.activeParty.size < GameViewModel.MAX_ACTIVE_MERCENARY,
+                            highlight = active
+                        ) {
+                            vm.toggleMercenaryActive(m)
+                        }
+                        WoodButton(
+                            text = if (selected) "장비 닫기" else "장비",
+                            highlight = selected
+                        ) {
+                            gearMercId = if (selected) null else m.id
+                        }
                     }
                 }
-            }
+            )
             StatBar("EXP", "${m.exp}/${m.expToNext}", m.expRatio, Palette.Gold, Modifier.fillMaxWidth())
             if (selected) {
                 MercGearPanel(vm, m.id)

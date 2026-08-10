@@ -54,6 +54,7 @@ import com.medieval.village.ui.village.drawKenneySprite
 import com.medieval.village.ui.village.drawKenneySpriteAsset
 import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
 import kotlin.math.hypot
 import kotlin.math.max
@@ -91,7 +92,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.4 Eastern forest",
+        watermark = "v0.4.5 Eastern forest",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
         moveHint = "화면을 눌러 이동 · 상자를 탭해 열기 · 짐승은 전투",
@@ -107,7 +108,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.4 Southern desert",
+        watermark = "v0.4.5 Southern desert",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
         moveHint = "화면을 눌러 이동 · 상자를 탭해 열기 · 사막 괴물은 전투",
@@ -123,7 +124,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.4 Northern glacier",
+        watermark = "v0.4.5 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
         moveHint = "화면을 눌러 이동 · 상자를 탭해 열기 · 극지 짐승은 전투",
@@ -134,6 +135,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
 @Composable
 fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = Modifier) {
     val atlas = rememberKenneyAtlasOrNull()
+    val art = rememberCustomArtOrNull()
     LaunchedEffect(Unit) { vm.ensureDungeonLoaded() }
     val floor = vm.dungeonFloor
     val record = when (theme) {
@@ -241,6 +243,7 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                             walking = walking,
                             phase = walkPhase + index * 0.7f,
                             scale = 0.72f,
+                            art = art,
                         )
                     }
                     drawHero(heroX, heroY, facing, walking, walkPhase, scale = 0.78f)

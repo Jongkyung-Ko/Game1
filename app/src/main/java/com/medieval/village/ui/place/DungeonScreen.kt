@@ -178,6 +178,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             walking = walking,
                             phase = walkPhase + index * 0.7f,
                             scale = 0.72f,
+                            art = art,
                         )
                     }
                     drawHero(
@@ -190,7 +191,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.4 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.5 Hybrid dungeon", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             Box(

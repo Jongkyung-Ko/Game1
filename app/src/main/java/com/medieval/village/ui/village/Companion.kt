@@ -12,8 +12,8 @@ import com.medieval.village.model.Mercenary
 import kotlin.math.sin
 
 /**
- * 걸어다니는 용병 스프라이트 (Canvas 도형).
- * 역할에 따라 망토·무기·색이 달라진다.
+ * 걸어다니는 용병 스프라이트.
+ * 커스텀 얼굴 이미지가 있으면 그걸 쓰고, 없으면 역할별 Canvas 도형을 그린다.
  */
 fun DrawScope.drawMercenary(
     mercenary: Mercenary,
@@ -23,7 +23,20 @@ fun DrawScope.drawMercenary(
     walking: Boolean = false,
     phase: Float = 0f,
     scale: Float = 1f,
+    art: CustomArt? = null,
 ) {
+    val bob = if (walking) sin(phase) * 2f else 0f
+    val sprite = art?.npcSpriteOrNull(mercenary.spriteKey)
+    if (sprite != null) {
+        drawCustomSprite(
+            image = sprite,
+            cx = x,
+            footY = y + bob,
+            worldHeight = 72f * scale,
+            mirrorX = facing == Facing.LEFT,
+        )
+        return
+    }
     if (scale != 1f) {
         scale(scale, scale, pivot = Offset(x, y)) {
             drawMercenaryBody(mercenary, x, y, facing, walking, phase)
