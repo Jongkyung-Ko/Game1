@@ -20,14 +20,20 @@ import com.medieval.village.game.Facing
 import com.medieval.village.model.Village
 import kotlin.math.roundToInt
 
-/** 커스텀 마을 맵 + 캐릭터 스프라이트. 로딩 실패 시 null을 허용한다. */
+/** 커스텀 마을 맵 + 캐릭터·건물 스프라이트. 로딩 실패 시 null을 허용한다. */
 class CustomArt(
     val villageMap: ImageBitmap,
     private val chars: Map<String, ImageBitmap>,
+    private val heroes: Map<String, ImageBitmap>,
+    private val buildings: Map<String, ImageBitmap>,
 ) {
     fun charOrNull(name: String): ImageBitmap? = chars[name]
 
     fun npcSpriteOrNull(key: String): ImageBitmap? = charOrNull(key)
+
+    fun heroSpriteOrNull(facingKey: String): ImageBitmap? = heroes[facingKey]
+
+    fun buildingOrNull(key: String): ImageBitmap? = buildings[key]
 
     fun zombieSpriteOrNull(kind: String): ImageBitmap? = when (kind) {
         "shambler" -> charOrNull("zombie_shambler")
@@ -54,6 +60,9 @@ class CustomArt(
             "zombie_blacksmith", "zombie_farmer", "golem_teacher",
         )
 
+        private val HERO_KEYS = listOf("front", "back", "side", "portrait")
+        private val BUILDING_KEYS = listOf("forge", "tower", "arena", "camp")
+
         fun loadOrNull(context: Context): CustomArt? {
             cached?.let { return it }
             return try {
@@ -67,7 +76,25 @@ class CustomArt(
                             chars[name] = it
                         }
                     }
-                    val art = CustomArt(villageMap = village, chars = chars)
+                    val heroes = LinkedHashMap<String, ImageBitmap>()
+                    HERO_KEYS.forEach { key ->
+                        loadAsset(app, "custom/hero_$key.png", cleanEdges = true)?.let {
+                            heroes[key] = it
+                        }
+                    }
+                    val buildings = LinkedHashMap<String, ImageBitmap>()
+                    BUILDING_KEYS.forEach { key ->
+                        // 건물 일러스트는 이미 알파가 정리되어 있으므로 가장자리 가공 없이 로드
+                        loadAsset(app, "custom/buildings/$key.png", cleanEdges = false)?.let {
+                            buildings[key] = it
+                        }
+                    }
+                    val art = CustomArt(
+                        villageMap = village,
+                        chars = chars,
+                        heroes = heroes,
+                        buildings = buildings,
+                    )
                     cached = art
                     art
                 }
@@ -123,9 +150,11 @@ class CustomArt(
                 val r = (c shr 16) and 0xFF
                 val g = (c shr 8) and 0xFF
                 val b = c and 0xFF
-                val nearWhite = r >= 236 && g >= 236 && b >= 236
+                val nearWhite = r >= 245 && g >= 245 && b >= 245
                 px[i] = when {
-                    a < 16 || nearWhite -> c and 0x00FFFFFF
+                    // 완전 투명 / 순백 배경만 제거. 중간 알파는 유지해 가장자리를 부드럽게.
+                    a < 10 || nearWhite -> c and 0x00FFFFFF
+                    a < 200 -> c // keep soft edge alpha
                     else -> c or 0xFF000000.toInt()
                 }
             }
@@ -156,6 +185,28 @@ fun DrawScope.drawCustomVillageMap(art: CustomArt) {
         dstSize = IntSize(Village.W.roundToInt(), Village.H.roundToInt()),
         filterQuality = FilterQuality.Medium,
     )
+    drawVillageBuildingOverlays(art)
+}
+
+/** 맵에 없는 합성 건물(대장간·마법탑·대련소·용병캠프)을 핫스팟에 맞춰 그린다. */
+fun DrawScope.drawVillageBuildingOverlays(art: CustomArt) {
+    Village.places.forEach { place ->
+        val key = place.overlayKey ?: return@forEach
+        val image = art.buildingOrNull(key) ?: return@forEach
+        val aspect = image.width.toFloat() / image.height.toFloat().coerceAtLeast(1f)
+        val h = place.h * 1.05f
+        val w = (h * aspect).coerceAtMost(place.w * 1.25f)
+        val left = place.cx - w / 2f
+        val top = place.bottom - h
+        drawImage(
+            image = image,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(image.width, image.height),
+            dstOffset = IntOffset(left.roundToInt(), top.roundToInt()),
+            dstSize = IntSize(w.roundToInt().coerceAtLeast(1), h.roundToInt().coerceAtLeast(1)),
+            filterQuality = FilterQuality.Medium,
+        )
+    }
 }
 
 fun DrawScope.drawCustomSprite(
@@ -172,6 +223,12 @@ fun DrawScope.drawCustomSprite(
     val top = footY - h
     val dw = w.roundToInt().coerceAtLeast(1)
     val dh = h.roundToInt().coerceAtLeast(1)
+    // 발 아래 부드러운 그림자
+    drawOval(
+        color = androidx.compose.ui.graphics.Color(0x33000000),
+        topLeft = Offset(cx - w * 0.28f, footY - h * 0.04f),
+        size = androidx.compose.ui.geometry.Size(w * 0.56f, h * 0.08f),
+    )
     if (mirrorX) {
         translate(left + w, top) {
             scale(-1f, 1f, pivot = Offset.Zero) {
@@ -182,7 +239,7 @@ fun DrawScope.drawCustomSprite(
                     dstOffset = IntOffset.Zero,
                     dstSize = IntSize(dw, dh),
                     alpha = 1f,
-                    filterQuality = FilterQuality.None,
+                    filterQuality = FilterQuality.Medium,
                 )
             }
         }
@@ -194,7 +251,7 @@ fun DrawScope.drawCustomSprite(
             dstOffset = IntOffset(left.roundToInt(), top.roundToInt()),
             dstSize = IntSize(dw, dh),
             alpha = 1f,
-            filterQuality = FilterQuality.None,
+            filterQuality = FilterQuality.Medium,
         )
     }
 }
@@ -204,9 +261,17 @@ fun DrawScope.drawCustomHero(
     x: Float,
     y: Float,
     facing: Facing,
-    worldHeight: Float = 72f,
+    worldHeight: Float = 96f,
 ) {
-    val sprite = art.charOrNull("warrior") ?: return
+    val key = when (facing) {
+        Facing.UP -> "back"
+        Facing.LEFT, Facing.RIGHT -> "side"
+        Facing.DOWN -> "front"
+    }
+    val sprite = art.heroSpriteOrNull(key)
+        ?: art.heroSpriteOrNull("front")
+        ?: art.charOrNull("warrior")
+        ?: return
     drawCustomSprite(
         image = sprite,
         cx = x,

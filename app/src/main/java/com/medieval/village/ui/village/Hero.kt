@@ -28,8 +28,9 @@ private val SteelDark = Color(0xFF7E858C)
 private val Gold = Color(0xFFD9A441)
 
 /**
- * 걸어다니는 중세 모험가 스프라이트 (Canvas 도형).
- * (x, y)는 발이 닿는 지점. walking + phase 로 다리·팔 흔들림을 준다.
+ * 걸어다니는 중세 모험가.
+ * 커스텀 히어로 스프라이트가 있으면 그걸 쓰고, 없으면 Canvas 도형으로 그린다.
+ * (x, y)는 발이 닿는 지점. walking + phase 로 흔들림을 준다.
  */
 fun DrawScope.drawHero(
     x: Float,
@@ -38,7 +39,19 @@ fun DrawScope.drawHero(
     walking: Boolean,
     phase: Float,
     scale: Float = 1f,
+    art: CustomArt? = null,
 ) {
+    val bob = if (walking) sin(phase) * 2.5f else 0f
+    if (art != null) {
+        drawCustomHero(
+            art = art,
+            x = x,
+            y = y + bob,
+            facing = facing,
+            worldHeight = 96f * scale,
+        )
+        return
+    }
     if (scale != 1f) {
         scale(scale, scale, pivot = Offset(x, y)) {
             drawHeroBody(x, y, facing, walking, phase)

@@ -57,20 +57,19 @@ fun DrawScope.drawWalkableInterior(
                 image = sprite,
                 cx = cx,
                 footY = footY,
-                worldHeight = 150f,
+                worldHeight = 112f,
             )
         } else {
-            drawCircle(Color(0xFFE7B98F), 22f, Offset(cx, footY - 95f))
-            drawRect(Color(0xFF3E6B8A), Offset(cx - 18f, footY - 78f), Size(36f, 78f))
+            drawCleanNpcFallback(cx, footY, npc.kind)
         }
-        drawLabelTiny("${npc.name} · ${npc.role}", cx - 55f, footY + 18f)
+        drawLabelTiny("${npc.name} · ${npc.role}", cx - 55f, footY + 16f)
         when (npc.kind) {
-            InteriorNpcKind.KEEPER -> drawLabelTiny("거래", cx - 18f, footY - 130f)
+            InteriorNpcKind.KEEPER -> drawLabelTiny("거래", cx - 18f, footY - 118f)
             InteriorNpcKind.VISITOR, InteriorNpcKind.HELPER ->
-                drawLabelTiny("대화", cx - 18f, footY - 130f)
+                drawLabelTiny("대화", cx - 18f, footY - 118f)
         }
         if (speechNpcId == npc.id && !speechText.isNullOrBlank()) {
-            drawSpeechBubble(cx, footY - 140f, speechText, w)
+            drawSpeechBubble(cx, footY - 128f, speechText, w)
         }
     }
 
@@ -86,7 +85,28 @@ fun DrawScope.drawWalkableInterior(
             art = art,
         )
     }
-    drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.0f)
+    drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.0f, art = art)
+}
+
+private fun DrawScope.drawCleanNpcFallback(cx: Float, footY: Float, kind: InteriorNpcKind) {
+    val outfit = when (kind) {
+        InteriorNpcKind.KEEPER -> Color(0xFF6B4A32)
+        InteriorNpcKind.HELPER -> Color(0xFF4A6B58)
+        InteriorNpcKind.VISITOR -> Color(0xFF4A5A78)
+    }
+    drawOval(Color(0x33000000), Offset(cx - 22f, footY - 6f), Size(44f, 14f))
+    drawRoundRect(outfit, Offset(cx - 16f, footY - 70f), Size(32f, 52f), CornerRadius(8f, 8f))
+    drawRoundRect(Color(0xFF3A2A1C), Offset(cx - 14f, footY - 24f), Size(11f, 24f), CornerRadius(3f, 3f))
+    drawRoundRect(Color(0xFF3A2A1C), Offset(cx + 3f, footY - 24f), Size(11f, 24f), CornerRadius(3f, 3f))
+    drawCircle(Color(0xFFE7B98F), 14f, Offset(cx, footY - 82f))
+    drawArc(
+        Color(0xFF4A3324),
+        180f,
+        180f,
+        true,
+        Offset(cx - 15f, footY - 96f),
+        Size(30f, 22f)
+    )
 }
 
 private fun DrawScope.drawLabelTiny(text: String, x: Float, y: Float) {

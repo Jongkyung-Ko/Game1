@@ -1,14 +1,13 @@
 package com.medieval.village.ui.village
 
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -16,15 +15,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
@@ -32,7 +34,7 @@ import com.medieval.village.model.Village
 import com.medieval.village.ui.theme.Palette
 import kotlin.math.hypot
 import kotlin.math.min
-import kotlin.math.roundToInt
+import kotlin.math.sin
 
 @Composable
 fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
@@ -66,7 +68,6 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                 }
         ) {
-            // 화면 좌표계 배경 (변환 실패해도 빈 화면 방지)
             drawRect(Color(0xFF2A1C12), size = size)
             withTransform({
                 translate(ox, oy)
@@ -75,20 +76,40 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 if (art != null) {
                     drawCustomVillageMap(art)
                 } else {
-                    // 에셋 로드 실패 시에도 오크헤이븐 좌표에 맞춘 임시 바닥
-                    drawRect(Color(0xFF6F9A54), size = androidx.compose.ui.geometry.Size(Village.W, Village.H))
-                    drawRect(Color(0xFFC2A16B), topLeft = Offset(Village.W * 0.45f, 0f), size = androidx.compose.ui.geometry.Size(Village.W * 0.1f, Village.H))
+                    drawRect(Color(0xFF6F9A54), size = Size(Village.W, Village.H))
+                    drawRect(
+                        Color(0xFFC2A16B),
+                        topLeft = Offset(Village.W * 0.45f, 0f),
+                        size = Size(Village.W * 0.1f, Village.H)
+                    )
                 }
 
-                // 건물 핫스팟 힌트
+                // 건물 핫스팟 + 이름 (같은 Canvas 변환으로 정렬)
                 Village.places.forEach { p ->
                     drawRoundRect(
-                        color = Color(0x66FFE29A),
+                        color = Color(0x88FFE29A),
                         topLeft = Offset(p.left, p.top),
-                        size = androidx.compose.ui.geometry.Size(p.w, p.h),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(12f, 12f),
-                        style = Stroke(width = 3f)
+                        size = Size(p.w, p.h),
+                        cornerRadius = CornerRadius(12f, 12f),
+                        style = Stroke(width = 3.5f)
                     )
+                    drawPlaceLabel(p.name, p.cx, p.top - 6f)
+                }
+
+                // 마을 주민
+                if (art != null) {
+                    Village.townsfolk.forEachIndexed { index, (key, x, y) ->
+                        val sprite = art.npcSpriteOrNull(key)
+                        if (sprite != null) {
+                            val bob = sin(walkPhase * 0.6f + index) * 1.5f
+                            drawCustomSprite(
+                                image = sprite,
+                                cx = x,
+                                footY = y + bob,
+                                worldHeight = 78f,
+                            )
+                        }
+                    }
                 }
 
                 party.forEachIndexed { index, mercenary ->
@@ -104,41 +125,12 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         art = art,
                     )
                 }
-                drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.05f)
-            }
-        }
-
-        Village.places.forEach { p ->
-            Box(
-                modifier = Modifier
-                    .offset {
-                        IntOffset(
-                            (ox + p.left * s).roundToInt(),
-                            (oy + (p.top - 18f) * s).roundToInt()
-                        )
-                    }
-                    .width(with(density) { (p.w * s).toDp() }),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(Color(0xCC1A120C), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 5.dp, vertical = 1.dp)
-                ) {
-                    Text(
-                        text = p.name,
-                        color = Palette.Parchment,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1
-                    )
-                }
+                drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.05f, art = art)
             }
         }
 
         Text(
-            text = if (art != null) "Oakhaven · v0.4.5" else "Oakhaven · v0.4.5 (맵 로딩 실패)",
+            text = if (art != null) "Oakhaven · v0.4.6" else "Oakhaven · v0.4.6 (맵 로딩 실패)",
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
@@ -167,5 +159,33 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 Text("${near.name} 들어가기", fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+private fun DrawScope.drawPlaceLabel(text: String, cx: Float, baselineY: Float) {
+    drawIntoCanvas { canvas ->
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#FFE29A")
+            textSize = 22f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        val width = paint.measureText(text)
+        val padX = 10f
+        val padY = 6f
+        val top = baselineY - paint.textSize
+        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(0xCC, 0x1A, 0x12, 0x0C)
+        }
+        canvas.nativeCanvas.drawRoundRect(
+            cx - width / 2f - padX,
+            top - padY,
+            cx + width / 2f + padX,
+            baselineY + padY,
+            8f,
+            8f,
+            bg
+        )
+        canvas.nativeCanvas.drawText(text, cx, baselineY, paint)
     }
 }

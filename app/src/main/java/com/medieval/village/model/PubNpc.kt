@@ -14,7 +14,8 @@ data class PubNpc(
     val kind: NpcKind,
     val x: Float,
     val y: Float,
-    val lines: List<String>
+    val lines: List<String>,
+    val spriteKey: String,
 )
 
 object PubNpcCatalog {
@@ -29,6 +30,7 @@ object PubNpcCatalog {
             kind = NpcKind.OWNER,
             x = 805f,
             y = 390f,
+            spriteKey = "merchant",
             lines = listOf(
                 "신성한 잔에 잘 왔네. 예전엔 포도주만으로도 마을이 웃었지…",
                 "지하에서 캐낸 좀비석 얘기는 손님들 사이에서 끊이질 않아.",
@@ -42,6 +44,7 @@ object PubNpcCatalog {
             kind = NpcKind.TRAVELER,
             x = 335f,
             y = 245f,
+            spriteKey = "rogue",
             lines = listOf(
                 "풍요의 마을이라니… 표지판과 달리 공기가 무겁네요.",
                 "영주가 병을 고치겠다고 좀비석을 만졌다는 소문을 들으러 왔어요.",
@@ -55,6 +58,7 @@ object PubNpcCatalog {
             kind = NpcKind.GUILD_MEMBER,
             x = 565f,
             y = 345f,
+            spriteKey = "warrior",
             lines = listOf(
                 "좀비 둥지는 라그나로크 던전처럼 직접 걸어 다니며 싸워야 해.",
                 "오염된 사람들은 죽지도 못하고 뇌가 썩어, 생살 허기만 남았지.",
@@ -68,6 +72,7 @@ object PubNpcCatalog {
             kind = NpcKind.DRUNK,
             x = 210f,
             y = 505f,
+            spriteKey = "farmer",
             lines = listOf(
                 "히끅… 신성한 포도주가… 검붉은 돌에 먹혀버렸어…",
                 "연금술사 놈들… 목숨 늘리겠다고 하다가 마을을 좀비 우리로 만들었지!",

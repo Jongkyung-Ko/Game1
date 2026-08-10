@@ -39,6 +39,8 @@ import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.village.CustomArt
+import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawMercenary
 import com.medieval.village.ui.village.rememberCustomArtOrNull
@@ -94,7 +96,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 }) {
                     drawPubBackground()
                     PubNpcCatalog.all.forEach { npc ->
-                        drawPubNpc(npc, vm.pubSpeakerId == npc.id, vm.pubDialogue)
+                        drawPubNpc(npc, vm.pubSpeakerId == npc.id, vm.pubDialogue, art)
                     }
                     vm.activeParty.forEachIndexed { index, mercenary ->
                         drawMercenary(
@@ -108,7 +110,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             art = art,
                         )
                     }
-                    drawHero(vm.pubHeroX, vm.pubHeroY, facing, walking, walkPhase, scale = 1.05f)
+                    drawHero(vm.pubHeroX, vm.pubHeroY, facing, walking, walkPhase, scale = 1.05f, art = art)
                 }
             }
         }
@@ -238,43 +240,58 @@ private fun DrawScope.drawStairs() {
     }
 }
 
-private fun DrawScope.drawPubNpc(npc: PubNpc, speaking: Boolean, dialogue: String?) {
-    val outfit = when (npc.kind) {
-        NpcKind.OWNER -> Color(0xFF9A3F35)
-        NpcKind.TRAVELER -> Color(0xFF456B8E)
-        NpcKind.GUILD_MEMBER -> Color(0xFF4E7843)
-        NpcKind.DRUNK -> Color(0xFF775489)
+private fun DrawScope.drawPubNpc(
+    npc: PubNpc,
+    speaking: Boolean,
+    dialogue: String?,
+    art: CustomArt?,
+) {
+    val sprite = art?.npcSpriteOrNull(npc.spriteKey)
+    if (sprite != null) {
+        drawCustomSprite(
+            image = sprite,
+            cx = npc.x,
+            footY = npc.y,
+            worldHeight = 118f,
+        )
+    } else {
+        val outfit = when (npc.kind) {
+            NpcKind.OWNER -> Color(0xFF9A3F35)
+            NpcKind.TRAVELER -> Color(0xFF456B8E)
+            NpcKind.GUILD_MEMBER -> Color(0xFF4E7843)
+            NpcKind.DRUNK -> Color(0xFF775489)
+        }
+        drawOval(Color(0x33000000), Offset(npc.x - 27f, npc.y - 7f), Size(54f, 18f))
+        drawRect(Color(0xFF453326), Offset(npc.x - 17f, npc.y - 34f), Size(12f, 34f))
+        drawRect(Color(0xFF453326), Offset(npc.x + 5f, npc.y - 34f), Size(12f, 34f))
+        val body = Path().apply {
+            moveTo(npc.x - 25f, npc.y - 92f)
+            lineTo(npc.x + 25f, npc.y - 92f)
+            lineTo(npc.x + 31f, npc.y - 31f)
+            lineTo(npc.x - 31f, npc.y - 31f)
+            close()
+        }
+        drawPath(body, outfit)
+        drawCircle(Color(0xFFE2B087), 21f, Offset(npc.x, npc.y - 113f))
+        drawArc(
+            if (npc.kind == NpcKind.DRUNK) Color(0xFF8B6A42) else Color(0xFF4D3325),
+            180f,
+            180f,
+            true,
+            Offset(npc.x - 22f, npc.y - 136f),
+            Size(44f, 35f)
+        )
+        if (npc.kind == NpcKind.OWNER) {
+            drawRect(Color(0xFFE7D9C2), Offset(npc.x - 19f, npc.y - 82f), Size(38f, 44f))
+        }
     }
-    drawOval(Color(0x33000000), Offset(npc.x - 27f, npc.y - 7f), Size(54f, 18f))
-    drawRect(Color(0xFF453326), Offset(npc.x - 17f, npc.y - 34f), Size(12f, 34f))
-    drawRect(Color(0xFF453326), Offset(npc.x + 5f, npc.y - 34f), Size(12f, 34f))
-    val body = Path().apply {
-        moveTo(npc.x - 25f, npc.y - 92f)
-        lineTo(npc.x + 25f, npc.y - 92f)
-        lineTo(npc.x + 31f, npc.y - 31f)
-        lineTo(npc.x - 31f, npc.y - 31f)
-        close()
-    }
-    drawPath(body, outfit)
-    drawCircle(Color(0xFFE2B087), 21f, Offset(npc.x, npc.y - 113f))
-    drawArc(
-        if (npc.kind == NpcKind.DRUNK) Color(0xFF8B6A42) else Color(0xFF4D3325),
-        180f,
-        180f,
-        true,
-        Offset(npc.x - 22f, npc.y - 136f),
-        Size(44f, 35f)
-    )
-    if (npc.kind == NpcKind.OWNER) {
-        drawRect(Color(0xFFE7D9C2), Offset(npc.x - 19f, npc.y - 82f), Size(38f, 44f))
-    }
-    drawLabel("${npc.name} · ${npc.role}", npc.x - 58f, npc.y + 25f, 18f, Color(0xFFF3E4C5))
+    drawLabel("${npc.name} · ${npc.role}", npc.x - 58f, npc.y + 22f, 18f, Color(0xFFF3E4C5))
 
     if (speaking && dialogue != null) {
-        drawSpeechBubble(npc.x, npc.y - 160f, dialogue)
+        drawSpeechBubble(npc.x, npc.y - 150f, dialogue)
     } else {
-        drawCircle(Color(0xFFE8D9B8), 17f, Offset(npc.x + 26f, npc.y - 145f))
-        drawLabel("…", npc.x + 18f, npc.y - 139f, 20f, Color(0xFF342017))
+        drawCircle(Color(0xFFE8D9B8), 17f, Offset(npc.x + 28f, npc.y - 130f))
+        drawLabel("…", npc.x + 20f, npc.y - 124f, 20f, Color(0xFF342017))
     }
 }
 
