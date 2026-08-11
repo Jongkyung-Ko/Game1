@@ -35,7 +35,7 @@ fun CustomArt.heroAnimSprite(
         Facing.LEFT, Facing.RIGHT -> "walk_side"
     }
     if (walkKey != null) {
-        val frame = if (useWalk) walkFrameIndex(walkPhase, animFrame, kind) else 0
+        val frame = if (useWalk) walkFrameIndex(walkPhase) else 0
         heroAnimFrameOrNull(walkKey, frame)?.let { return it }
     }
     val staticKey = when (facing) {
@@ -48,8 +48,8 @@ fun CustomArt.heroAnimSprite(
         ?: charOrNull("warrior")
 }
 
-private fun walkFrameIndex(walkPhase: Float, animFrame: Int, kind: HeroAnimKind): Int {
-    if (kind == HeroAnimKind.WALK && animFrame in 0..3) return animFrame
+/** 선두·후열 공통 — walkPhase 로 4프레임 순환 */
+private fun walkFrameIndex(walkPhase: Float): Int {
     val idx = floor(((walkPhase % 6.2831855f) / 6.2831855f) * 4f).toInt()
     return ((idx % 4) + 4) % 4
 }

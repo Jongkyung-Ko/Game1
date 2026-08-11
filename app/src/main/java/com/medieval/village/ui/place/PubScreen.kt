@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -37,6 +38,7 @@ import com.medieval.village.model.NpcKind
 import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.ui.MessageLog
+import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
@@ -107,9 +109,17 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         art = art,
                         heroScale = 1.05f,
                         mercScale = 0.95f,
+                        frontIndex = vm.frontIndex,
                     )
                 }
             }
+
+            PartySwitchBar(
+                vm = vm,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+            )
         }
 
         Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {

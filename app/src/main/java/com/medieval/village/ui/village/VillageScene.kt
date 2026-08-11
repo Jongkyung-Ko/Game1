@@ -30,7 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
+import com.medieval.village.game.HeroAnimKind
 import com.medieval.village.model.Village
+import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.theme.Palette
 import kotlin.math.hypot
 import kotlin.math.min
@@ -52,6 +54,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         val walking = vm.walking
         val walkPhase = vm.walkPhase
         val party = vm.activeParty
+        val frontIndex = vm.frontIndex
 
         Canvas(
             modifier = Modifier
@@ -122,12 +125,14 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                     art = art,
                     heroScale = 1.05f,
                     mercScale = 0.95f,
+                    frontIndex = frontIndex,
+                    frontAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
                 )
             }
         }
 
         Text(
-            text = if (art != null) "Oakhaven · v0.4.9" else "Oakhaven · v0.4.9 (맵 로딩 실패)",
+            text = if (art != null) "Oakhaven · v0.4.10" else "Oakhaven · v0.4.10 (맵 로딩 실패)",
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
@@ -136,6 +141,13 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 .padding(8.dp)
                 .background(Color(0xCC000000), RoundedCornerShape(6.dp))
                 .padding(horizontal = 10.dp, vertical = 4.dp)
+        )
+
+        PartySwitchBar(
+            vm = vm,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp),
         )
 
         val near = Village.places.firstOrNull {

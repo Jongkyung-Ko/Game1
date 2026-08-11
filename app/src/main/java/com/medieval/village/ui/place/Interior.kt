@@ -40,6 +40,7 @@ fun DrawScope.drawWalkableInterior(
     animTime: Float = 0f,
     speechNpcId: String? = null,
     speechText: String? = null,
+    frontIndex: Int = 0,
 ) {
     val w = InteriorRoom.WORLD_W
     val h = InteriorRoom.WORLD_H
@@ -82,6 +83,7 @@ fun DrawScope.drawWalkableInterior(
         art = art,
         heroScale = 1.0f,
         mercScale = 0.92f,
+        frontIndex = frontIndex,
     )
 }
 

@@ -82,9 +82,9 @@ fun CustomArt.mercAnimSprite(
         }
         HeroAnimKind.WALK, HeroAnimKind.IDLE -> {
             val useWalk = kind == HeroAnimKind.WALK || walking
+            // 후열도 walkPhase 로 걷히게 — animFrame 고정을 쓰지 않는다.
             val frame = if (useWalk) {
-                if (kind == HeroAnimKind.WALK && animFrame in 0..3) animFrame
-                else ((floor(((walkPhase % 6.2831855f) / 6.2831855f) * 4f).toInt() % 4) + 4) % 4
+                ((floor(((walkPhase % 6.2831855f) / 6.2831855f) * 4f).toInt() % 4) + 4) % 4
             } else 0
             heroAnimFrameOrNull("${spriteKey}_walk", frame)?.let { return it }
         }

@@ -1087,7 +1087,7 @@ class GameViewModel : ViewModel() {
         heroAnimFrame = 0
         heroAnimTime = 0f
         attackAnimPlaying = false
-        frontIndex = 0
+        // frontIndex 는 마을·던전 공용 — 탈출 시에도 유지
     }
 
     fun setDungeonPad(dx: Float, dy: Float) {

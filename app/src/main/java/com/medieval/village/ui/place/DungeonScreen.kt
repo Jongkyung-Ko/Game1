@@ -46,6 +46,7 @@ import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.ItemCatalog
 import com.medieval.village.ui.Chip
 import com.medieval.village.ui.MessageLog
+import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
@@ -89,10 +90,8 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Chip(vm.frontStatusLabel(), Palette.Gold)
                 Chip("기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
                 Chip("좀비 ${floor?.monsters?.count { it.alive } ?: 0}", Palette.Blood)
-                WoodButton("교대", highlight = true) { vm.cyclePartyFront() }
             }
         }
 
@@ -194,7 +193,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.9 Party front", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.10 Party switch", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(
@@ -203,6 +202,13 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
                 onPadRelease = { vm.clearDungeonPad() },
                 onAttack = { vm.dungeonAttack() },
+            )
+
+            PartySwitchBar(
+                vm = vm,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp),
             )
 
             Box(

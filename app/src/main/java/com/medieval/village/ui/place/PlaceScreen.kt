@@ -46,6 +46,7 @@ import com.medieval.village.ui.ItemIcon
 import com.medieval.village.ui.ListRow
 import com.medieval.village.ui.MercPortrait
 import com.medieval.village.ui.MessageLog
+import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.SectionTitle
 import com.medieval.village.ui.ThinDivider
 import com.medieval.village.ui.WoodButton
@@ -144,9 +145,17 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
                         animTime = vm.animTime,
                         speechNpcId = vm.interiorSpeakerId,
                         speechText = vm.interiorSpeech,
+                        frontIndex = vm.frontIndex,
                     )
                 }
             }
+
+            PartySwitchBar(
+                vm = vm,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+            )
 
             Box(
                 modifier = Modifier
