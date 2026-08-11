@@ -28,6 +28,14 @@ data class DungeonMonster(
     var alive: Boolean = true,
     var hp: Int = (power * 4).coerceAtLeast(24),
     val maxHp: Int = (power * 4).coerceAtLeast(24),
+    /** 연출·AI 상태 (탐험 중 갱신) */
+    var facingLeft: Boolean = false,
+    var moving: Boolean = false,
+    var attacking: Boolean = false,
+    var animFrame: Int = 0,
+    var animTime: Float = 0f,
+    var attackCooldown: Float = 0f,
+    var attackHitApplied: Boolean = false,
 )
 
 data class DungeonFloor(

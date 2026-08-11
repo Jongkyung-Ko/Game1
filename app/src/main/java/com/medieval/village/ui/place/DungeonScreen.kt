@@ -186,7 +186,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     slashFx?.let { drawMeleeSlashFx(it) }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.11 Combat FX", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.12 Monster AI", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(
@@ -554,30 +554,43 @@ private fun DrawScope.drawDungeonMonster(atlas: KenneyAtlas?, art: CustomArt?, m
     val y = monster.y
     drawOval(Color(0x55000000), Offset(x - 22f, y - 4f), Size(44f, 14f))
 
-    val kenneyId = when (monster.kind) {
-        "shambler", "bloater" -> DungeonTiles.SLIME
-        "runner" -> DungeonTiles.BAT
-        "armored", "blacksmith" -> DungeonTiles.ORC
-        "farmer" -> DungeonTiles.SPIDER
-        "golem" -> DungeonTiles.SKELETON
-        else -> DungeonTiles.SLIME
-    }
-
-    if (atlas != null) {
-        drawKenneySprite(atlas.dungeon, kenneyId, x, y, size = 56f)
+    val animSprite = art?.zombieAnimFrameOrNull(
+        kind = monster.kind,
+        attacking = monster.attacking,
+        walking = monster.moving,
+        frame = monster.animFrame,
+    )
+    if (animSprite != null && art.hasZombieAnim(monster.kind)) {
+        drawCustomSprite(
+            image = animSprite,
+            cx = x,
+            footY = y,
+            worldHeight = 68f,
+            mirrorX = monster.facingLeft,
+        )
     } else {
-        val sprite = art?.zombieSpriteOrNull(monster.kind)
-        if (sprite != null) {
-            drawCustomSprite(sprite, x, y, worldHeight = 64f)
-        } else {
-            val body = Path().apply {
-                moveTo(x - 18f, y)
-                quadraticBezierTo(x - 20f, y - 34f, x, y - 38f)
-                quadraticBezierTo(x + 20f, y - 34f, x + 18f, y)
-                close()
+        val kenneyId = when (monster.kind) {
+            "shambler", "bloater" -> DungeonTiles.SLIME
+            "runner" -> DungeonTiles.BAT
+            "armored", "blacksmith" -> DungeonTiles.ORC
+            "farmer" -> DungeonTiles.SPIDER
+            "golem" -> DungeonTiles.SKELETON
+            else -> DungeonTiles.SLIME
+        }
+        val static = art?.zombieSpriteOrNull(monster.kind)
+        when {
+            static != null -> drawCustomSprite(static, x, y, worldHeight = 64f, mirrorX = monster.facingLeft)
+            atlas != null -> drawKenneySprite(atlas.dungeon, kenneyId, x, y, size = 56f)
+            else -> {
+                val body = Path().apply {
+                    moveTo(x - 18f, y)
+                    quadraticBezierTo(x - 20f, y - 34f, x, y - 38f)
+                    quadraticBezierTo(x + 20f, y - 34f, x + 18f, y)
+                    close()
+                }
+                drawPath(body, Color(0xFF6FBF5A))
+                drawPath(body, Color(0xFF2F5A28), style = Stroke(3f))
             }
-            drawPath(body, Color(0xFF6FBF5A))
-            drawPath(body, Color(0xFF2F5A28), style = Stroke(3f))
         }
     }
     drawLabel(monster.name, x - 48f, y + 14f, 13f, Color(0xFFE8D9B8))

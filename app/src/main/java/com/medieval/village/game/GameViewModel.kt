@@ -67,14 +67,16 @@ class GameViewModel : ViewModel() {
     companion object {
         private const val WALK_SPEED = 360f
         private const val DUNGEON_WALK_SPEED = 280f
-        private const val DUNGEON_TOUCH_RANGE = 44f
         private const val MELEE_RANGE = 78f
         private const val MELEE_CONE_DOT = 0.35f // ~70° 전방
         private const val ATTACK_COOLDOWN = 0.42f
         private const val MAGIC_MP_COST = 6
         private const val PROJECTILE_SPEED = 420f
-        private const val CONTACT_DAMAGE_INTERVAL = 0.75f
         private const val KNOCKBACK_DISTANCE = 42f
+        private const val MONSTER_AGGRO_RANGE = 175f
+        private const val MONSTER_ATTACK_RANGE = 52f
+        private const val MONSTER_ATTACK_DURATION = 0.48f
+        private const val MONSTER_ATTACK_COOLDOWN = 1.15f
         const val MAX_ACTIVE_MERCENARY = 2
     }
 
@@ -208,7 +210,6 @@ class GameViewModel : ViewModel() {
     private var dungeonCombatLock = false
     private var monsterWanderAcc = 0f
     private var attackCooldown = 0f
-    private var contactDamageAcc = 0f
 
     init {
         newGame()
@@ -1081,7 +1082,6 @@ class GameViewModel : ViewModel() {
         meleeSlashFx = null
         dungeonProjectiles.clear()
         attackCooldown = 0f
-        contactDamageAcc = 0f
         dungeonCombatFrame = 0
         attackReady = true
         heroAnimKind = HeroAnimKind.IDLE
@@ -1386,7 +1386,6 @@ class GameViewModel : ViewModel() {
         meleeSlashFx = null
         dungeonProjectiles.clear()
         attackCooldown = 0f
-        contactDamageAcc = 0f
         attackReady = true
         heroAnimKind = HeroAnimKind.IDLE
         heroAnimFrame = 0
@@ -1579,10 +1578,9 @@ class GameViewModel : ViewModel() {
     private fun tickDungeon(dt: Float) {
         val map = dungeonFloor ?: return
         updateDungeonHint(map)
-        wanderMonsters(map, dt)
+        tickMonsters(map, dt)
         tickAttackFx(dt)
         tickProjectiles(map, dt)
-        applyContactThreat(map, dt)
 
         if (attackCooldown > 0f) {
             attackCooldown = (attackCooldown - dt).coerceAtLeast(0f)
@@ -1744,53 +1742,149 @@ class GameViewModel : ViewModel() {
         }
     }
 
-    private fun wanderMonsters(map: DungeonFloor, dt: Float) {
-        monsterWanderAcc += dt
-        if (monsterWanderAcc < 0.45f) return
-        monsterWanderAcc = 0f
-        map.monsters.filter { it.alive }.forEach { zombie ->
-            val ang = Random.nextFloat() * (Math.PI * 2).toFloat()
-            val dist = Random.nextFloat() * 28f
-            val nx = zombie.x + kotlin.math.cos(ang) * dist
-            val ny = zombie.y + kotlin.math.sin(ang) * dist
-            if (map.isWalkable(nx, ny)) {
-                zombie.x = nx
-                zombie.y = ny
-            }
-        }
-        refreshDungeonFloor()
+    private fun monsterChaseSpeed(kind: String): Float = when (kind) {
+        "runner" -> 110f
+        "farmer" -> 72f
+        "shambler" -> 62f
+        "blacksmith" -> 58f
+        "armored" -> 52f
+        "golem" -> 46f
+        "bloater" -> 42f
+        else -> 58f
     }
 
-    /** 적과 겹치면 주기적으로 피해 (자동 전투 대신 위협만 유지) */
-    private fun applyContactThreat(map: DungeonFloor, dt: Float) {
+    /**
+     * 주인공이 가까이 오면 추격하고, 사거리에 들어오면 공격 애니와 함께 타격한다.
+     * 멀리 있는 적은 가끔 배회한다.
+     */
+    private fun tickMonsters(map: DungeonFloor, dt: Float) {
         if (dungeonCombatLock) return
-        val foe = map.monsters.firstOrNull {
-            it.alive && hypot(dungeonHeroX - it.x, dungeonHeroY - it.y) < DUNGEON_TOUCH_RANGE
+        var dirty = false
+        monsterWanderAcc += dt
+        val doWander = monsterWanderAcc >= 0.55f
+        if (doWander) monsterWanderAcc = 0f
+
+        map.monsters.filter { it.alive }.forEach { monster ->
+            if (monster.attackCooldown > 0f) {
+                monster.attackCooldown = (monster.attackCooldown - dt).coerceAtLeast(0f)
+            }
+
+            // 공격 애니 재생 중
+            if (monster.attacking) {
+                monster.animTime += dt
+                monster.animFrame =
+                    ((monster.animTime / MONSTER_ATTACK_DURATION) * 4f).toInt().coerceIn(0, 3)
+                if (!monster.attackHitApplied && monster.animTime >= MONSTER_ATTACK_DURATION * 0.42f) {
+                    monster.attackHitApplied = true
+                    val dist = hypot(dungeonHeroX - monster.x, dungeonHeroY - monster.y)
+                    if (dist <= MONSTER_ATTACK_RANGE + 14f) {
+                        resolveMonsterAttackHit(monster)
+                    }
+                }
+                if (monster.animTime >= MONSTER_ATTACK_DURATION) {
+                    monster.attacking = false
+                    monster.animTime = 0f
+                    monster.animFrame = 0
+                    monster.moving = false
+                }
+                dirty = true
+                return@forEach
+            }
+
+            val dx = dungeonHeroX - monster.x
+            val dy = dungeonHeroY - monster.y
+            val dist = hypot(dx, dy)
+
+            if (dist <= MONSTER_AGGRO_RANGE && dist > 0.5f) {
+                monster.facingLeft = dx < 0f
+                if (dist <= MONSTER_ATTACK_RANGE && monster.attackCooldown <= 0f) {
+                    monster.attacking = true
+                    monster.attackHitApplied = false
+                    monster.animTime = 0f
+                    monster.animFrame = 0
+                    monster.moving = false
+                    monster.attackCooldown = MONSTER_ATTACK_COOLDOWN
+                    dirty = true
+                } else {
+                    val speed = monsterChaseSpeed(monster.kind)
+                    val nx = monster.x + dx / dist * speed * dt
+                    val ny = monster.y + dy / dist * speed * dt
+                    if (tryMoveMonster(map, monster, nx, ny)) {
+                        monster.moving = true
+                        monster.animTime += dt
+                        monster.animFrame = (((monster.animTime * 7f).toInt() % 4) + 4) % 4
+                        dirty = true
+                    } else {
+                        // 축 분리 시도
+                        val movedX = tryMoveMonster(map, monster, nx, monster.y)
+                        val movedY = tryMoveMonster(map, monster, monster.x, ny)
+                        monster.moving = movedX || movedY
+                        if (monster.moving) {
+                            monster.animTime += dt
+                            monster.animFrame = (((monster.animTime * 7f).toInt() % 4) + 4) % 4
+                            dirty = true
+                        }
+                    }
+                }
+            } else {
+                // 어그로 밖 — 가끔 배회
+                if (monster.moving) {
+                    monster.moving = false
+                    monster.animFrame = 0
+                    dirty = true
+                }
+                if (doWander) {
+                    val ang = Random.nextFloat() * (Math.PI * 2).toFloat()
+                    val step = Random.nextFloat() * 22f
+                    val nx = monster.x + cos(ang) * step
+                    val ny = monster.y + sin(ang) * step
+                    if (tryMoveMonster(map, monster, nx, ny)) {
+                        monster.facingLeft = cos(ang) < 0f
+                        dirty = true
+                    }
+                }
+            }
         }
-        if (foe == null) {
-            contactDamageAcc = 0f
-            return
+
+        if (dirty) {
+            refreshDungeonFloor()
+            dungeonCombatFrame++
         }
-        contactDamageAcc += dt
-        if (contactDamageAcc < CONTACT_DAMAGE_INTERVAL) return
-        contactDamageAcc = 0f
-        val dmg = (foe.power - totalDef).coerceAtLeast(2) / 2 + Random.nextInt(0, 3)
+    }
+
+    private fun tryMoveMonster(map: DungeonFloor, monster: DungeonMonster, x: Float, y: Float): Boolean {
+        val r = 12f
+        if (!map.isWalkable(x, y) ||
+            !map.isWalkable(x - r, y) || !map.isWalkable(x + r, y) ||
+            !map.isWalkable(x, y - r) || !map.isWalkable(x, y + r)
+        ) return false
+        monster.x = x
+        monster.y = y
+        return true
+    }
+
+    private fun resolveMonsterAttackHit(monster: DungeonMonster) {
+        val dmg = (monster.power - totalDef).coerceAtLeast(3) + Random.nextInt(0, 4)
         val biome = currentBiome()
         say(
             when (biome) {
-                ExploreBiome.FOREST -> "${foe.name}의 발톱이 스친다! (HP -$dmg)"
-                ExploreBiome.DESERT -> "${foe.name}의 독침이 스친다! (HP -$dmg)"
-                ExploreBiome.GLACIER -> "${foe.name}의 한기가 스친다! (HP -$dmg)"
-                ExploreBiome.DUNGEON -> "${foe.name}의 이빨이 스친다! (HP -$dmg)"
+                ExploreBiome.FOREST -> "${monster.name}이(가) 덮친다! (HP -$dmg)"
+                ExploreBiome.DESERT -> "${monster.name}이(가) 찌른다! (HP -$dmg)"
+                ExploreBiome.GLACIER -> "${monster.name}이(가) 할퀸다! (HP -$dmg)"
+                ExploreBiome.DUNGEON -> "${monster.name}이(가) 물어뜯는다! (HP -$dmg)"
             }
         )
+        emitSfx("hit")
         applyFrontDamage(dmg)
-        val push = 28f
-        val ang = Random.nextFloat() * (Math.PI * 2).toFloat()
+        val push = 34f
+        val dx = dungeonHeroX - monster.x
+        val dy = dungeonHeroY - monster.y
+        val len = hypot(dx, dy).coerceAtLeast(0.01f)
+        val map = dungeonFloor ?: return
         tryMoveDungeon(
             map,
-            dungeonHeroX + cos(ang) * push,
-            dungeonHeroY + sin(ang) * push
+            dungeonHeroX + dx / len * push,
+            dungeonHeroY + dy / len * push
         )
     }
 

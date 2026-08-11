@@ -55,6 +55,27 @@ class CustomArt(
         else -> charOrNull("zombie_shambler")
     }
 
+    /** 몬스터 애니메이션 키 (kind → shambler 등) */
+    fun zombieAnimKey(kind: String): String = when (kind) {
+        "shambler", "runner", "bloater", "armored", "blacksmith", "farmer", "golem" -> kind
+        else -> "shambler"
+    }
+
+    fun zombieAnimFrameOrNull(kind: String, attacking: Boolean, walking: Boolean, frame: Int): ImageBitmap? {
+        val key = zombieAnimKey(kind)
+        if (attacking) {
+            heroAnimFrameOrNull("${key}_attack", frame)?.let { return it }
+        }
+        if (walking || attacking) {
+            heroAnimFrameOrNull("${key}_walk", frame)?.let { return it }
+        }
+        heroAnimFrameOrNull("${key}_walk", 0)?.let { return it }
+        return zombieSpriteOrNull(kind)
+    }
+
+    fun hasZombieAnim(kind: String): Boolean =
+        hasHeroAnim("${zombieAnimKey(kind)}_walk") || hasHeroAnim("${zombieAnimKey(kind)}_attack")
+
     companion object {
         private const val TAG = "CustomArt"
 
@@ -78,6 +99,14 @@ class CustomArt(
             "rogue_walk", "rogue_slash",
             "paladin_walk", "paladin_slash",
             "mage_walk", "mage_cast",
+            // 던전 몬스터 걷기/공격
+            "shambler_walk", "shambler_attack",
+            "runner_walk", "runner_attack",
+            "bloater_walk", "bloater_attack",
+            "armored_walk", "armored_attack",
+            "blacksmith_walk", "blacksmith_attack",
+            "farmer_walk", "farmer_attack",
+            "golem_walk", "golem_attack",
         )
         private const val HERO_ANIM_FRAMES = 4
 
