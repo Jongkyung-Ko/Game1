@@ -256,7 +256,6 @@ class GameViewModel : ViewModel() {
         frontIndex = 0
         partyTrail.clear()
         log.clear()
-        // pub/village 좌표 설정 후 아래에서 궤적 시드
         path.clear()
         pendingEnter = null
         pubTarget = null
