@@ -74,6 +74,7 @@ class GameViewModel : ViewModel() {
         private const val MAGIC_MP_COST = 6
         private const val PROJECTILE_SPEED = 420f
         private const val CONTACT_DAMAGE_INTERVAL = 0.75f
+        private const val KNOCKBACK_DISTANCE = 42f
         const val MAX_ACTIVE_MERCENARY = 2
     }
 
@@ -1155,7 +1156,6 @@ class GameViewModel : ViewModel() {
             (totalAtk + partyPower / 2 + blessBonus() / 2 + Random.nextInt(0, 5))
                 .coerceAtLeast(4)
         }
-        emitSfx("hit")
         startAttackAnim(
             when (style) {
                 WeaponStyle.MELEE -> HeroAnimKind.SLASH
@@ -1164,12 +1164,19 @@ class GameViewModel : ViewModel() {
             }
         )
         when (style) {
-            WeaponStyle.MELEE -> performMeleeSlash(map, dmg)
-            WeaponStyle.BOW -> spawnProjectile(WeaponStyle.BOW, dmg, life = 1.15f)
+            WeaponStyle.MELEE -> {
+                emitSfx("hit") // 휘두르는 순간
+                performMeleeSlash(map, dmg)
+            }
+            WeaponStyle.BOW -> {
+                emitSfx("click")
+                spawnProjectile(WeaponStyle.BOW, dmg, life = 1.15f)
+            }
             WeaponStyle.MAGIC -> {
                 if (heroCasting) {
                     player = player.copy(mp = player.mp - MAGIC_MP_COST)
                 }
+                emitSfx("click")
                 spawnProjectile(WeaponStyle.MAGIC, dmg + 3, life = 1.25f)
             }
         }
@@ -1224,7 +1231,12 @@ class GameViewModel : ViewModel() {
             say("칼날이 허공을 가른다.")
             return
         }
-        hits.forEach { damageMonster(it, damage) }
+        hits.forEach { monster ->
+            val kdx = monster.x - dungeonHeroX
+            val kdy = monster.y - dungeonHeroY
+            // 휘두르기 효과음은 이미 재생됨 — 여기서는 넉백만
+            damageMonster(monster, damage, knockDx = kdx, knockDy = kdy, hitSfx = null)
+        }
     }
 
     private fun slashFxOrigin(): Pair<Float, Float> =
@@ -1256,8 +1268,16 @@ class GameViewModel : ViewModel() {
         say(if (style == WeaponStyle.BOW) "화살을 날렸다!" else "마력을 쏘아냈다!")
     }
 
-    private fun damageMonster(monster: DungeonMonster, damage: Int) {
+    private fun damageMonster(
+        monster: DungeonMonster,
+        damage: Int,
+        knockDx: Float = 0f,
+        knockDy: Float = 0f,
+        hitSfx: String? = "hit",
+    ) {
         if (!monster.alive) return
+        if (hitSfx != null) emitSfx(hitSfx)
+        applyKnockback(monster, knockDx, knockDy)
         monster.hp -= damage
         if (monster.hp > 0) {
             say("${monster.name}에게 ${damage} 피해! (HP ${monster.hp}/${monster.maxHp})")
@@ -1268,6 +1288,25 @@ class GameViewModel : ViewModel() {
         monster.hp = 0
         refreshDungeonFloor()
         rewardMonsterKill(monster)
+    }
+
+    /** 맞은 방향으로 몬스터를 밀어낸다 (벽이면 가능한 만큼만). */
+    private fun applyKnockback(monster: DungeonMonster, dx: Float, dy: Float) {
+        val map = dungeonFloor ?: return
+        val len = hypot(dx, dy)
+        if (len < 0.01f) return
+        val nx = dx / len
+        val ny = dy / len
+        for (step in 5 downTo 1) {
+            val dist = KNOCKBACK_DISTANCE * step / 5f
+            val tx = monster.x + nx * dist
+            val ty = monster.y + ny * dist
+            if (map.isWalkable(tx, ty)) {
+                monster.x = tx
+                monster.y = ty
+                return
+            }
+        }
     }
 
     private fun rewardMonsterKill(monster: DungeonMonster) {
@@ -1661,7 +1700,18 @@ class GameViewModel : ViewModel() {
                 it.alive && hypot(it.x - p.x, it.y - p.y) < p.radius + 30f
             }
             if (hit != null) {
-                damageMonster(hit, p.damage)
+                val hitSfx = when (p.style) {
+                    WeaponStyle.BOW -> "arrow_hit"
+                    WeaponStyle.MAGIC -> "magic_hit"
+                    else -> "hit"
+                }
+                damageMonster(
+                    monster = hit,
+                    damage = p.damage,
+                    knockDx = p.vx,
+                    knockDy = p.vy,
+                    hitSfx = hitSfx,
+                )
                 doomed += p
             }
         }

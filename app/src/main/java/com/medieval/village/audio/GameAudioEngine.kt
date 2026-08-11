@@ -14,6 +14,10 @@ enum class MusicMood {
 
 enum class Sfx {
     HIT,
+    /** 화살 적중 */
+    ARROW_HIT,
+    /** 마법 적중 */
+    MAGIC_HIT,
     DOOR,
     CLICK
 }
@@ -44,8 +48,12 @@ class GameAudioEngine(context: Context) {
     }.getOrNull()
 
     private val sfxIds: Map<Sfx, Int> = soundPool?.let { pool ->
+        val hit = pool.load(appContext, R.raw.sfx_hit, 1)
         mapOf(
-            Sfx.HIT to pool.load(appContext, R.raw.sfx_hit, 1),
+            Sfx.HIT to hit,
+            // 동일 히트음, 재생 속도로 화살/마법 구분
+            Sfx.ARROW_HIT to hit,
+            Sfx.MAGIC_HIT to hit,
             Sfx.DOOR to pool.load(appContext, R.raw.sfx_door, 1),
             Sfx.CLICK to pool.load(appContext, R.raw.sfx_click, 1)
         )
@@ -105,7 +113,13 @@ class GameAudioEngine(context: Context) {
         if (released) return
         val pool = soundPool ?: return
         val id = sfxIds[sfx] ?: return
-        runCatching { pool.play(id, 0.7f, 0.7f, 1, 0, 1f) }
+        val (vol, rate) = when (sfx) {
+            Sfx.ARROW_HIT -> 0.75f to 1.35f
+            Sfx.MAGIC_HIT -> 0.8f to 0.72f
+            Sfx.HIT -> 0.75f to 1f
+            else -> 0.7f to 1f
+        }
+        runCatching { pool.play(id, vol, vol, 1, 0, rate) }
     }
 
     fun pause() {

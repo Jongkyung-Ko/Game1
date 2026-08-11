@@ -56,7 +56,6 @@ import com.medieval.village.ui.village.drawBattleLineParty
 import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawKenneySprite
 import com.medieval.village.ui.village.drawKenneyTile
-import com.medieval.village.ui.village.frontSlashAnimSet
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
 import kotlin.math.max
@@ -117,7 +116,6 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val heroAnimKind = vm.heroAnimKind
             val heroAnimFrame = vm.heroAnimFrame
             val frontIndex = vm.frontIndex
-            val frontMerc = vm.frontMercenary()
 
             Canvas(
                 modifier = Modifier
@@ -171,13 +169,6 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         drawDungeonMonster(atlas, art, monster)
                     }
                     projectiles.forEach { drawDungeonProjectile(it) }
-                    // 선두 참격 시트에 초승달이 포함되어 있으면 별도 FX는 생략
-                    val slashSet = frontSlashAnimSet(frontMerc)
-                    val useSlashSheet = art?.hasHeroAnim(slashSet) == true &&
-                        heroAnimKind == com.medieval.village.game.HeroAnimKind.SLASH
-                    if (!useSlashSheet) {
-                        slashFx?.let { drawMeleeSlashFx(it) }
-                    }
                     drawBattleLineParty(
                         leadX = heroX,
                         leadY = heroY,
@@ -191,9 +182,11 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         art = art,
                         scale = 0.78f,
                     )
+                    // 캐릭터 위에 반달 참격이 보이도록 나중에 그림
+                    slashFx?.let { drawMeleeSlashFx(it) }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.10 Party switch", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.11 Combat FX", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(

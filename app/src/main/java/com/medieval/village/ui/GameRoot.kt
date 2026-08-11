@@ -70,6 +70,8 @@ fun GameRoot(modifier: Modifier = Modifier) {
         if (vm.sfxSignal == 0) return@LaunchedEffect
         when (vm.lastSfx) {
             "hit" -> audio.playSfx(Sfx.HIT)
+            "arrow_hit" -> audio.playSfx(Sfx.ARROW_HIT)
+            "magic_hit" -> audio.playSfx(Sfx.MAGIC_HIT)
             "door" -> audio.playSfx(Sfx.DOOR)
             "click" -> audio.playSfx(Sfx.CLICK)
         }

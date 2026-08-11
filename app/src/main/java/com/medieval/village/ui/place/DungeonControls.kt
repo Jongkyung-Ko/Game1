@@ -176,41 +176,67 @@ fun BoxScope.DungeonCombatHud(
     )
 }
 
+/** 칼 휘두르기 반달(초승달) 참격 이펙트 */
 fun DrawScope.drawMeleeSlashFx(fx: MeleeSlashFx) {
-    val fade = 1f - fx.progress
+    val fade = (1f - fx.progress).coerceIn(0f, 1f)
     val angle = when (fx.facing) {
         Facing.RIGHT -> 0f
         Facing.DOWN -> 90f
         Facing.LEFT -> 180f
         Facing.UP -> 270f
     }
-    val sweep = 110f
-    val start = angle - sweep / 2f + fx.progress * 18f
-    val radius = 54f + fx.progress * 18f
-    val color = Color(0xFFE8E0D0).copy(alpha = 0.85f * fade)
-    val edge = Color(0xFFFFF6D0).copy(alpha = 0.95f * fade)
+    val sweep = 130f
+    val start = angle - sweep / 2f + fx.progress * 22f
+    val outerR = 62f + fx.progress * 22f
+    val innerR = outerR * 0.58f
+    val glow = Color(0xFFFFF1B0).copy(alpha = 0.35f * fade)
+    val blade = Color(0xFFF5F0E4).copy(alpha = 0.92f * fade)
+    val edge = Color(0xFFFFFFFF).copy(alpha = 0.95f * fade)
+
+    // 반달 면 — 바깥 호 → 안쪽 호를 역방향으로 닫아 초승달 형태
+    val crescent = Path().apply {
+        val steps = 18
+        for (i in 0..steps) {
+            val t = i / steps.toFloat()
+            val a = Math.toRadians((start + sweep * t).toDouble())
+            val px = fx.x + cos(a).toFloat() * outerR
+            val py = fx.y + sin(a).toFloat() * outerR
+            if (i == 0) moveTo(px, py) else lineTo(px, py)
+        }
+        for (i in steps downTo 0) {
+            val t = i / steps.toFloat()
+            val a = Math.toRadians((start + sweep * t).toDouble())
+            lineTo(
+                fx.x + cos(a).toFloat() * innerR,
+                fx.y + sin(a).toFloat() * innerR,
+            )
+        }
+        close()
+    }
+    drawPath(crescent, glow)
+    drawPath(crescent, blade.copy(alpha = 0.55f * fade))
     drawArc(
-        color = color,
+        color = edge,
         startAngle = start,
         sweepAngle = sweep,
         useCenter = false,
-        topLeft = Offset(fx.x - radius, fx.y - radius),
-        size = Size(radius * 2f, radius * 2f),
-        style = Stroke(width = 14f * fade, cap = StrokeCap.Round)
+        topLeft = Offset(fx.x - outerR, fx.y - outerR),
+        size = Size(outerR * 2f, outerR * 2f),
+        style = Stroke(width = 7f * fade + 2f, cap = StrokeCap.Round)
     )
     drawArc(
-        color = edge,
-        startAngle = start + 8f,
-        sweepAngle = sweep - 16f,
+        color = Color(0xFFFFE29A).copy(alpha = 0.8f * fade),
+        startAngle = start + 10f,
+        sweepAngle = sweep - 20f,
         useCenter = false,
-        topLeft = Offset(fx.x - radius * 0.82f, fx.y - radius * 0.82f),
-        size = Size(radius * 1.64f, radius * 1.64f),
-        style = Stroke(width = 5f * fade, cap = StrokeCap.Round)
+        topLeft = Offset(fx.x - outerR * 0.88f, fx.y - outerR * 0.88f),
+        size = Size(outerR * 1.76f, outerR * 1.76f),
+        style = Stroke(width = 3.5f * fade, cap = StrokeCap.Round)
     )
-    val tipAng = Math.toRadians((start + sweep * 0.7f).toDouble())
-    val tipX = fx.x + cos(tipAng).toFloat() * radius
-    val tipY = fx.y + sin(tipAng).toFloat() * radius
-    drawCircle(Color(0xFFFFFFFF).copy(alpha = 0.7f * fade), 5f * fade, Offset(tipX, tipY))
+    val tipAng = Math.toRadians((start + sweep * 0.72f).toDouble())
+    val tipX = fx.x + cos(tipAng).toFloat() * outerR
+    val tipY = fx.y + sin(tipAng).toFloat() * outerR
+    drawCircle(Color(0xFFFFFFFF).copy(alpha = 0.85f * fade), 6.5f * fade, Offset(tipX, tipY))
 }
 
 fun DrawScope.drawDungeonProjectile(p: DungeonProjectile) {
