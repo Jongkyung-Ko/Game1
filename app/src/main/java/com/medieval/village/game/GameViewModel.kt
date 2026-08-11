@@ -87,6 +87,14 @@ class GameViewModel : ViewModel() {
     val party = mutableStateListOf<Mercenary>()
     /** Status에서 원정대로 선택한 용병 id (최대 2명) */
     val activeMercenaryIds = mutableStateListOf<String>()
+    /** 용병별 현재 HP (선두 피해용) */
+    val mercHp = mutableStateMapOf<String, Int>()
+    /**
+     * 탐험 중 맨앞 캐릭터.
+     * 0 = 주인공, 1+ = activeParty[index-1]
+     */
+    var frontIndex by mutableIntStateOf(0)
+        private set
 
     /** 현재 화면에서 보여줄 대사/결과 로그 */
     val log = mutableStateListOf<String>()
@@ -214,6 +222,8 @@ class GameViewModel : ViewModel() {
         skills.clear()
         party.clear()
         activeMercenaryIds.clear()
+        mercHp.clear()
+        frontIndex = 0
         log.clear()
         path.clear()
         pendingEnter = null
@@ -258,9 +268,63 @@ class GameViewModel : ViewModel() {
     val activeParty: List<Mercenary>
         get() = activeMercenaryIds.mapNotNull { id -> party.firstOrNull { it.id == id } }
     val partyPower: Int get() = activeParty.sumOf { it.power }
+    /** 주인공 + 원정대 */
+    val partyActorCount: Int get() = 1 + activeParty.size
 
     val totalAtk: Int get() = player.baseAtk + equipAtk + player.str / 2 + skillPower
     val totalDef: Int get() = player.baseDef + equipDef + player.agi / 3
+
+    fun frontMercenary(): Mercenary? =
+        if (frontIndex <= 0) null else activeParty.getOrNull(frontIndex - 1)
+
+    fun frontActorName(): String = frontMercenary()?.name ?: player.name
+
+    fun mercCurrentHp(merc: Mercenary): Int = mercHp[merc.id] ?: merc.maxHp
+
+    fun isMercAlive(merc: Mercenary): Boolean = mercCurrentHp(merc) > 0
+
+    private fun ensureMercHp(merc: Mercenary) {
+        if (merc.id !in mercHp) mercHp[merc.id] = merc.maxHp
+    }
+
+    private fun isActorAlive(index: Int): Boolean {
+        if (index <= 0) return player.hp > 0
+        val merc = activeParty.getOrNull(index - 1) ?: return false
+        return isMercAlive(merc)
+    }
+
+    fun clampFrontIndex() {
+        val n = partyActorCount
+        if (n <= 0) {
+            frontIndex = 0
+            return
+        }
+        if (frontIndex !in 0 until n || !isActorAlive(frontIndex)) {
+            frontIndex = 0
+        }
+    }
+
+    /** 탐험 중 선두 교대 (쓰러진 용병은 건너뜀) */
+    fun cyclePartyFront() {
+        val n = partyActorCount
+        if (n <= 1) {
+            say("교대할 동료가 없다.")
+            return
+        }
+        activeParty.forEach { ensureMercHp(it) }
+        var next = (frontIndex + 1) % n
+        repeat(n) {
+            if (isActorAlive(next)) {
+                frontIndex = next
+                say("${frontActorName()}이(가) 맨앞으로 나섰다.")
+                dungeonCombatFrame++
+                return
+            }
+            next = (next + 1) % n
+        }
+        frontIndex = 0
+        say("나설 수 있는 동료가 없다.")
+    }
 
     // ---------------------------------------------------------------- 이동
 
@@ -864,7 +928,9 @@ class GameViewModel : ViewModel() {
         }
         player = player.copy(gold = player.gold - merc.cost)
         // 카탈로그 템플릿을 복사해 성장·장비를 개별 관리한다.
-        party.add(merc.copy(level = 1, exp = 0, equipment = emptyMap()))
+        val hired = merc.copy(level = 1, exp = 0, equipment = emptyMap())
+        party.add(hired)
+        mercHp[hired.id] = hired.maxHp
         if (activeMercenaryIds.size < MAX_ACTIVE_MERCENARY) {
             activeMercenaryIds.add(merc.id)
             say("${merc.name}이(가) 동료가 되어 원정대에 합류했다! (-${merc.cost}G)")
@@ -878,12 +944,15 @@ class GameViewModel : ViewModel() {
         current.equipment.values.forEach { addItem(it.item) }
         party.removeAll { it.id == merc.id }
         activeMercenaryIds.remove(merc.id)
+        mercHp.remove(merc.id)
+        clampFrontIndex()
         say("${merc.name}과(와) 작별했다." + if (current.equipment.isNotEmpty()) " 착용 장비는 가방으로 돌아왔다." else "")
     }
 
     fun toggleMercenaryActive(merc: Mercenary) {
         if (merc.id in activeMercenaryIds) {
             activeMercenaryIds.remove(merc.id)
+            clampFrontIndex()
             say("${merc.name}을(를) 원정대에서 대기시켰다.")
             return
         }
@@ -892,6 +961,7 @@ class GameViewModel : ViewModel() {
             return
         }
         activeMercenaryIds.add(merc.id)
+        ensureMercHp(merc)
         say("${merc.name}이(가) 원정대에 합류했다.")
     }
 
@@ -1017,6 +1087,7 @@ class GameViewModel : ViewModel() {
         heroAnimFrame = 0
         heroAnimTime = 0f
         attackAnimPlaying = false
+        frontIndex = 0
     }
 
     fun setDungeonPad(dx: Float, dy: Float) {
@@ -1038,9 +1109,12 @@ class GameViewModel : ViewModel() {
         dungeonPadY = 0f
     }
 
-    /** 장착 무기의 공격 방식 (미장착 시 맨손 근접) */
-    fun currentWeaponStyle(): WeaponStyle =
-        equipment[ItemType.WEAPON]?.item?.weaponStyle ?: WeaponStyle.MELEE
+    /** 선두 캐릭터의 공격 방식 (주인공은 장착 무기, 용병은 역할) */
+    fun currentWeaponStyle(): WeaponStyle {
+        val merc = frontMercenary()
+        if (merc != null) return merc.weaponStyle
+        return equipment[ItemType.WEAPON]?.item?.weaponStyle ?: WeaponStyle.MELEE
+    }
 
     fun attackLabel(): String = when (currentWeaponStyle()) {
         WeaponStyle.MELEE -> "휘두르기"
@@ -1051,24 +1125,36 @@ class GameViewModel : ViewModel() {
     fun canDungeonAttack(): Boolean = attackReady && dungeonFloor != null && !dungeonCombatLock
 
     private fun refreshAttackReady() {
-        attackReady = attackCooldown <= 0f &&
-            (currentWeaponStyle() != WeaponStyle.MAGIC || player.mp >= MAGIC_MP_COST)
+        val style = currentWeaponStyle()
+        val needsHeroMp = style == WeaponStyle.MAGIC && frontMercenary() == null
+        attackReady = attackCooldown <= 0f && (!needsHeroMp || player.mp >= MAGIC_MP_COST)
     }
 
-    /** 공격 버튼 — 근접 참격 또는 화살/마법 발사 */
+    /** 공격 버튼 — 선두가 근접 참격 또는 화살/마법 발사 */
     fun dungeonAttack() {
         val map = dungeonFloor ?: return
         if (dungeonCombatLock || attackCooldown > 0f) return
+        clampFrontIndex()
+        val frontMerc = frontMercenary()
+        if (frontMerc != null && !isMercAlive(frontMerc)) {
+            frontIndex = 0
+        }
         val style = currentWeaponStyle()
-        if (style == WeaponStyle.MAGIC && player.mp < MAGIC_MP_COST) {
+        val heroCasting = style == WeaponStyle.MAGIC && frontMercenary() == null
+        if (heroCasting && player.mp < MAGIC_MP_COST) {
             say("마나가 부족하다.")
             refreshAttackReady()
             return
         }
         attackCooldown = ATTACK_COOLDOWN
         refreshAttackReady()
-        val dmg = (totalAtk + partyPower / 2 + blessBonus() / 2 + Random.nextInt(0, 5))
-            .coerceAtLeast(4)
+        val dmg = if (frontMercenary() != null) {
+            val m = frontMercenary()!!
+            (m.power + blessBonus() / 2 + Random.nextInt(0, 5)).coerceAtLeast(4)
+        } else {
+            (totalAtk + partyPower / 2 + blessBonus() / 2 + Random.nextInt(0, 5))
+                .coerceAtLeast(4)
+        }
         emitSfx("hit")
         startAttackAnim(
             when (style) {
@@ -1081,7 +1167,9 @@ class GameViewModel : ViewModel() {
             WeaponStyle.MELEE -> performMeleeSlash(map, dmg)
             WeaponStyle.BOW -> spawnProjectile(WeaponStyle.BOW, dmg, life = 1.15f)
             WeaponStyle.MAGIC -> {
-                player = player.copy(mp = player.mp - MAGIC_MP_COST)
+                if (heroCasting) {
+                    player = player.copy(mp = player.mp - MAGIC_MP_COST)
+                }
                 spawnProjectile(WeaponStyle.MAGIC, dmg + 3, life = 1.25f)
             }
         }
@@ -1265,6 +1353,9 @@ class GameViewModel : ViewModel() {
         heroAnimFrame = 0
         heroAnimTime = 0f
         attackAnimPlaying = false
+        // 층 진입 시 원정대 체력 회복
+        activeParty.forEach { mercHp[it.id] = it.maxHp }
+        clampFrontIndex()
         dungeonHint = "stairs_up"
         when (biome) {
             ExploreBiome.FOREST -> {
@@ -1643,7 +1734,7 @@ class GameViewModel : ViewModel() {
                 ExploreBiome.DUNGEON -> "${foe.name}의 이빨이 스친다! (HP -$dmg)"
             }
         )
-        applyDamage(dmg)
+        applyFrontDamage(dmg)
         val push = 28f
         val ang = Random.nextFloat() * (Math.PI * 2).toFloat()
         tryMoveDungeon(
@@ -1651,6 +1742,26 @@ class GameViewModel : ViewModel() {
             dungeonHeroX + cos(ang) * push,
             dungeonHeroY + sin(ang) * push
         )
+    }
+
+    /** 맨앞 캐릭터가 피해를 받는다. 용병이 쓰러지면 주인공이 선두로. */
+    private fun applyFrontDamage(dmg: Int): Boolean {
+        clampFrontIndex()
+        val merc = frontMercenary()
+        if (merc == null) return applyDamage(dmg)
+        ensureMercHp(merc)
+        val hp = mercCurrentHp(merc) - dmg
+        if (hp <= 0) {
+            mercHp[merc.id] = 0
+            say("${merc.name}이(가) 쓰러졌다! ${player.name}이(가) 앞으로 나선다.")
+            frontIndex = 0
+            dungeonCombatFrame++
+            return false
+        }
+        mercHp[merc.id] = hp
+        say("${merc.name} HP ${hp}/${merc.maxHp}")
+        dungeonCombatFrame++
+        return false
     }
 
     private fun mapCleared(): Boolean =
@@ -1666,7 +1777,16 @@ class GameViewModel : ViewModel() {
     }
 
     fun dungeonMoveHint(): String =
-        "왼쪽 패드로 이동 · 오른쪽 ${attackLabel()} · 상자는 탭"
+        "왼쪽 패드 이동 · 오른쪽 ${attackLabel()} · 상단 교대 · 상자 탭"
+
+    fun frontStatusLabel(): String {
+        val merc = frontMercenary()
+        return if (merc != null) {
+            "선두 ${merc.name} ${mercCurrentHp(merc)}/${merc.maxHp}"
+        } else {
+            "선두 ${player.name} ${player.hp}/${player.maxHp}"
+        }
+    }
 
     private fun blessBonus(): Int = if (player.blessing > 0) 9 else 0
 

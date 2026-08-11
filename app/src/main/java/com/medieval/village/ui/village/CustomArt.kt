@@ -71,7 +71,14 @@ class CustomArt(
 
         private val HERO_KEYS = listOf("front", "back", "side", "portrait")
         private val BUILDING_KEYS = listOf("forge", "tower", "arena", "camp")
-        private val HERO_ANIM_SETS = listOf("walk_side", "walk_down", "slash", "bow", "magic")
+        private val HERO_ANIM_SETS = listOf(
+            "walk_side", "walk_down", "slash", "bow", "magic",
+            // 용병 애니메이션
+            "warrior_walk", "warrior_slash",
+            "rogue_walk", "rogue_slash",
+            "paladin_walk", "paladin_slash",
+            "mage_walk", "mage_cast",
+        )
         private const val HERO_ANIM_FRAMES = 4
 
         fun loadOrNull(context: Context): CustomArt? {

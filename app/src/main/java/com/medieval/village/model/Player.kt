@@ -72,6 +72,14 @@ data class Mercenary(
     val equipDef: Int get() = equipment.values.sumOf { it.def }
     /** 던전 전투에 합산되는 최종 기여치 */
     val power: Int get() = basePower + (level - 1) * 2 + equipAtk + equipDef / 2
+    /** 선두로 나섰을 때 버틸 수 있는 체력 */
+    val maxHp: Int get() = 40 + basePower * 3 + (level - 1) * 8
+    /** 역할별 공격 방식 */
+    val weaponStyle: WeaponStyle get() = when (spriteKey) {
+        "mage" -> WeaponStyle.MAGIC
+        "rogue" -> WeaponStyle.MELEE
+        else -> WeaponStyle.MELEE
+    }
 }
 
 object MercenaryCatalog {

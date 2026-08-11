@@ -20,9 +20,8 @@ import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.TownTiles
 import com.medieval.village.ui.village.drawCustomSprite
-import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawKenneyTile
-import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.drawVillageFollowParty
 import kotlin.math.sin
 
 /**
@@ -73,19 +72,17 @@ fun DrawScope.drawWalkableInterior(
         }
     }
 
-    companions.forEachIndexed { index, mercenary ->
-        drawMercenary(
-            mercenary = mercenary,
-            x = heroX + if (index == 0) -52f else 52f,
-            y = heroY + 40f + index * 8f,
-            facing = facing,
-            walking = walking,
-            phase = walkPhase + index * 0.7f,
-            scale = 0.92f,
-            art = art,
-        )
-    }
-    drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.0f, art = art)
+    drawVillageFollowParty(
+        heroX = heroX,
+        heroY = heroY,
+        facing = facing,
+        walking = walking,
+        walkPhase = walkPhase,
+        mercs = companions,
+        art = art,
+        heroScale = 1.0f,
+        mercScale = 0.92f,
+    )
 }
 
 private fun DrawScope.drawCleanNpcFallback(cx: Float, footY: Float, kind: InteriorNpcKind) {

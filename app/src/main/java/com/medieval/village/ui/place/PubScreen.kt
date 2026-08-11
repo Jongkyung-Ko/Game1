@@ -41,8 +41,7 @@ import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.drawCustomSprite
-import com.medieval.village.ui.village.drawHero
-import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.drawVillageFollowParty
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import kotlin.math.hypot
 import kotlin.math.min
@@ -98,19 +97,17 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     PubNpcCatalog.all.forEach { npc ->
                         drawPubNpc(npc, vm.pubSpeakerId == npc.id, vm.pubDialogue, art)
                     }
-                    vm.activeParty.forEachIndexed { index, mercenary ->
-                        drawMercenary(
-                            mercenary = mercenary,
-                            x = vm.pubHeroX + if (index == 0) -58f else 58f,
-                            y = vm.pubHeroY + 45f + index * 8f,
-                            facing = facing,
-                            walking = walking,
-                            phase = walkPhase + index * 0.7f,
-                            scale = 0.95f,
-                            art = art,
-                        )
-                    }
-                    drawHero(vm.pubHeroX, vm.pubHeroY, facing, walking, walkPhase, scale = 1.05f, art = art)
+                    drawVillageFollowParty(
+                        heroX = vm.pubHeroX,
+                        heroY = vm.pubHeroY,
+                        facing = facing,
+                        walking = walking,
+                        walkPhase = walkPhase,
+                        mercs = vm.activeParty,
+                        art = art,
+                        heroScale = 1.05f,
+                        mercScale = 0.95f,
+                    )
                 }
             }
         }

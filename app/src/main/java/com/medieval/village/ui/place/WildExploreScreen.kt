@@ -48,11 +48,11 @@ import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.TownTiles
-import com.medieval.village.ui.village.drawHero
+import com.medieval.village.ui.village.drawBattleLineParty
 import com.medieval.village.ui.village.drawKenneySprite
 import com.medieval.village.ui.village.drawKenneySpriteAsset
 import com.medieval.village.ui.village.drawKenneyTile
-import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.frontSlashAnimSet
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
 import kotlin.math.max
@@ -90,7 +90,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.8 Eastern forest",
+        watermark = "v0.4.9 Eastern forest",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -106,7 +106,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.8 Southern desert",
+        watermark = "v0.4.9 Southern desert",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -122,7 +122,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.8 Northern glacier",
+        watermark = "v0.4.9 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -157,9 +157,11 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 Text(ui.title, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Text(ui.subtitle, color = Palette.ParchmentDim, fontSize = 10.sp)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Chip(vm.frontStatusLabel(), Palette.Gold)
                 Chip(ui.recordLabel(record), Palette.WoodLight)
                 Chip(ui.foeLabel, ui.foeChip)
+                WoodButton("교대", highlight = true) { vm.cyclePartyFront() }
             }
         }
 
@@ -184,6 +186,8 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
             val combatFrame = vm.dungeonCombatFrame
             val heroAnimKind = vm.heroAnimKind
             val heroAnimFrame = vm.heroAnimFrame
+            val frontIndex = vm.frontIndex
+            val frontMerc = vm.frontMercenary()
 
             Canvas(
                 modifier = Modifier
@@ -231,33 +235,24 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                         drawWildBeast(atlas, theme, monster)
                     }
                     projectiles.forEach { drawDungeonProjectile(it) }
-                    val useSlashSheet = art?.hasHeroAnim("slash") == true &&
+                    val slashSet = frontSlashAnimSet(frontMerc)
+                    val useSlashSheet = art?.hasHeroAnim(slashSet) == true &&
                         heroAnimKind == com.medieval.village.game.HeroAnimKind.SLASH
                     if (!useSlashSheet) {
                         slashFx?.let { drawMeleeSlashFx(it) }
                     }
-                    party.forEachIndexed { index, mercenary ->
-                        drawMercenary(
-                            mercenary = mercenary,
-                            x = heroX + if (index == 0) -40f else 40f,
-                            y = heroY + 28f + index * 6f,
-                            facing = facing,
-                            walking = walking,
-                            phase = walkPhase + index * 0.7f,
-                            scale = 0.72f,
-                            art = art,
-                        )
-                    }
-                    drawHero(
-                        heroX,
-                        heroY,
-                        facing,
-                        walking,
-                        walkPhase,
-                        scale = 0.78f,
+                    drawBattleLineParty(
+                        leadX = heroX,
+                        leadY = heroY,
+                        facing = facing,
+                        walking = walking,
+                        walkPhase = walkPhase,
+                        frontIndex = frontIndex,
+                        party = party,
+                        frontAnimKind = heroAnimKind,
+                        frontAnimFrame = heroAnimFrame,
                         art = art,
-                        animKind = heroAnimKind,
-                        animFrame = heroAnimFrame,
+                        scale = 0.78f,
                     )
                 }
                 drawWildMinimap(map, theme, heroX, heroY, viewW, viewH)

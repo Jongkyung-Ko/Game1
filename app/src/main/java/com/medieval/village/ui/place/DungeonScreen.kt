@@ -51,11 +51,11 @@ import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
+import com.medieval.village.ui.village.drawBattleLineParty
 import com.medieval.village.ui.village.drawCustomSprite
-import com.medieval.village.ui.village.drawHero
 import com.medieval.village.ui.village.drawKenneySprite
 import com.medieval.village.ui.village.drawKenneyTile
-import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.frontSlashAnimSet
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
 import kotlin.math.max
@@ -88,9 +88,11 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     fontSize = 10.sp
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Chip(vm.frontStatusLabel(), Palette.Gold)
                 Chip("기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
                 Chip("좀비 ${floor?.monsters?.count { it.alive } ?: 0}", Palette.Blood)
+                WoodButton("교대", highlight = true) { vm.cyclePartyFront() }
             }
         }
 
@@ -115,6 +117,8 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val combatFrame = vm.dungeonCombatFrame
             val heroAnimKind = vm.heroAnimKind
             val heroAnimFrame = vm.heroAnimFrame
+            val frontIndex = vm.frontIndex
+            val frontMerc = vm.frontMercenary()
 
             Canvas(
                 modifier = Modifier
@@ -168,38 +172,29 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         drawDungeonMonster(atlas, art, monster)
                     }
                     projectiles.forEach { drawDungeonProjectile(it) }
-                    // 칼 휘두르기 시트에 초승달이 포함되어 있으면 별도 FX는 생략
-                    val useSlashSheet = art?.hasHeroAnim("slash") == true &&
+                    // 선두 참격 시트에 초승달이 포함되어 있으면 별도 FX는 생략
+                    val slashSet = frontSlashAnimSet(frontMerc)
+                    val useSlashSheet = art?.hasHeroAnim(slashSet) == true &&
                         heroAnimKind == com.medieval.village.game.HeroAnimKind.SLASH
                     if (!useSlashSheet) {
                         slashFx?.let { drawMeleeSlashFx(it) }
                     }
-                    party.forEachIndexed { index, mercenary ->
-                        drawMercenary(
-                            mercenary = mercenary,
-                            x = heroX + if (index == 0) -40f else 40f,
-                            y = heroY + 28f + index * 6f,
-                            facing = facing,
-                            walking = walking,
-                            phase = walkPhase + index * 0.7f,
-                            scale = 0.72f,
-                            art = art,
-                        )
-                    }
-                    drawHero(
-                        heroX,
-                        heroY,
-                        facing,
-                        walking,
-                        walkPhase,
-                        scale = 0.78f,
+                    drawBattleLineParty(
+                        leadX = heroX,
+                        leadY = heroY,
+                        facing = facing,
+                        walking = walking,
+                        walkPhase = walkPhase,
+                        frontIndex = frontIndex,
+                        party = party,
+                        frontAnimKind = heroAnimKind,
+                        frontAnimFrame = heroAnimFrame,
                         art = art,
-                        animKind = heroAnimKind,
-                        animFrame = heroAnimFrame,
+                        scale = 0.78f,
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.8 Hero anim", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.9 Party front", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(

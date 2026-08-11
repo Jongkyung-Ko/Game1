@@ -112,25 +112,22 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                 }
 
-                party.forEachIndexed { index, mercenary ->
-                    val side = if (index == 0) -1f else 1f
-                    drawMercenary(
-                        mercenary = mercenary,
-                        x = heroX + side * 28f,
-                        y = heroY + 18f + index * 8f,
-                        facing = facing,
-                        walking = walking,
-                        phase = walkPhase + index * 0.7f,
-                        scale = 0.95f,
-                        art = art,
-                    )
-                }
-                drawHero(heroX, heroY, facing, walking, walkPhase, scale = 1.05f, art = art)
+                drawVillageFollowParty(
+                    heroX = heroX,
+                    heroY = heroY,
+                    facing = facing,
+                    walking = walking,
+                    walkPhase = walkPhase,
+                    mercs = party,
+                    art = art,
+                    heroScale = 1.05f,
+                    mercScale = 0.95f,
+                )
             }
         }
 
         Text(
-            text = if (art != null) "Oakhaven · v0.4.8" else "Oakhaven · v0.4.8 (맵 로딩 실패)",
+            text = if (art != null) "Oakhaven · v0.4.9" else "Oakhaven · v0.4.9 (맵 로딩 실패)",
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,

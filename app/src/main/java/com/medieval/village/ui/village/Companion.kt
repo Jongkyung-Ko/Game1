@@ -8,12 +8,14 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import com.medieval.village.game.Facing
+import com.medieval.village.game.HeroAnimKind
 import com.medieval.village.model.Mercenary
+import kotlin.math.floor
 import kotlin.math.sin
 
 /**
  * 걸어다니는 용병 스프라이트.
- * 커스텀 얼굴 이미지가 있으면 그걸 쓰고, 없으면 역할별 Canvas 도형을 그린다.
+ * 걷기/공격 시트가 있으면 애니메이션, 없으면 정적 전신 → Canvas 폴백.
  */
 fun DrawScope.drawMercenary(
     mercenary: Mercenary,
@@ -24,16 +26,32 @@ fun DrawScope.drawMercenary(
     phase: Float = 0f,
     scale: Float = 1f,
     art: CustomArt? = null,
+    animKind: HeroAnimKind = HeroAnimKind.IDLE,
+    animFrame: Int = 0,
 ) {
-    val bob = if (walking) sin(phase) * 2f else 0f
-    val sprite = art?.npcSpriteOrNull(mercenary.spriteKey)
+    val attacking = animKind == HeroAnimKind.SLASH ||
+        animKind == HeroAnimKind.BOW ||
+        animKind == HeroAnimKind.MAGIC
+    val bob = if (walking && !attacking) sin(phase) * 2f else 0f
+    val sprite = art?.mercAnimSprite(
+        spriteKey = mercenary.spriteKey,
+        kind = animKind,
+        walking = walking,
+        walkPhase = phase,
+        animFrame = animFrame,
+    )
     if (sprite != null) {
+        val mirror = when (animKind) {
+            HeroAnimKind.SLASH, HeroAnimKind.BOW, HeroAnimKind.MAGIC ->
+                facing == Facing.LEFT || facing == Facing.UP
+            else -> facing == Facing.LEFT
+        }
         drawCustomSprite(
             image = sprite,
             cx = x,
             footY = y + bob,
             worldHeight = 72f * scale,
-            mirrorX = facing == Facing.LEFT,
+            mirrorX = mirror,
         )
         return
     }
@@ -44,6 +62,34 @@ fun DrawScope.drawMercenary(
     } else {
         drawMercenaryBody(mercenary, x, y, facing, walking, phase)
     }
+}
+
+fun CustomArt.mercAnimSprite(
+    spriteKey: String,
+    kind: HeroAnimKind,
+    walking: Boolean,
+    walkPhase: Float,
+    animFrame: Int,
+): androidx.compose.ui.graphics.ImageBitmap? {
+    when (kind) {
+        HeroAnimKind.SLASH -> {
+            heroAnimFrameOrNull("${spriteKey}_slash", animFrame)?.let { return it }
+            heroAnimFrameOrNull("${spriteKey}_cast", animFrame)?.let { return it }
+        }
+        HeroAnimKind.MAGIC, HeroAnimKind.BOW -> {
+            heroAnimFrameOrNull("${spriteKey}_cast", animFrame)?.let { return it }
+            heroAnimFrameOrNull("${spriteKey}_slash", animFrame)?.let { return it }
+        }
+        HeroAnimKind.WALK, HeroAnimKind.IDLE -> {
+            val useWalk = kind == HeroAnimKind.WALK || walking
+            val frame = if (useWalk) {
+                if (kind == HeroAnimKind.WALK && animFrame in 0..3) animFrame
+                else ((floor(((walkPhase % 6.2831855f) / 6.2831855f) * 4f).toInt() % 4) + 4) % 4
+            } else 0
+            heroAnimFrameOrNull("${spriteKey}_walk", frame)?.let { return it }
+        }
+    }
+    return npcSpriteOrNull(spriteKey)
 }
 
 private fun DrawScope.drawMercenaryBody(
