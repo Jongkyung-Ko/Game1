@@ -48,11 +48,14 @@ import com.medieval.village.ui.Chip
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
+import com.medieval.village.ui.mapZoomGestures
+import com.medieval.village.ui.rememberMapZoomState
+import com.medieval.village.ui.withMapZoom
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
-import com.medieval.village.ui.village.drawBattleLineParty
+import com.medieval.village.ui.village.drawPartySlots
 import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawKenneySprite
 import com.medieval.village.ui.village.drawKenneyTile
@@ -104,28 +107,29 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val density = LocalDensity.current
             val widthPx = with(density) { maxWidth.toPx() }
             val heightPx = with(density) { maxHeight.toPx() }
-            val facing = vm.facing
             val walking = vm.dungeonWalking
             val walkPhase = vm.walkPhase
             val heroX = vm.dungeonHeroX
             val heroY = vm.dungeonHeroY
-            val party = vm.activeParty
             val slashFx = vm.meleeSlashFx
             val projectiles = vm.dungeonProjectiles.toList()
             val combatFrame = vm.dungeonCombatFrame
             val heroAnimKind = vm.heroAnimKind
             val heroAnimFrame = vm.heroAnimFrame
-            val frontIndex = vm.frontIndex
+            val partySlots = vm.partyDrawSlots(heroX, heroY)
+            val mapZoom = rememberMapZoomState()
+            val viewSize = Size(widthPx, heightPx)
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(floor?.floor, widthPx, heightPx) {
+                    .pointerInput(floor?.floor, widthPx, heightPx, mapZoom.zoom, mapZoom.pan) {
                         detectTapGestures { tap ->
                             val map = vm.dungeonFloor ?: return@detectTapGestures
+                            val content = mapZoom.screenToContent(tap, viewSize)
                             val cam = cameraOffset(map, vm.dungeonHeroX, vm.dungeonHeroY, widthPx, heightPx)
-                            val worldX = tap.x + cam.first
-                            val worldY = tap.y + cam.second
+                            val worldX = content.x + cam.first
+                            val worldY = content.y + cam.second
                             val col = (worldX / map.tileSize).toInt()
                             val row = (worldY / map.tileSize).toInt()
                             // 터치 이동은 끄고, 보물상자 탭만 허용
@@ -134,6 +138,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             }
                         }
                     }
+                    .mapZoomGestures(mapZoom)
             ) {
                 // combatFrame 구독 — 탄환/참격 갱신
                 @Suppress("UNUSED_EXPRESSION")
@@ -157,37 +162,35 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 val viewW = size.width.coerceAtLeast(1f)
                 val viewH = size.height.coerceAtLeast(1f)
                 val (camX, camY) = cameraOffset(map, heroX, heroY, viewW, viewH)
-                withTransform({
-                    translate(-camX, -camY)
-                }) {
-                    if (atlas != null) {
-                        drawHybridDungeonFloor(atlas, map)
-                    } else {
-                        drawDungeonFloorFallback(map)
+                withMapZoom(mapZoom) {
+                    withTransform({
+                        translate(-camX, -camY)
+                    }) {
+                        if (atlas != null) {
+                            drawHybridDungeonFloor(atlas, map)
+                        } else {
+                            drawDungeonFloorFallback(map)
+                        }
+                        map.monsters.filter { it.alive }.forEach { monster ->
+                            drawDungeonMonster(atlas, art, monster)
+                        }
+                        projectiles.forEach { drawDungeonProjectile(it) }
+                        drawPartySlots(
+                            slots = partySlots,
+                            walking = walking,
+                            walkPhase = walkPhase,
+                            frontAnimKind = heroAnimKind,
+                            frontAnimFrame = heroAnimFrame,
+                            art = art,
+                            scale = 0.88f,
+                            rearScaleFactor = 0.78f,
+                        )
+                        // 캐릭터 위에 반달 참격이 보이도록 나중에 그림
+                        slashFx?.let { drawMeleeSlashFx(it) }
                     }
-                    map.monsters.filter { it.alive }.forEach { monster ->
-                        drawDungeonMonster(atlas, art, monster)
-                    }
-                    projectiles.forEach { drawDungeonProjectile(it) }
-                    drawBattleLineParty(
-                        leadX = heroX,
-                        leadY = heroY,
-                        facing = facing,
-                        walking = walking,
-                        walkPhase = walkPhase,
-                        frontIndex = frontIndex,
-                        party = party,
-                        frontAnimKind = heroAnimKind,
-                        frontAnimFrame = heroAnimFrame,
-                        art = art,
-                        scale = 0.88f,
-                        rearScaleFactor = 0.78f,
-                    )
-                    // 캐릭터 위에 반달 참격이 보이도록 나중에 그림
-                    slashFx?.let { drawMeleeSlashFx(it) }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.13 Front scale", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.14 Pinch zoom", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(

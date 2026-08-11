@@ -45,12 +45,15 @@ import com.medieval.village.ui.Chip
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
+import com.medieval.village.ui.mapZoomGestures
+import com.medieval.village.ui.rememberMapZoomState
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.withMapZoom
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.TownTiles
-import com.medieval.village.ui.village.drawBattleLineParty
+import com.medieval.village.ui.village.drawPartySlots
 import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawKenneySprite
 import com.medieval.village.ui.village.drawKenneySpriteAsset
@@ -92,7 +95,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.12 Eastern forest",
+        watermark = "v0.4.14 Eastern forest",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -108,7 +111,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.12 Southern desert",
+        watermark = "v0.4.14 Southern desert",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -124,7 +127,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.13 Northern glacier",
+        watermark = "v0.4.14 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -175,28 +178,29 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
             val density = LocalDensity.current
             val widthPx = with(density) { maxWidth.toPx() }
             val heightPx = with(density) { maxHeight.toPx() }
-            val facing = vm.facing
             val walking = vm.dungeonWalking
             val walkPhase = vm.walkPhase
             val heroX = vm.dungeonHeroX
             val heroY = vm.dungeonHeroY
-            val party = vm.activeParty
             val slashFx = vm.meleeSlashFx
             val projectiles = vm.dungeonProjectiles.toList()
             val combatFrame = vm.dungeonCombatFrame
             val heroAnimKind = vm.heroAnimKind
             val heroAnimFrame = vm.heroAnimFrame
-            val frontIndex = vm.frontIndex
+            val partySlots = vm.partyDrawSlots(heroX, heroY)
+            val mapZoom = rememberMapZoomState()
+            val viewSize = Size(widthPx, heightPx)
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(floor?.floor, widthPx, heightPx, theme) {
+                    .pointerInput(floor?.floor, widthPx, heightPx, theme, mapZoom.zoom, mapZoom.pan) {
                         detectTapGestures { tap ->
                             val map = vm.dungeonFloor ?: return@detectTapGestures
+                            val content = mapZoom.screenToContent(tap, viewSize)
                             val cam = wildCamera(map, vm.dungeonHeroX, vm.dungeonHeroY, widthPx, heightPx)
-                            val worldX = tap.x + cam.first
-                            val worldY = tap.y + cam.second
+                            val worldX = content.x + cam.first
+                            val worldY = content.y + cam.second
                             val col = (worldX / map.tileSize).toInt()
                             val row = (worldY / map.tileSize).toInt()
                             if (map.tileAt(col, row) == DungeonTile.VAULT) {
@@ -204,6 +208,7 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                             }
                         }
                     }
+                    .mapZoomGestures(mapZoom)
             ) {
                 @Suppress("UNUSED_EXPRESSION")
                 combatFrame
@@ -224,31 +229,29 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 val viewW = size.width.coerceAtLeast(1f)
                 val viewH = size.height.coerceAtLeast(1f)
                 val (camX, camY) = wildCamera(map, heroX, heroY, viewW, viewH)
-                withTransform({ translate(-camX, -camY) }) {
-                    when (theme) {
-                        WildTheme.FOREST -> drawForestFloor(atlas, map)
-                        WildTheme.DESERT -> drawDesertFloor(atlas, map)
-                        WildTheme.GLACIER -> drawGlacierFloor(atlas, map)
+                withMapZoom(mapZoom) {
+                    withTransform({ translate(-camX, -camY) }) {
+                        when (theme) {
+                            WildTheme.FOREST -> drawForestFloor(atlas, map)
+                            WildTheme.DESERT -> drawDesertFloor(atlas, map)
+                            WildTheme.GLACIER -> drawGlacierFloor(atlas, map)
+                        }
+                        map.monsters.filter { it.alive }.forEach { monster ->
+                            drawWildBeast(atlas, art, theme, monster)
+                        }
+                        projectiles.forEach { drawDungeonProjectile(it) }
+                        drawPartySlots(
+                            slots = partySlots,
+                            walking = walking,
+                            walkPhase = walkPhase,
+                            frontAnimKind = heroAnimKind,
+                            frontAnimFrame = heroAnimFrame,
+                            art = art,
+                            scale = 0.88f,
+                            rearScaleFactor = 0.78f,
+                        )
+                        slashFx?.let { drawMeleeSlashFx(it) }
                     }
-                    map.monsters.filter { it.alive }.forEach { monster ->
-                        drawWildBeast(atlas, art, theme, monster)
-                    }
-                    projectiles.forEach { drawDungeonProjectile(it) }
-                    drawBattleLineParty(
-                        leadX = heroX,
-                        leadY = heroY,
-                        facing = facing,
-                        walking = walking,
-                        walkPhase = walkPhase,
-                        frontIndex = frontIndex,
-                        party = party,
-                        frontAnimKind = heroAnimKind,
-                        frontAnimFrame = heroAnimFrame,
-                        art = art,
-                        scale = 0.88f,
-                        rearScaleFactor = 0.78f,
-                    )
-                    slashFx?.let { drawMeleeSlashFx(it) }
                 }
                 drawWildMinimap(map, theme, heroX, heroY, viewW, viewH)
                 wildLabel(ui.watermark, 14f, 28f, 18f, ui.border)

@@ -3,55 +3,47 @@ package com.medieval.village.ui.village
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.medieval.village.game.Facing
 import com.medieval.village.game.HeroAnimKind
+import com.medieval.village.game.PartyDrawSlot
 import com.medieval.village.game.PartyFormation
 import com.medieval.village.model.Mercenary
 
 /**
- * 마을·실내·던전 공통: [frontIndex] 선두가 lead 위치, 나머지는 뒤 일렬.
- * 선두는 크게, 후열(주인공 포함)은 작게 그린다.
+ * 궤적 추종 슬롯으로 파티를 그린다.
+ * 선두는 크게, 후열은 작게. 각자 슬롯의 facing 사용.
  */
-fun DrawScope.drawBattleLineParty(
-    leadX: Float,
-    leadY: Float,
-    facing: Facing,
+fun DrawScope.drawPartySlots(
+    slots: List<PartyDrawSlot>,
     walking: Boolean,
     walkPhase: Float,
-    frontIndex: Int,
-    party: List<Mercenary>,
     frontAnimKind: HeroAnimKind,
     frontAnimFrame: Int,
     art: CustomArt?,
-    /** 선두 크기 */
     scale: Float = 0.78f,
-    /** 후열 = scale * rearScaleFactor */
     rearScaleFactor: Float = 0.82f,
 ) {
-    val line = PartyFormation.battleLine(frontIndex, party)
-    for (i in line.lastIndex downTo 0) {
-        val (ox, oy) = PartyFormation.behindOffset(facing, i)
-        val x = leadX + ox
-        val y = leadY + oy
-        val isFront = i == 0
-        val actorScale = if (isFront) scale else scale * rearScaleFactor
+    // 뒤쪽부터 그려 선두가 위에
+    for (i in slots.lastIndex downTo 0) {
+        val slot = slots[i]
+        val actorScale = if (slot.isFront) scale else scale * rearScaleFactor
         val phase = walkPhase + i * 0.55f
-        val attacking = isFront && (
+        val attacking = slot.isFront && (
             frontAnimKind == HeroAnimKind.SLASH ||
                 frontAnimKind == HeroAnimKind.BOW ||
                 frontAnimKind == HeroAnimKind.MAGIC
             )
         val animKind = when {
             attacking -> frontAnimKind
-            walking || (isFront && frontAnimKind == HeroAnimKind.WALK) -> HeroAnimKind.WALK
+            walking || (slot.isFront && frontAnimKind == HeroAnimKind.WALK) -> HeroAnimKind.WALK
             else -> HeroAnimKind.IDLE
         }
         val animFrame = if (attacking) frontAnimFrame else 0
-        val actorWalking = walking || (isFront && frontAnimKind == HeroAnimKind.WALK)
-        val actor = line[i]
-        if (actor == null) {
+        val actorWalking = walking || (slot.isFront && frontAnimKind == HeroAnimKind.WALK)
+        val merc = slot.mercenary
+        if (merc == null) {
             drawHero(
-                x,
-                y,
-                facing,
+                slot.x,
+                slot.y,
+                slot.facing,
                 walking = actorWalking,
                 phase = phase,
                 scale = actorScale,
@@ -61,10 +53,10 @@ fun DrawScope.drawBattleLineParty(
             )
         } else {
             drawMercenary(
-                mercenary = actor,
-                x = x,
-                y = y,
-                facing = facing,
+                mercenary = merc,
+                x = slot.x,
+                y = slot.y,
+                facing = slot.facing,
                 walking = actorWalking,
                 phase = phase,
                 scale = actorScale,
@@ -76,9 +68,38 @@ fun DrawScope.drawBattleLineParty(
     }
 }
 
-/**
- * 마을·실내용 래퍼 — 선두 교대를 반영한 일렬 종대.
- */
+/** 하위 호환: 궤적 없이 오프셋 배치 (폴백) */
+fun DrawScope.drawBattleLineParty(
+    leadX: Float,
+    leadY: Float,
+    facing: Facing,
+    walking: Boolean,
+    walkPhase: Float,
+    frontIndex: Int,
+    party: List<Mercenary>,
+    frontAnimKind: HeroAnimKind,
+    frontAnimFrame: Int,
+    art: CustomArt?,
+    scale: Float = 0.78f,
+    rearScaleFactor: Float = 0.82f,
+) {
+    val line = PartyFormation.battleLine(frontIndex, party)
+    val slots = line.mapIndexed { i, actor ->
+        val (ox, oy) = PartyFormation.behindOffset(facing, i)
+        PartyDrawSlot(actor, leadX + ox, leadY + oy, facing, isFront = i == 0)
+    }
+    drawPartySlots(
+        slots = slots,
+        walking = walking,
+        walkPhase = walkPhase,
+        frontAnimKind = frontAnimKind,
+        frontAnimFrame = frontAnimFrame,
+        art = art,
+        scale = scale,
+        rearScaleFactor = rearScaleFactor,
+    )
+}
+
 fun DrawScope.drawVillageFollowParty(
     heroX: Float,
     heroY: Float,
@@ -92,7 +113,21 @@ fun DrawScope.drawVillageFollowParty(
     frontIndex: Int = 0,
     frontAnimKind: HeroAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
     frontAnimFrame: Int = 0,
+    slots: List<PartyDrawSlot>? = null,
 ) {
+    if (slots != null) {
+        drawPartySlots(
+            slots = slots,
+            walking = walking,
+            walkPhase = walkPhase,
+            frontAnimKind = frontAnimKind,
+            frontAnimFrame = frontAnimFrame,
+            art = art,
+            scale = heroScale,
+            rearScaleFactor = if (heroScale <= 0f) 0.82f else mercScale / heroScale,
+        )
+        return
+    }
     drawBattleLineParty(
         leadX = heroX,
         leadY = heroY,
@@ -109,7 +144,6 @@ fun DrawScope.drawVillageFollowParty(
     )
 }
 
-/** 선두 캐릭터의 참격 시트 키 (마법사는 cast) */
 fun frontSlashAnimSet(frontMerc: Mercenary?): String = when {
     frontMerc == null -> "slash"
     frontMerc.spriteKey == "mage" -> "mage_cast"

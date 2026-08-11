@@ -146,6 +146,7 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
                         speechNpcId = vm.interiorSpeakerId,
                         speechText = vm.interiorSpeech,
                         frontIndex = vm.frontIndex,
+                        partySlots = vm.partyDrawSlots(vm.pubHeroX, vm.pubHeroY),
                     )
                 }
             }

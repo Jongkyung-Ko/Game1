@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import com.medieval.village.game.Facing
+import com.medieval.village.game.PartyDrawSlot
 import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InteriorNpcKind
@@ -41,6 +42,7 @@ fun DrawScope.drawWalkableInterior(
     speechNpcId: String? = null,
     speechText: String? = null,
     frontIndex: Int = 0,
+    partySlots: List<PartyDrawSlot>? = null,
 ) {
     val w = InteriorRoom.WORLD_W
     val h = InteriorRoom.WORLD_H
@@ -84,6 +86,7 @@ fun DrawScope.drawWalkableInterior(
         heroScale = 1.05f,
         mercScale = 0.80f,
         frontIndex = frontIndex,
+        slots = partySlots,
     )
 }
 

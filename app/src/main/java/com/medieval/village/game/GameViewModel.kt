@@ -210,9 +210,37 @@ class GameViewModel : ViewModel() {
     private var dungeonCombatLock = false
     private var monsterWanderAcc = 0f
     private var attackCooldown = 0f
+    /** 선두 이동 궤적 — 후열이 점프하지 않고 따라온다 */
+    private val partyTrail = PartyTrail()
 
     init {
         newGame()
+    }
+
+    /** 현재 선두 기준 파티 그리기 슬롯 (궤적 추종 포함) */
+    fun partyDrawSlots(leadX: Float, leadY: Float): List<PartyDrawSlot> {
+        val line = PartyFormation.battleLine(frontIndex, activeParty)
+        return line.mapIndexed { index, actor ->
+            if (index == 0) {
+                PartyDrawSlot(actor, leadX, leadY, facing, isFront = true)
+            } else {
+                val p = partyTrail.positionBehind(
+                    distance = index * PartyFormation.SPACING,
+                    leadX = leadX,
+                    leadY = leadY,
+                    leadFacing = facing,
+                )
+                PartyDrawSlot(actor, p.x, p.y, p.facing, isFront = false)
+            }
+        }
+    }
+
+    private fun noteLeaderMove(x: Float, y: Float) {
+        partyTrail.record(x, y, facing)
+    }
+
+    private fun resetPartyTrail(x: Float, y: Float) {
+        partyTrail.reset(x, y, facing)
     }
 
     // ---------------------------------------------------------------- 세이브/리셋
@@ -226,7 +254,9 @@ class GameViewModel : ViewModel() {
         activeMercenaryIds.clear()
         mercHp.clear()
         frontIndex = 0
+        partyTrail.clear()
         log.clear()
+        // pub/village 좌표 설정 후 아래에서 궤적 시드
         path.clear()
         pendingEnter = null
         pubTarget = null
@@ -257,6 +287,7 @@ class GameViewModel : ViewModel() {
         scene = Scene.INTERIOR
         currentPlace = PlaceId.HOME
         menuTab = MenuTab.NONE
+        resetPartyTrail(pubHeroX, pubHeroY)
         say("풍요의 마을… 한때 '신성한 포도주'로 번영했던 이곳에 눈을 떴다.")
         say("몇 년 전 지하 최심부에서 검붉은 '좀비석'이 발굴된 뒤, 마을은 저주에 잠식되고 있다.")
         say("문을 열고, 지상으로 스며드는 재앙의 근원을 마주하자. 실내에서는 화면을 눌러 걸어 다닐 수 있다.")
@@ -318,6 +349,11 @@ class GameViewModel : ViewModel() {
         repeat(n) {
             if (isActorAlive(next)) {
                 frontIndex = next
+                val leadX = if (currentPlace.isExplorePlace()) dungeonHeroX else
+                    if (scene == Scene.INTERIOR) pubHeroX else heroX
+                val leadY = if (currentPlace.isExplorePlace()) dungeonHeroY else
+                    if (scene == Scene.INTERIOR) pubHeroY else heroY
+                resetPartyTrail(leadX, leadY)
                 say("${frontActorName()}이(가) 맨앞으로 나섰다.")
                 dungeonCombatFrame++
                 return
@@ -382,6 +418,7 @@ class GameViewModel : ViewModel() {
                 if (dy > 0) Facing.DOWN else Facing.UP
             }
         }
+        noteLeaderMove(heroX, heroY)
     }
 
     private fun tickPub(dt: Float) {
@@ -411,6 +448,7 @@ class GameViewModel : ViewModel() {
             } else {
                 if (dy > 0) Facing.DOWN else Facing.UP
             }
+            noteLeaderMove(pubHeroX, pubHeroY)
         }
     }
 
@@ -468,6 +506,7 @@ class GameViewModel : ViewModel() {
             } else {
                 if (dy > 0) Facing.DOWN else Facing.UP
             }
+            noteLeaderMove(pubHeroX, pubHeroY)
         }
     }
 
@@ -564,6 +603,8 @@ class GameViewModel : ViewModel() {
         }
         if (id.isExplorePlace()) {
             enterExploreFloor(1)
+        } else {
+            resetPartyTrail(pubHeroX, pubHeroY)
         }
         emitSfx("door")
         greetInteriorNpcs(id)
@@ -590,6 +631,7 @@ class GameViewModel : ViewModel() {
         scene = Scene.VILLAGE
         currentPlace = null
         menuTab = MenuTab.NONE
+        resetPartyTrail(heroX, heroY)
     }
 
     /** 실내 입장 시 NPC들이 번갈아 인사한다. */
@@ -1386,6 +1428,7 @@ class GameViewModel : ViewModel() {
         meleeSlashFx = null
         dungeonProjectiles.clear()
         attackCooldown = 0f
+        resetPartyTrail(dungeonHeroX, dungeonHeroY)
         attackReady = true
         heroAnimKind = HeroAnimKind.IDLE
         heroAnimFrame = 0
@@ -1610,6 +1653,7 @@ class GameViewModel : ViewModel() {
                         if (dungeonPadY > 0) Facing.DOWN else Facing.UP
                     }
                 }
+                noteLeaderMove(dungeonHeroX, dungeonHeroY)
             }
             tickHeroAnim(dt, moving = dungeonWalking)
             return
@@ -1664,6 +1708,7 @@ class GameViewModel : ViewModel() {
                 if (dy > 0) Facing.DOWN else Facing.UP
             }
         }
+        noteLeaderMove(dungeonHeroX, dungeonHeroY)
         tickHeroAnim(dt, moving = true)
     }
 

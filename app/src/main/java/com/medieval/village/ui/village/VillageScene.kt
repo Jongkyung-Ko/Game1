@@ -33,7 +33,10 @@ import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.HeroAnimKind
 import com.medieval.village.model.Village
 import com.medieval.village.ui.PartySwitchBar
+import com.medieval.village.ui.mapZoomGestures
+import com.medieval.village.ui.rememberMapZoomState
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.withMapZoom
 import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.sin
@@ -41,6 +44,7 @@ import kotlin.math.sin
 @Composable
 fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
     val art = rememberCustomArtOrNull()
+    val mapZoom = rememberMapZoomState()
     BoxWithConstraints(modifier.background(Color(0xFF1A140E))) {
         val density = LocalDensity.current
         val wPx = with(density) { maxWidth.toPx() }
@@ -55,14 +59,17 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         val walkPhase = vm.walkPhase
         val party = vm.activeParty
         val frontIndex = vm.frontIndex
+        val partySlots = vm.partyDrawSlots(heroX, heroY)
+        val viewSize = Size(wPx, hPx)
 
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(s, ox, oy) {
+                .pointerInput(s, ox, oy, mapZoom.zoom, mapZoom.pan) {
                     detectTapGestures { tap ->
-                        val wx = (tap.x - ox) / s
-                        val wy = (tap.y - oy) / s
+                        val content = mapZoom.screenToContent(tap, viewSize)
+                        val wx = (content.x - ox) / s
+                        val wy = (content.y - oy) / s
                         val hit = Village.places.firstOrNull { p ->
                             wx >= p.left - 16f && wx <= p.right + 16f &&
                                 wy >= p.top - 24f && wy <= p.doorY + 20f
@@ -70,69 +77,73 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         if (hit != null) vm.goToPlace(hit) else vm.walkTo(wx, wy)
                     }
                 }
+                .mapZoomGestures(mapZoom)
         ) {
             drawRect(Color(0xFF2A1C12), size = size)
-            withTransform({
-                translate(ox, oy)
-                scale(s, s, Offset.Zero)
-            }) {
-                if (art != null) {
-                    drawCustomVillageMap(art)
-                } else {
-                    drawRect(Color(0xFF6F9A54), size = Size(Village.W, Village.H))
-                    drawRect(
-                        Color(0xFFC2A16B),
-                        topLeft = Offset(Village.W * 0.45f, 0f),
-                        size = Size(Village.W * 0.1f, Village.H)
-                    )
-                }
+            withMapZoom(mapZoom) {
+                withTransform({
+                    translate(ox, oy)
+                    scale(s, s, Offset.Zero)
+                }) {
+                    if (art != null) {
+                        drawCustomVillageMap(art)
+                    } else {
+                        drawRect(Color(0xFF6F9A54), size = Size(Village.W, Village.H))
+                        drawRect(
+                            Color(0xFFC2A16B),
+                            topLeft = Offset(Village.W * 0.45f, 0f),
+                            size = Size(Village.W * 0.1f, Village.H)
+                        )
+                    }
 
-                // 건물 핫스팟 + 이름 (같은 Canvas 변환으로 정렬)
-                Village.places.forEach { p ->
-                    drawRoundRect(
-                        color = Color(0x88FFE29A),
-                        topLeft = Offset(p.left, p.top),
-                        size = Size(p.w, p.h),
-                        cornerRadius = CornerRadius(12f, 12f),
-                        style = Stroke(width = 3.5f)
-                    )
-                    drawPlaceLabel(p.name, p.cx, p.top - 6f)
-                }
+                    // 건물 핫스팟 + 이름 (같은 Canvas 변환으로 정렬)
+                    Village.places.forEach { p ->
+                        drawRoundRect(
+                            color = Color(0x88FFE29A),
+                            topLeft = Offset(p.left, p.top),
+                            size = Size(p.w, p.h),
+                            cornerRadius = CornerRadius(12f, 12f),
+                            style = Stroke(width = 3.5f)
+                        )
+                        drawPlaceLabel(p.name, p.cx, p.top - 6f)
+                    }
 
-                // 마을 주민
-                if (art != null) {
-                    Village.townsfolk.forEachIndexed { index, (key, x, y) ->
-                        val sprite = art.npcSpriteOrNull(key)
-                        if (sprite != null) {
-                            val bob = sin(walkPhase * 0.6f + index) * 1.5f
-                            drawCustomSprite(
-                                image = sprite,
-                                cx = x,
-                                footY = y + bob,
-                                worldHeight = 78f,
-                            )
+                    // 마을 주민
+                    if (art != null) {
+                        Village.townsfolk.forEachIndexed { index, (key, x, y) ->
+                            val sprite = art.npcSpriteOrNull(key)
+                            if (sprite != null) {
+                                val bob = sin(walkPhase * 0.6f + index) * 1.5f
+                                drawCustomSprite(
+                                    image = sprite,
+                                    cx = x,
+                                    footY = y + bob,
+                                    worldHeight = 78f,
+                                )
+                            }
                         }
                     }
-                }
 
-                drawVillageFollowParty(
-                    heroX = heroX,
-                    heroY = heroY,
-                    facing = facing,
-                    walking = walking,
-                    walkPhase = walkPhase,
-                    mercs = party,
-                    art = art,
-                    heroScale = 1.08f,
-                    mercScale = 0.82f,
-                    frontIndex = frontIndex,
-                    frontAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
-                )
+                    drawVillageFollowParty(
+                        heroX = heroX,
+                        heroY = heroY,
+                        facing = facing,
+                        walking = walking,
+                        walkPhase = walkPhase,
+                        mercs = party,
+                        art = art,
+                        heroScale = 1.08f,
+                        mercScale = 0.82f,
+                        frontIndex = frontIndex,
+                        frontAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
+                        slots = partySlots,
+                    )
+                }
             }
         }
 
         Text(
-            text = if (art != null) "Oakhaven · v0.4.13" else "Oakhaven · v0.4.13 (맵 로딩 실패)",
+            text = if (art != null) "Oakhaven · v0.4.14" else "Oakhaven · v0.4.14 (맵 로딩 실패)",
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,

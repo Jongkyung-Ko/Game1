@@ -110,6 +110,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         heroScale = 1.08f,
                         mercScale = 0.82f,
                         frontIndex = vm.frontIndex,
+                        slots = vm.partyDrawSlots(vm.pubHeroX, vm.pubHeroY),
                     )
                 }
             }
