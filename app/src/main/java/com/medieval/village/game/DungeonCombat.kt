@@ -29,7 +29,7 @@ data class MeleeSlashFx(
     val y: Float,
     val facing: Facing,
     var age: Float = 0f,
-    val duration: Float = 0.28f,
+    val duration: Float = 0.34f,
 ) {
     val progress: Float get() = (age / duration).coerceIn(0f, 1f)
     val alive: Boolean get() = age < duration
