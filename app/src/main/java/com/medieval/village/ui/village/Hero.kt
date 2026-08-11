@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import com.medieval.village.game.Facing
+import com.medieval.village.game.HeroAnimKind
 import kotlin.math.sin
 
 private val Skin = Color(0xFFE7B98F)
@@ -40,8 +41,13 @@ fun DrawScope.drawHero(
     phase: Float,
     scale: Float = 1f,
     art: CustomArt? = null,
+    animKind: HeroAnimKind = HeroAnimKind.IDLE,
+    animFrame: Int = 0,
 ) {
-    val bob = if (walking) sin(phase) * 2.5f else 0f
+    val attacking = animKind == HeroAnimKind.SLASH ||
+        animKind == HeroAnimKind.BOW ||
+        animKind == HeroAnimKind.MAGIC
+    val bob = if (walking && !attacking) sin(phase) * 2.5f else 0f
     if (art != null) {
         drawCustomHero(
             art = art,
@@ -49,6 +55,10 @@ fun DrawScope.drawHero(
             y = y + bob,
             facing = facing,
             worldHeight = 96f * scale,
+            walking = walking,
+            walkPhase = phase,
+            animKind = animKind,
+            animFrame = animFrame,
         )
         return
     }

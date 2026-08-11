@@ -113,6 +113,8 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val slashFx = vm.meleeSlashFx
             val projectiles = vm.dungeonProjectiles.toList()
             val combatFrame = vm.dungeonCombatFrame
+            val heroAnimKind = vm.heroAnimKind
+            val heroAnimFrame = vm.heroAnimFrame
 
             Canvas(
                 modifier = Modifier
@@ -166,7 +168,12 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         drawDungeonMonster(atlas, art, monster)
                     }
                     projectiles.forEach { drawDungeonProjectile(it) }
-                    slashFx?.let { drawMeleeSlashFx(it) }
+                    // 칼 휘두르기 시트에 초승달이 포함되어 있으면 별도 FX는 생략
+                    val useSlashSheet = art?.hasHeroAnim("slash") == true &&
+                        heroAnimKind == com.medieval.village.game.HeroAnimKind.SLASH
+                    if (!useSlashSheet) {
+                        slashFx?.let { drawMeleeSlashFx(it) }
+                    }
                     party.forEachIndexed { index, mercenary ->
                         drawMercenary(
                             mercenary = mercenary,
@@ -187,10 +194,12 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         walkPhase,
                         scale = 0.78f,
                         art = art,
+                        animKind = heroAnimKind,
+                        animFrame = heroAnimFrame,
                     )
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.7 Pad combat", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.8 Hero anim", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(

@@ -26,6 +26,7 @@ class CustomArt(
     private val chars: Map<String, ImageBitmap>,
     private val heroes: Map<String, ImageBitmap>,
     private val buildings: Map<String, ImageBitmap>,
+    private val heroAnims: Map<String, List<ImageBitmap>>,
 ) {
     fun charOrNull(name: String): ImageBitmap? = chars[name]
 
@@ -34,6 +35,14 @@ class CustomArt(
     fun heroSpriteOrNull(facingKey: String): ImageBitmap? = heroes[facingKey]
 
     fun buildingOrNull(key: String): ImageBitmap? = buildings[key]
+
+    fun heroAnimFrameOrNull(set: String, frame: Int): ImageBitmap? {
+        val list = heroAnims[set] ?: return null
+        if (list.isEmpty()) return null
+        return list[frame.coerceIn(0, list.lastIndex)]
+    }
+
+    fun hasHeroAnim(set: String): Boolean = heroAnims[set]?.isNotEmpty() == true
 
     fun zombieSpriteOrNull(kind: String): ImageBitmap? = when (kind) {
         "shambler" -> charOrNull("zombie_shambler")
@@ -62,6 +71,8 @@ class CustomArt(
 
         private val HERO_KEYS = listOf("front", "back", "side", "portrait")
         private val BUILDING_KEYS = listOf("forge", "tower", "arena", "camp")
+        private val HERO_ANIM_SETS = listOf("walk_side", "walk_down", "slash", "bow", "magic")
+        private const val HERO_ANIM_FRAMES = 4
 
         fun loadOrNull(context: Context): CustomArt? {
             cached?.let { return it }
@@ -89,11 +100,25 @@ class CustomArt(
                             buildings[key] = it
                         }
                     }
+                    val heroAnims = LinkedHashMap<String, List<ImageBitmap>>()
+                    HERO_ANIM_SETS.forEach { set ->
+                        val frames = ArrayList<ImageBitmap>(HERO_ANIM_FRAMES)
+                        for (i in 0 until HERO_ANIM_FRAMES) {
+                            loadAsset(
+                                app,
+                                "custom/hero_anim/frames/${set}_$i.png",
+                                cleanEdges = true,
+                            )?.let { frames += it }
+                        }
+                        if (frames.isNotEmpty()) heroAnims[set] = frames
+                    }
+                    Log.i(TAG, "Loaded hero anim sets: ${heroAnims.keys}")
                     val art = CustomArt(
                         villageMap = village,
                         chars = chars,
                         heroes = heroes,
                         buildings = buildings,
+                        heroAnims = heroAnims,
                     )
                     cached = art
                     art
@@ -262,21 +287,20 @@ fun DrawScope.drawCustomHero(
     y: Float,
     facing: Facing,
     worldHeight: Float = 96f,
+    walking: Boolean = false,
+    walkPhase: Float = 0f,
+    animKind: com.medieval.village.game.HeroAnimKind = com.medieval.village.game.HeroAnimKind.IDLE,
+    animFrame: Int = 0,
 ) {
-    val key = when (facing) {
-        Facing.UP -> "back"
-        Facing.LEFT, Facing.RIGHT -> "side"
-        Facing.DOWN -> "front"
-    }
-    val sprite = art.heroSpriteOrNull(key)
-        ?: art.heroSpriteOrNull("front")
-        ?: art.charOrNull("warrior")
-        ?: return
-    drawCustomSprite(
-        image = sprite,
-        cx = x,
-        footY = y,
+    drawAnimatedHero(
+        art = art,
+        x = x,
+        y = y,
+        facing = facing,
+        walking = walking,
+        walkPhase = walkPhase,
         worldHeight = worldHeight,
-        mirrorX = facing == Facing.LEFT,
+        animKind = animKind,
+        animFrame = animFrame,
     )
 }

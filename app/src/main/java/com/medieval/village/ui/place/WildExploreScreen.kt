@@ -90,7 +90,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.7 Eastern forest",
+        watermark = "v0.4.8 Eastern forest",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -106,7 +106,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.7 Southern desert",
+        watermark = "v0.4.8 Southern desert",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -122,7 +122,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.7 Northern glacier",
+        watermark = "v0.4.8 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -182,6 +182,8 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
             val slashFx = vm.meleeSlashFx
             val projectiles = vm.dungeonProjectiles.toList()
             val combatFrame = vm.dungeonCombatFrame
+            val heroAnimKind = vm.heroAnimKind
+            val heroAnimFrame = vm.heroAnimFrame
 
             Canvas(
                 modifier = Modifier
@@ -229,7 +231,11 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                         drawWildBeast(atlas, theme, monster)
                     }
                     projectiles.forEach { drawDungeonProjectile(it) }
-                    slashFx?.let { drawMeleeSlashFx(it) }
+                    val useSlashSheet = art?.hasHeroAnim("slash") == true &&
+                        heroAnimKind == com.medieval.village.game.HeroAnimKind.SLASH
+                    if (!useSlashSheet) {
+                        slashFx?.let { drawMeleeSlashFx(it) }
+                    }
                     party.forEachIndexed { index, mercenary ->
                         drawMercenary(
                             mercenary = mercenary,
@@ -242,7 +248,17 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                             art = art,
                         )
                     }
-                    drawHero(heroX, heroY, facing, walking, walkPhase, scale = 0.78f, art = art)
+                    drawHero(
+                        heroX,
+                        heroY,
+                        facing,
+                        walking,
+                        walkPhase,
+                        scale = 0.78f,
+                        art = art,
+                        animKind = heroAnimKind,
+                        animFrame = heroAnimFrame,
+                    )
                 }
                 drawWildMinimap(map, theme, heroX, heroY, viewW, viewH)
                 wildLabel(ui.watermark, 14f, 28f, 18f, ui.border)

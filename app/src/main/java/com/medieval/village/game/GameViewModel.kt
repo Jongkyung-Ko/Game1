@@ -166,7 +166,7 @@ class GameViewModel : ViewModel() {
         private set
     var dungeonPadY by mutableFloatStateOf(0f)
         private set
-    /** 근접 초승달 참격 연출 */
+    /** 근접 초승달 참격 연출 (폴백용 — 시트 애니메이션이 있으면 화면에서 생략) */
     var meleeSlashFx by mutableStateOf<MeleeSlashFx?>(null)
         private set
     /** 화살·마법 탄환 */
@@ -177,6 +177,14 @@ class GameViewModel : ViewModel() {
     /** 공격 버튼 활성 여부 (쿨다운/마나) */
     var attackReady by mutableStateOf(true)
         private set
+    /** 주인공 스프라이트 애니메이션 */
+    var heroAnimKind by mutableStateOf(HeroAnimKind.IDLE)
+        private set
+    var heroAnimFrame by mutableIntStateOf(0)
+        private set
+    private var heroAnimTime = 0f
+    private var attackAnimPlaying = false
+    private val attackAnimDuration = 0.42f
 
     private val path = ArrayDeque<Waypoint>()
     private var pendingEnter: PlaceId? = null
@@ -1005,6 +1013,10 @@ class GameViewModel : ViewModel() {
         contactDamageAcc = 0f
         dungeonCombatFrame = 0
         attackReady = true
+        heroAnimKind = HeroAnimKind.IDLE
+        heroAnimFrame = 0
+        heroAnimTime = 0f
+        attackAnimPlaying = false
     }
 
     fun setDungeonPad(dx: Float, dy: Float) {
@@ -1058,6 +1070,13 @@ class GameViewModel : ViewModel() {
         val dmg = (totalAtk + partyPower / 2 + blessBonus() / 2 + Random.nextInt(0, 5))
             .coerceAtLeast(4)
         emitSfx("hit")
+        startAttackAnim(
+            when (style) {
+                WeaponStyle.MELEE -> HeroAnimKind.SLASH
+                WeaponStyle.BOW -> HeroAnimKind.BOW
+                WeaponStyle.MAGIC -> HeroAnimKind.MAGIC
+            }
+        )
         when (style) {
             WeaponStyle.MELEE -> performMeleeSlash(map, dmg)
             WeaponStyle.BOW -> spawnProjectile(WeaponStyle.BOW, dmg, life = 1.15f)
@@ -1067,6 +1086,36 @@ class GameViewModel : ViewModel() {
             }
         }
         refreshAttackReady()
+    }
+
+    private fun startAttackAnim(kind: HeroAnimKind) {
+        heroAnimKind = kind
+        heroAnimFrame = 0
+        heroAnimTime = 0f
+        attackAnimPlaying = true
+        dungeonCombatFrame++
+    }
+
+    private fun tickHeroAnim(dt: Float, moving: Boolean) {
+        if (attackAnimPlaying) {
+            heroAnimTime += dt
+            heroAnimFrame = ((heroAnimTime / attackAnimDuration) * 4f).toInt().coerceIn(0, 3)
+            if (heroAnimTime >= attackAnimDuration) {
+                attackAnimPlaying = false
+                heroAnimKind = if (moving) HeroAnimKind.WALK else HeroAnimKind.IDLE
+                heroAnimFrame = 0
+                heroAnimTime = 0f
+            }
+            dungeonCombatFrame++
+            return
+        }
+        if (moving) {
+            heroAnimKind = HeroAnimKind.WALK
+            heroAnimFrame = (((walkPhase * 2.2f).toInt() % 4) + 4) % 4
+        } else {
+            heroAnimKind = HeroAnimKind.IDLE
+            heroAnimFrame = 0
+        }
     }
 
     private fun performMeleeSlash(map: DungeonFloor, damage: Int) {
@@ -1212,6 +1261,10 @@ class GameViewModel : ViewModel() {
         attackCooldown = 0f
         contactDamageAcc = 0f
         attackReady = true
+        heroAnimKind = HeroAnimKind.IDLE
+        heroAnimFrame = 0
+        heroAnimTime = 0f
+        attackAnimPlaying = false
         dungeonHint = "stairs_up"
         when (biome) {
             ExploreBiome.FOREST -> {
@@ -1422,12 +1475,15 @@ class GameViewModel : ViewModel() {
             }
             if (dungeonWalking) {
                 walkPhase += dt * 10f
-                facing = if (abs(dungeonPadX) > abs(dungeonPadY)) {
-                    if (dungeonPadX > 0) Facing.RIGHT else Facing.LEFT
-                } else {
-                    if (dungeonPadY > 0) Facing.DOWN else Facing.UP
+                if (!attackAnimPlaying) {
+                    facing = if (abs(dungeonPadX) > abs(dungeonPadY)) {
+                        if (dungeonPadX > 0) Facing.RIGHT else Facing.LEFT
+                    } else {
+                        if (dungeonPadY > 0) Facing.DOWN else Facing.UP
+                    }
                 }
             }
+            tickHeroAnim(dt, moving = dungeonWalking)
             return
         }
 
@@ -1435,6 +1491,7 @@ class GameViewModel : ViewModel() {
         val target = dungeonTarget
         if (target == null) {
             dungeonWalking = false
+            tickHeroAnim(dt, moving = false)
             return
         }
 
@@ -1452,6 +1509,7 @@ class GameViewModel : ViewModel() {
             if (pc != null && pr != null) {
                 openDungeonChest(pc, pr)
             }
+            tickHeroAnim(dt, moving = false)
             return
         }
 
@@ -1465,16 +1523,20 @@ class GameViewModel : ViewModel() {
                 dungeonTarget = null
                 dungeonWalking = false
                 pendingDungeonMonster = null
+                tickHeroAnim(dt, moving = false)
                 return
             }
         }
         dungeonWalking = true
         walkPhase += dt * 10f
-        facing = if (abs(dx) > abs(dy)) {
-            if (dx > 0) Facing.RIGHT else Facing.LEFT
-        } else {
-            if (dy > 0) Facing.DOWN else Facing.UP
+        if (!attackAnimPlaying) {
+            facing = if (abs(dx) > abs(dy)) {
+                if (dx > 0) Facing.RIGHT else Facing.LEFT
+            } else {
+                if (dy > 0) Facing.DOWN else Facing.UP
+            }
         }
+        tickHeroAnim(dt, moving = true)
     }
 
     private fun tickAttackFx(dt: Float) {

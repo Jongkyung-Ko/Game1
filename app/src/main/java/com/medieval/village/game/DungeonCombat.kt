@@ -2,6 +2,15 @@ package com.medieval.village.game
 
 import com.medieval.village.model.WeaponStyle
 
+/** 주인공 스프라이트 시트 재생 종류 */
+enum class HeroAnimKind {
+    IDLE,
+    WALK,
+    SLASH,
+    BOW,
+    MAGIC,
+}
+
 /** 던전/탐험에서 발사되는 화살·마법 탄환 */
 data class DungeonProjectile(
     var x: Float,
