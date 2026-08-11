@@ -180,13 +180,14 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         frontAnimKind = heroAnimKind,
                         frontAnimFrame = heroAnimFrame,
                         art = art,
-                        scale = 0.78f,
+                        scale = 0.88f,
+                        rearScaleFactor = 0.78f,
                     )
                     // 캐릭터 위에 반달 참격이 보이도록 나중에 그림
                     slashFx?.let { drawMeleeSlashFx(it) }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.12 Monster AI", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.13 Front scale", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(

@@ -107,8 +107,8 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         walkPhase = walkPhase,
                         mercs = vm.activeParty,
                         art = art,
-                        heroScale = 1.05f,
-                        mercScale = 0.95f,
+                        heroScale = 1.08f,
+                        mercScale = 0.82f,
                         frontIndex = vm.frontIndex,
                     )
                 }

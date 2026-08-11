@@ -81,8 +81,8 @@ fun DrawScope.drawWalkableInterior(
         walkPhase = walkPhase,
         mercs = companions,
         art = art,
-        heroScale = 1.0f,
-        mercScale = 0.92f,
+        heroScale = 1.05f,
+        mercScale = 0.80f,
         frontIndex = frontIndex,
     )
 }

@@ -46,10 +46,12 @@ import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.TownTiles
 import com.medieval.village.ui.village.drawBattleLineParty
+import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawKenneySprite
 import com.medieval.village.ui.village.drawKenneySpriteAsset
 import com.medieval.village.ui.village.drawKenneyTile
@@ -122,7 +124,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.12 Northern glacier",
+        watermark = "v0.4.13 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -229,7 +231,7 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                         WildTheme.GLACIER -> drawGlacierFloor(atlas, map)
                     }
                     map.monsters.filter { it.alive }.forEach { monster ->
-                        drawWildBeast(atlas, theme, monster)
+                        drawWildBeast(atlas, art, theme, monster)
                     }
                     projectiles.forEach { drawDungeonProjectile(it) }
                     drawBattleLineParty(
@@ -243,7 +245,8 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                         frontAnimKind = heroAnimKind,
                         frontAnimFrame = heroAnimFrame,
                         art = art,
-                        scale = 0.78f,
+                        scale = 0.88f,
+                        rearScaleFactor = 0.78f,
                     )
                     slashFx?.let { drawMeleeSlashFx(it) }
                 }
@@ -519,10 +522,33 @@ private fun DrawScope.drawWildSpecialTiles(
     }
 }
 
-private fun DrawScope.drawWildBeast(atlas: KenneyAtlas?, theme: WildTheme, monster: DungeonMonster) {
+private fun DrawScope.drawWildBeast(
+    atlas: KenneyAtlas?,
+    art: CustomArt?,
+    theme: WildTheme,
+    monster: DungeonMonster,
+) {
     val x = monster.x
     val y = monster.y
     drawOval(Color(0x55000000), Offset(x - 20f, y - 4f), Size(40f, 12f))
+
+    val anim = art?.monsterAnimFrameOrNull(
+        kind = monster.kind,
+        attacking = monster.attacking,
+        walking = monster.moving,
+        frame = monster.animFrame,
+    )
+    if (anim != null && art.hasMonsterAnim(monster.kind)) {
+        drawCustomSprite(
+            image = anim,
+            cx = x,
+            footY = y,
+            worldHeight = 66f,
+            mirrorX = monster.facingLeft,
+        )
+        wildLabel(monster.name, x - 36f, y + 14f, 13f, Color(0xFFF3E4C5))
+        return
+    }
 
     when (theme) {
         WildTheme.FOREST -> drawForestBeast(atlas, monster, x, y)

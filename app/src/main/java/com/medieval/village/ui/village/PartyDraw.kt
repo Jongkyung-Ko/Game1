@@ -8,7 +8,7 @@ import com.medieval.village.model.Mercenary
 
 /**
  * 마을·실내·던전 공통: [frontIndex] 선두가 lead 위치, 나머지는 뒤 일렬.
- * 선두는 공격/걷기 애니, 후열도 이동 중이면 걷기 애니가 돌아간다.
+ * 선두는 크게, 후열(주인공 포함)은 작게 그린다.
  */
 fun DrawScope.drawBattleLineParty(
     leadX: Float,
@@ -21,8 +21,10 @@ fun DrawScope.drawBattleLineParty(
     frontAnimKind: HeroAnimKind,
     frontAnimFrame: Int,
     art: CustomArt?,
+    /** 선두 크기 */
     scale: Float = 0.78f,
-    mercScaleFactor: Float = 0.92f,
+    /** 후열 = scale * rearScaleFactor */
+    rearScaleFactor: Float = 0.82f,
 ) {
     val line = PartyFormation.battleLine(frontIndex, party)
     for (i in line.lastIndex downTo 0) {
@@ -30,6 +32,7 @@ fun DrawScope.drawBattleLineParty(
         val x = leadX + ox
         val y = leadY + oy
         val isFront = i == 0
+        val actorScale = if (isFront) scale else scale * rearScaleFactor
         val phase = walkPhase + i * 0.55f
         val attacking = isFront && (
             frontAnimKind == HeroAnimKind.SLASH ||
@@ -51,7 +54,7 @@ fun DrawScope.drawBattleLineParty(
                 facing,
                 walking = actorWalking,
                 phase = phase,
-                scale = scale,
+                scale = actorScale,
                 art = art,
                 animKind = animKind,
                 animFrame = animFrame,
@@ -64,7 +67,7 @@ fun DrawScope.drawBattleLineParty(
                 facing = facing,
                 walking = actorWalking,
                 phase = phase,
-                scale = scale * mercScaleFactor,
+                scale = actorScale,
                 art = art,
                 animKind = animKind,
                 animFrame = animFrame,
@@ -85,7 +88,7 @@ fun DrawScope.drawVillageFollowParty(
     mercs: List<Mercenary>,
     art: CustomArt?,
     heroScale: Float = 1f,
-    mercScale: Float = 0.95f,
+    mercScale: Float = 0.82f,
     frontIndex: Int = 0,
     frontAnimKind: HeroAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
     frontAnimFrame: Int = 0,
@@ -102,7 +105,7 @@ fun DrawScope.drawVillageFollowParty(
         frontAnimFrame = frontAnimFrame,
         art = art,
         scale = heroScale,
-        mercScaleFactor = if (heroScale <= 0f) 0.92f else mercScale / heroScale,
+        rearScaleFactor = if (heroScale <= 0f) 0.82f else mercScale / heroScale,
     )
 }
 

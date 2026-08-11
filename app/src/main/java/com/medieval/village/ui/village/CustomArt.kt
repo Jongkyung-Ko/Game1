@@ -55,14 +55,40 @@ class CustomArt(
         else -> charOrNull("zombie_shambler")
     }
 
-    /** 몬스터 애니메이션 키 (kind → shambler 등) */
-    fun zombieAnimKey(kind: String): String = when (kind) {
+    /** 던전·야외 몬스터 애니메이션 세트 키 */
+    fun monsterAnimKey(kind: String): String = when (kind) {
+        // 던전 좀비
         "shambler", "runner", "bloater", "armored", "blacksmith", "farmer", "golem" -> kind
-        else -> "shambler"
+        // 숲
+        "wolf", "dire_wolf" -> "wolf"
+        "bear" -> "bear"
+        "boar", "giant_boar" -> "boar"
+        "fox", "ice_fox", "snow_hare", "rabbit" -> "fox"
+        "deer", "stag" -> "deer"
+        "snake" -> "snake"
+        "forest_spider", "camel_spider", "ice_spider" -> "spider"
+        "owl", "frost_owl" -> "fox"
+        // 사막
+        "scorpion", "giant_scorpion", "deathstalker" -> "scorpion"
+        "desert_fox" -> "desert_fox"
+        "sand_snake", "sidewinder" -> "snake"
+        "sand_golem" -> "sand_golem"
+        "desert_drake" -> "desert_drake"
+        "vulture" -> "desert_fox"
+        "dung_beetle", "dune_worm" -> "scorpion"
+        // 빙하
+        "penguin", "ice_penguin", "frost_penguin", "seal" -> "penguin"
+        "polar_bear" -> "polar_bear"
+        "yeti" -> "yeti"
+        "ice_wolf" -> "ice_wolf"
+        "ice_elemental" -> "ice_elemental"
+        else -> "wolf"
     }
 
-    fun zombieAnimFrameOrNull(kind: String, attacking: Boolean, walking: Boolean, frame: Int): ImageBitmap? {
-        val key = zombieAnimKey(kind)
+    fun zombieAnimKey(kind: String): String = monsterAnimKey(kind)
+
+    fun monsterAnimFrameOrNull(kind: String, attacking: Boolean, walking: Boolean, frame: Int): ImageBitmap? {
+        val key = monsterAnimKey(kind)
         if (attacking) {
             heroAnimFrameOrNull("${key}_attack", frame)?.let { return it }
         }
@@ -73,8 +99,13 @@ class CustomArt(
         return zombieSpriteOrNull(kind)
     }
 
-    fun hasZombieAnim(kind: String): Boolean =
-        hasHeroAnim("${zombieAnimKey(kind)}_walk") || hasHeroAnim("${zombieAnimKey(kind)}_attack")
+    fun zombieAnimFrameOrNull(kind: String, attacking: Boolean, walking: Boolean, frame: Int): ImageBitmap? =
+        monsterAnimFrameOrNull(kind, attacking, walking, frame)
+
+    fun hasMonsterAnim(kind: String): Boolean =
+        hasHeroAnim("${monsterAnimKey(kind)}_walk") || hasHeroAnim("${monsterAnimKey(kind)}_attack")
+
+    fun hasZombieAnim(kind: String): Boolean = hasMonsterAnim(kind)
 
     companion object {
         private const val TAG = "CustomArt"
@@ -107,6 +138,23 @@ class CustomArt(
             "blacksmith_walk", "blacksmith_attack",
             "farmer_walk", "farmer_attack",
             "golem_walk", "golem_attack",
+            // 야외 몬스터 걷기/공격
+            "wolf_walk", "wolf_attack",
+            "bear_walk", "bear_attack",
+            "boar_walk", "boar_attack",
+            "fox_walk", "fox_attack",
+            "deer_walk", "deer_attack",
+            "spider_walk", "spider_attack",
+            "scorpion_walk", "scorpion_attack",
+            "snake_walk", "snake_attack",
+            "sand_golem_walk", "sand_golem_attack",
+            "desert_drake_walk", "desert_drake_attack",
+            "desert_fox_walk", "desert_fox_attack",
+            "polar_bear_walk", "polar_bear_attack",
+            "yeti_walk", "yeti_attack",
+            "penguin_walk", "penguin_attack",
+            "ice_wolf_walk", "ice_wolf_attack",
+            "ice_elemental_walk", "ice_elemental_attack",
         )
         private const val HERO_ANIM_FRAMES = 4
 
