@@ -20,11 +20,13 @@ enum class DungeonTile {
 data class DungeonMonster(
     val id: String,
     val name: String,
-    /** shambler / runner / bloater / armored / blacksmith / farmer / golem */
+    /** shambler / runner / bloater / armored / blacksmith / farmer / golem / boss_* */
     val kind: String,
     var x: Float,
     var y: Float,
     val power: Int,
+    /** 10층마다 등장하는 보스 */
+    val isBoss: Boolean = false,
     var alive: Boolean = true,
     var hp: Int = (power * 4).coerceAtLeast(24),
     val maxHp: Int = (power * 4).coerceAtLeast(24),
@@ -104,6 +106,20 @@ object DungeonFactory {
         "farmer" to "감염된 농부",
         "golem" to "저주받은 선생님",
     )
+
+    /** 10 / 20 / 30층… 순환 보스 */
+    private val bossRoster = listOf(
+        "boss_warden" to "지하 감시자",
+        "boss_abomination" to "역병 흉물",
+        "boss_lich" to "저주받은 리치",
+    )
+
+    fun isBossFloor(floor: Int): Boolean = floor > 0 && floor % 10 == 0
+
+    fun bossForFloor(floor: Int): Pair<String, String> {
+        val idx = ((floor / 10) - 1).coerceAtLeast(0) % bossRoster.size
+        return bossRoster[idx]
+    }
 
     fun generate(floor: Int, seed: Int = floor * 7919 + 42): DungeonFloor {
         val rng = Random(seed)
@@ -190,7 +206,9 @@ object DungeonFactory {
         }
 
         val monsters = mutableListOf<DungeonMonster>()
-        val monsterCount = 4 + floor + rng.nextInt(0, 3)
+        val bossFloor = isBossFloor(floor)
+        // 보스층은 일반 몹을 조금 줄여 보스가 돋보이게
+        val monsterCount = (4 + floor + rng.nextInt(0, 3) - if (bossFloor) 2 else 0).coerceAtLeast(3)
         var attempts = 0
         while (monsters.size < monsterCount && attempts < 200) {
             attempts++
@@ -221,6 +239,54 @@ object DungeonFactory {
             )
         }
 
+        if (bossFloor) {
+            val (kind, name) = bossForFloor(floor)
+            val power = 28 + floor * 16 + rng.nextInt(0, 12)
+            val maxHp = (power * 11).coerceAtLeast(180)
+            // 하층 계단 근처 끝방 — 내려가기 전 마주치게
+            val offsets = listOf(
+                -TILE * 1.6f to 0f,
+                TILE * 1.6f to 0f,
+                0f to -TILE * 1.4f,
+                0f to TILE * 1.4f,
+            )
+            var placed = false
+            for ((ox, oy) in offsets.shuffled(rng)) {
+                val bx = (downX + ox).coerceIn(TILE * 1.5f, (COLS - 1.5f) * TILE)
+                val by = (downY + oy).coerceIn(TILE * 1.5f, (ROWS - 1.5f) * TILE)
+                if (!isWalkableTile(tiles, bx, by)) continue
+                if (hypot(bx - spawnX, by - spawnY) < TILE * 3f) continue
+                monsters += DungeonMonster(
+                    id = "boss_${floor}",
+                    name = name,
+                    kind = kind,
+                    x = bx,
+                    y = by,
+                    power = power,
+                    isBoss = true,
+                    hp = maxHp,
+                    maxHp = maxHp,
+                )
+                placed = true
+                break
+            }
+            if (!placed) {
+                val bx = (downX - TILE * 1.2f).coerceIn(TILE * 1.5f, (COLS - 1.5f) * TILE)
+                val by = downY.coerceIn(TILE * 1.5f, (ROWS - 1.5f) * TILE)
+                monsters += DungeonMonster(
+                    id = "boss_${floor}",
+                    name = name,
+                    kind = kind,
+                    x = bx,
+                    y = by,
+                    power = power,
+                    isBoss = true,
+                    hp = maxHp,
+                    maxHp = maxHp,
+                )
+            }
+        }
+
         return DungeonFloor(
             floor = floor,
             cols = COLS,
@@ -233,5 +299,12 @@ object DungeonFactory {
             stairsDownY = downY,
             monsters = monsters
         )
+    }
+
+    private fun isWalkableTile(tiles: Array<DungeonTile>, x: Float, y: Float): Boolean {
+        val c = (x / TILE).toInt()
+        val r = (y / TILE).toInt()
+        if (c !in 0 until COLS || r !in 0 until ROWS) return false
+        return tiles[r * COLS + c] != DungeonTile.WALL
     }
 }

@@ -52,6 +52,9 @@ class CustomArt(
         "blacksmith" -> charOrNull("zombie_blacksmith")
         "farmer" -> charOrNull("zombie_farmer")
         "golem" -> charOrNull("golem_teacher")
+        "boss_warden" -> charOrNull("zombie_boss_warden")
+        "boss_abomination" -> charOrNull("zombie_boss_abomination")
+        "boss_lich" -> charOrNull("zombie_boss_lich")
         else -> charOrNull("zombie_shambler")
     }
 
@@ -59,6 +62,7 @@ class CustomArt(
     fun monsterAnimKey(kind: String): String = when (kind) {
         // 던전 좀비
         "shambler", "runner", "bloater", "armored", "blacksmith", "farmer", "golem" -> kind
+        "boss_warden", "boss_abomination", "boss_lich" -> kind
         // 숲
         "wolf", "dire_wolf" -> "wolf"
         "bear" -> "bear"
@@ -119,6 +123,7 @@ class CustomArt(
             "farmer", "teacher", "chef",
             "zombie_shambler", "zombie_runner", "zombie_bloater", "zombie_armored",
             "zombie_blacksmith", "zombie_farmer", "golem_teacher",
+            "zombie_boss_warden", "zombie_boss_abomination", "zombie_boss_lich",
         )
 
         private val HERO_KEYS = listOf("front", "back", "side", "portrait")
@@ -138,6 +143,10 @@ class CustomArt(
             "blacksmith_walk", "blacksmith_attack",
             "farmer_walk", "farmer_attack",
             "golem_walk", "golem_attack",
+            // 던전 보스
+            "boss_warden_walk", "boss_warden_attack",
+            "boss_abomination_walk", "boss_abomination_attack",
+            "boss_lich_walk", "boss_lich_attack",
             // 야외 몬스터 걷기/공격
             "wolf_walk", "wolf_attack",
             "bear_walk", "bear_attack",

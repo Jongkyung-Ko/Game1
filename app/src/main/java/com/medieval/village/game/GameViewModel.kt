@@ -1354,9 +1354,14 @@ class GameViewModel : ViewModel() {
         val floor = dungeonFloorNumber
         val biome = currentBiome()
         val wild = biome != ExploreBiome.DUNGEON
-        val gold = (if (wild) 14 else 18) + floor * (if (wild) 11 else 14) + Random.nextInt(0, 16)
-        val exp = (if (wild) 16 else 20) + floor * (if (wild) 10 else 12)
-        say("${monster.name}을(를) 쓰러뜨렸다! (+${gold}G, EXP +$exp)")
+        val bossMult = if (monster.isBoss) 3 else 1
+        val gold = ((if (wild) 14 else 18) + floor * (if (wild) 11 else 14) + Random.nextInt(0, 16)) * bossMult
+        val exp = ((if (wild) 16 else 20) + floor * (if (wild) 10 else 12)) * bossMult
+        if (monster.isBoss) {
+            say("보스 ${monster.name}을(를) 쓰러뜨렸다! (+${gold}G, EXP +$exp)")
+        } else {
+            say("${monster.name}을(를) 쓰러뜨렸다! (+${gold}G, EXP +$exp)")
+        }
         player = player.copy(gold = player.gold + gold)
         when (biome) {
             ExploreBiome.FOREST -> if (floor > player.forestDepth) player = player.copy(forestDepth = floor)
@@ -1369,7 +1374,8 @@ class GameViewModel : ViewModel() {
         if (activeParty.isNotEmpty()) {
             say("원정대 용병도 경험을 쌓았다. (+${exp} EXP)")
         }
-        if (Random.nextInt(100) < 40) {
+        val lootChance = if (monster.isBoss) 100 else 40
+        if (Random.nextInt(100) < lootChance) {
             val loot = when (biome) {
                 ExploreBiome.FOREST -> ItemCatalog.forestLoot.random()
                 ExploreBiome.DESERT -> ItemCatalog.desertLoot.random()
@@ -1378,11 +1384,12 @@ class GameViewModel : ViewModel() {
             }
             addItem(loot)
             say(
-                when (biome) {
-                    ExploreBiome.FOREST -> "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
-                    ExploreBiome.DESERT -> "모래 속에서 ${loot.name}을(를) 주웠다."
-                    ExploreBiome.GLACIER -> "얼음 틈에서 ${loot.name}을(를) 챙겼다."
-                    ExploreBiome.DUNGEON -> "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
+                when {
+                    monster.isBoss -> "보스의 잔해에서 ${loot.name}을(를) 챙겼다."
+                    biome == ExploreBiome.FOREST -> "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
+                    biome == ExploreBiome.DESERT -> "모래 속에서 ${loot.name}을(를) 주웠다."
+                    biome == ExploreBiome.GLACIER -> "얼음 틈에서 ${loot.name}을(를) 챙겼다."
+                    else -> "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
                 }
             )
         }
@@ -1465,10 +1472,14 @@ class GameViewModel : ViewModel() {
             ExploreBiome.DUNGEON -> {
                 if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
                 say("─── 지하 ${floor}층 · 오염된 통로 ───")
-                say(
-                    if (floor == 1) "한때 포도주 보관소와 하수도였던 길이 좀비의 숨결로 가득하다."
-                    else "더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다."
-                )
+                when {
+                    DungeonFactory.isBossFloor(floor) -> {
+                        val bossName = DungeonFactory.bossForFloor(floor).second
+                        say("이 층의 주인이 깨어 있다 — 보스 『$bossName』. 하층 계단 근처를 경계하라.")
+                    }
+                    floor == 1 -> say("한때 포도주 보관소와 하수도였던 길이 좀비의 숨결로 가득하다.")
+                    else -> say("더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다.")
+                }
             }
         }
     }
@@ -1794,8 +1805,20 @@ class GameViewModel : ViewModel() {
         "armored" -> 52f
         "golem" -> 46f
         "bloater" -> 42f
+        "boss_warden" -> 48f
+        "boss_abomination" -> 36f
+        "boss_lich" -> 44f
         else -> 58f
     }
+
+    private fun monsterAggroRange(monster: DungeonMonster): Float =
+        if (monster.isBoss) MONSTER_AGGRO_RANGE + 55f else MONSTER_AGGRO_RANGE
+
+    private fun monsterAttackRange(monster: DungeonMonster): Float =
+        if (monster.isBoss) MONSTER_ATTACK_RANGE + 30f else MONSTER_ATTACK_RANGE
+
+    private fun monsterAttackCooldown(monster: DungeonMonster): Float =
+        if (monster.isBoss) MONSTER_ATTACK_COOLDOWN + 0.35f else MONSTER_ATTACK_COOLDOWN
 
     /**
      * 주인공이 가까이 오면 추격하고, 사거리에 들어오면 공격 애니와 함께 타격한다.
@@ -1821,7 +1844,7 @@ class GameViewModel : ViewModel() {
                 if (!monster.attackHitApplied && monster.animTime >= MONSTER_ATTACK_DURATION * 0.42f) {
                     monster.attackHitApplied = true
                     val dist = hypot(dungeonHeroX - monster.x, dungeonHeroY - monster.y)
-                    if (dist <= MONSTER_ATTACK_RANGE + 14f) {
+                    if (dist <= monsterAttackRange(monster) + 14f) {
                         resolveMonsterAttackHit(monster)
                     }
                 }
@@ -1838,16 +1861,18 @@ class GameViewModel : ViewModel() {
             val dx = dungeonHeroX - monster.x
             val dy = dungeonHeroY - monster.y
             val dist = hypot(dx, dy)
+            val aggro = monsterAggroRange(monster)
+            val atkRange = monsterAttackRange(monster)
 
-            if (dist <= MONSTER_AGGRO_RANGE && dist > 0.5f) {
+            if (dist <= aggro && dist > 0.5f) {
                 monster.facingLeft = dx < 0f
-                if (dist <= MONSTER_ATTACK_RANGE && monster.attackCooldown <= 0f) {
+                if (dist <= atkRange && monster.attackCooldown <= 0f) {
                     monster.attacking = true
                     monster.attackHitApplied = false
                     monster.animTime = 0f
                     monster.animFrame = 0
                     monster.moving = false
-                    monster.attackCooldown = MONSTER_ATTACK_COOLDOWN
+                    monster.attackCooldown = monsterAttackCooldown(monster)
                     dirty = true
                 } else {
                     val speed = monsterChaseSpeed(monster.kind)
@@ -1897,7 +1922,7 @@ class GameViewModel : ViewModel() {
     }
 
     private fun tryMoveMonster(map: DungeonFloor, monster: DungeonMonster, x: Float, y: Float): Boolean {
-        val r = 12f
+        val r = if (monster.isBoss) 18f else 12f
         if (!map.isWalkable(x, y) ||
             !map.isWalkable(x - r, y) || !map.isWalkable(x + r, y) ||
             !map.isWalkable(x, y - r) || !map.isWalkable(x, y + r)
@@ -1908,14 +1933,16 @@ class GameViewModel : ViewModel() {
     }
 
     private fun resolveMonsterAttackHit(monster: DungeonMonster) {
-        val dmg = (monster.power - totalDef).coerceAtLeast(3) + Random.nextInt(0, 4)
+        val base = (monster.power - totalDef).coerceAtLeast(3) + Random.nextInt(0, 4)
+        val dmg = if (monster.isBoss) (base * 1.35f).toInt().coerceAtLeast(base + 4) else base
         val biome = currentBiome()
         say(
-            when (biome) {
-                ExploreBiome.FOREST -> "${monster.name}이(가) 덮친다! (HP -$dmg)"
-                ExploreBiome.DESERT -> "${monster.name}이(가) 찌른다! (HP -$dmg)"
-                ExploreBiome.GLACIER -> "${monster.name}이(가) 할퀸다! (HP -$dmg)"
-                ExploreBiome.DUNGEON -> "${monster.name}이(가) 물어뜯는다! (HP -$dmg)"
+            when {
+                monster.isBoss -> "보스 ${monster.name}의 일격! (HP -$dmg)"
+                biome == ExploreBiome.FOREST -> "${monster.name}이(가) 덮친다! (HP -$dmg)"
+                biome == ExploreBiome.DESERT -> "${monster.name}이(가) 찌른다! (HP -$dmg)"
+                biome == ExploreBiome.GLACIER -> "${monster.name}이(가) 할퀸다! (HP -$dmg)"
+                else -> "${monster.name}이(가) 물어뜯는다! (HP -$dmg)"
             }
         )
         emitSfx("hit")

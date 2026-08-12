@@ -94,6 +94,10 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Chip("기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
                 Chip("좀비 ${floor?.monsters?.count { it.alive } ?: 0}", Palette.Blood)
+                val bossAlive = floor?.monsters?.any { it.isBoss && it.alive } == true
+                if (bossAlive) {
+                    Chip("보스!", Palette.Blood)
+                }
             }
         }
 
@@ -190,7 +194,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.14 Pinch zoom", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.15 Boss floors", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(
@@ -556,7 +560,11 @@ private fun DrawScope.drawDungeonFloorFallback(map: DungeonFloor) {
 private fun DrawScope.drawDungeonMonster(atlas: KenneyAtlas?, art: CustomArt?, monster: DungeonMonster) {
     val x = monster.x
     val y = monster.y
-    drawOval(Color(0x55000000), Offset(x - 22f, y - 4f), Size(44f, 14f))
+    val boss = monster.isBoss
+    val bodyH = if (boss) 118f else 68f
+    val shadowW = if (boss) 72f else 44f
+    val shadowH = if (boss) 22f else 14f
+    drawOval(Color(0x55000000), Offset(x - shadowW / 2f, y - 4f), Size(shadowW, shadowH))
 
     val animSprite = art?.zombieAnimFrameOrNull(
         kind = monster.kind,
@@ -569,35 +577,58 @@ private fun DrawScope.drawDungeonMonster(atlas: KenneyAtlas?, art: CustomArt?, m
             image = animSprite,
             cx = x,
             footY = y,
-            worldHeight = 68f,
+            worldHeight = bodyH,
             mirrorX = monster.facingLeft,
         )
     } else {
         val kenneyId = when (monster.kind) {
-            "shambler", "bloater" -> DungeonTiles.SLIME
+            "shambler", "bloater", "boss_abomination" -> DungeonTiles.SLIME
             "runner" -> DungeonTiles.BAT
-            "armored", "blacksmith" -> DungeonTiles.ORC
+            "armored", "blacksmith", "boss_warden" -> DungeonTiles.ORC
             "farmer" -> DungeonTiles.SPIDER
-            "golem" -> DungeonTiles.SKELETON
+            "golem", "boss_lich" -> DungeonTiles.SKELETON
             else -> DungeonTiles.SLIME
         }
         val static = art?.zombieSpriteOrNull(monster.kind)
         when {
-            static != null -> drawCustomSprite(static, x, y, worldHeight = 64f, mirrorX = monster.facingLeft)
-            atlas != null -> drawKenneySprite(atlas.dungeon, kenneyId, x, y, size = 56f)
+            static != null -> drawCustomSprite(
+                static,
+                x,
+                y,
+                worldHeight = if (boss) 112f else 64f,
+                mirrorX = monster.facingLeft,
+            )
+            atlas != null -> drawKenneySprite(
+                atlas.dungeon,
+                kenneyId,
+                x,
+                y,
+                size = if (boss) 92f else 56f,
+            )
             else -> {
                 val body = Path().apply {
-                    moveTo(x - 18f, y)
-                    quadraticBezierTo(x - 20f, y - 34f, x, y - 38f)
-                    quadraticBezierTo(x + 20f, y - 34f, x + 18f, y)
+                    val w = if (boss) 32f else 18f
+                    val h = if (boss) 64f else 38f
+                    moveTo(x - w, y)
+                    quadraticBezierTo(x - w - 2f, y - h + 4f, x, y - h)
+                    quadraticBezierTo(x + w + 2f, y - h + 4f, x + w, y)
                     close()
                 }
-                drawPath(body, Color(0xFF6FBF5A))
+                drawPath(body, if (boss) Color(0xFF8B2E2E) else Color(0xFF6FBF5A))
                 drawPath(body, Color(0xFF2F5A28), style = Stroke(3f))
             }
         }
     }
-    drawLabel(monster.name, x - 48f, y + 14f, 13f, Color(0xFFE8D9B8))
+    val labelColor = if (boss) Color(0xFFFFD27A) else Color(0xFFE8D9B8)
+    val label = if (boss) "★ ${monster.name}" else monster.name
+    drawLabel(label, x - if (boss) 64f else 48f, y + 14f, if (boss) 15f else 13f, labelColor)
+    if (boss) {
+        // 간단한 체력 막대
+        val barW = 70f
+        val ratio = (monster.hp.toFloat() / monster.maxHp.coerceAtLeast(1)).coerceIn(0f, 1f)
+        drawRoundRect(Color(0xAA1A0C0C), Offset(x - barW / 2f, y - bodyH - 10f), Size(barW, 7f), CornerRadius(3f, 3f))
+        drawRoundRect(Color(0xFFC0392B), Offset(x - barW / 2f, y - bodyH - 10f), Size(barW * ratio, 7f), CornerRadius(3f, 3f))
+    }
 }
 
 private fun DrawScope.drawMinimap(
@@ -635,7 +666,9 @@ private fun DrawScope.drawMinimap(
         }
     }
     map.monsters.filter { it.alive }.forEach {
-        drawCircle(Color(0xFFC0392B), 2.2f, Offset(left + it.x * sx, top + it.y * sy))
+        val r = if (it.isBoss) 4.2f else 2.2f
+        val color = if (it.isBoss) Color(0xFFFF6B3D) else Color(0xFFC0392B)
+        drawCircle(color, r, Offset(left + it.x * sx, top + it.y * sy))
     }
     drawCircle(Color(0xFFF4D35E), 3.2f, Offset(left + heroX * sx, top + heroY * sy))
     drawRoundRect(
