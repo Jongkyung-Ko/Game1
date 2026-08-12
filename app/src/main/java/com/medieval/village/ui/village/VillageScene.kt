@@ -143,7 +143,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = if (art != null) "Oakhaven · v0.4.15" else "Oakhaven · v0.4.15 (맵 로딩 실패)",
+            text = if (art != null) "Oakhaven · v0.4.16" else "Oakhaven · v0.4.16 (맵 로딩 실패)",
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,

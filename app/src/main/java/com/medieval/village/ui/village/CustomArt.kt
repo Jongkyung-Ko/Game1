@@ -26,6 +26,7 @@ class CustomArt(
     private val chars: Map<String, ImageBitmap>,
     private val heroes: Map<String, ImageBitmap>,
     private val buildings: Map<String, ImageBitmap>,
+    private val interiors: Map<String, ImageBitmap>,
     private val heroAnims: Map<String, List<ImageBitmap>>,
 ) {
     fun charOrNull(name: String): ImageBitmap? = chars[name]
@@ -35,6 +36,8 @@ class CustomArt(
     fun heroSpriteOrNull(facingKey: String): ImageBitmap? = heroes[facingKey]
 
     fun buildingOrNull(key: String): ImageBitmap? = buildings[key]
+
+    fun interiorOrNull(key: String): ImageBitmap? = interiors[key]
 
     fun heroAnimFrameOrNull(set: String, frame: Int): ImageBitmap? {
         val list = heroAnims[set] ?: return null
@@ -128,6 +131,7 @@ class CustomArt(
 
         private val HERO_KEYS = listOf("front", "back", "side", "portrait")
         private val BUILDING_KEYS = listOf("forge", "tower", "arena", "camp")
+        private val INTERIOR_KEYS = listOf("home", "shop", "weapon_shop")
         private val HERO_ANIM_SETS = listOf(
             "walk_side", "walk_down", "slash", "bow", "magic",
             // 용병 애니메이션
@@ -193,6 +197,13 @@ class CustomArt(
                             buildings[key] = it
                         }
                     }
+                    val interiors = LinkedHashMap<String, ImageBitmap>()
+                    INTERIOR_KEYS.forEach { key ->
+                        loadAsset(app, "custom/interiors/$key.png", cleanEdges = false)?.let {
+                            interiors[key] = it
+                        }
+                    }
+                    Log.i(TAG, "Loaded interiors: ${interiors.keys}")
                     val heroAnims = LinkedHashMap<String, List<ImageBitmap>>()
                     HERO_ANIM_SETS.forEach { set ->
                         val frames = ArrayList<ImageBitmap>(HERO_ANIM_FRAMES)
@@ -211,6 +222,7 @@ class CustomArt(
                         chars = chars,
                         heroes = heroes,
                         buildings = buildings,
+                        interiors = interiors,
                         heroAnims = heroAnims,
                     )
                     cached = art

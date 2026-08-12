@@ -4,10 +4,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import com.medieval.village.game.Facing
 import com.medieval.village.game.PartyDrawSlot
 import com.medieval.village.model.InteriorNpc
@@ -23,6 +26,7 @@ import com.medieval.village.ui.village.TownTiles
 import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.drawVillageFollowParty
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
@@ -46,8 +50,11 @@ fun DrawScope.drawWalkableInterior(
 ) {
     val w = InteriorRoom.WORLD_W
     val h = InteriorRoom.WORLD_H
-    drawInteriorBackground(atlas, id, w, h)
-    drawInteriorFurniture(id)
+    val hasCartoonRoom = drawInteriorBackground(atlas, art, id, w, h)
+    // 풀룸 일러스트에 가구가 이미 들어가 있으면 벡터 가구는 생략
+    if (!hasCartoonRoom) {
+        drawInteriorFurniture(id)
+    }
 
     InteriorNpcCatalog.forPlace(id).forEachIndexed { index, npc ->
         val bob = sin(animTime * 2.6f + index) * 2f
@@ -139,7 +146,36 @@ private fun npcSpriteKey(npc: InteriorNpc): String =
         PlaceId.NORTH_GLACIER -> "mage"
     }
 
-private fun DrawScope.drawInteriorBackground(atlas: KenneyAtlas, id: PlaceId, w: Float, h: Float) {
+/** @return 카툰 풀룸 배경을 그렸으면 true (가구 오버레이 생략용) */
+private fun DrawScope.drawInteriorBackground(
+    atlas: KenneyAtlas,
+    art: CustomArt?,
+    id: PlaceId,
+    w: Float,
+    h: Float,
+): Boolean {
+    val interiorKey = when (id) {
+        PlaceId.HOME -> "home"
+        PlaceId.SHOP -> "shop"
+        PlaceId.WEAPON_SHOP -> "weapon_shop"
+        else -> null
+    }
+    val roomArt = interiorKey?.let { art?.interiorOrNull(it) }
+    if (roomArt != null) {
+        drawImage(
+            image = roomArt,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(roomArt.width, roomArt.height),
+            dstOffset = IntOffset.Zero,
+            dstSize = IntSize(w.roundToInt(), h.roundToInt()),
+            filterQuality = FilterQuality.Medium,
+        )
+        // 살짝 가장자리로 걷이도록 살짝 비네트
+        drawRect(Color(0x22000000), Offset.Zero, Size(w, h * 0.08f))
+        drawRect(Color(0x33000000), Offset(0f, h * 0.92f), Size(w, h * 0.08f))
+        return true
+    }
+
     val tile = 80f
     drawRect(Color(0xFF2B1C12), Offset.Zero, Size(w, h))
     drawRect(Color(0xFF3E2A1C), Offset(0f, 0f), Size(w, h * 0.36f))
@@ -165,6 +201,7 @@ private fun DrawScope.drawInteriorBackground(atlas: KenneyAtlas, id: PlaceId, w:
         else -> Color(0x33FFFFFF)
     }
     drawRect(accent, Offset(0f, h * 0.36f), Size(w, 8f))
+    return false
 }
 
 private fun DrawScope.drawSpeechBubble(cx: Float, top: Float, text: String, roomW: Float) {
