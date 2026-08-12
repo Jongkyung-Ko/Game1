@@ -158,6 +158,14 @@ private fun DrawScope.drawInteriorBackground(
         PlaceId.HOME -> "home"
         PlaceId.SHOP -> "shop"
         PlaceId.WEAPON_SHOP -> "weapon_shop"
+        PlaceId.INN -> "inn"
+        PlaceId.HOSPITAL -> "hospital"
+        PlaceId.CHURCH -> "church"
+        PlaceId.BLACKSMITH -> "blacksmith"
+        PlaceId.MAGIC_SCHOOL -> "magic_school"
+        PlaceId.ARENA -> "arena"
+        PlaceId.MERCENARY -> "mercenary"
+        PlaceId.PUB -> "pub"
         else -> null
     }
     val roomArt = interiorKey?.let { art?.interiorOrNull(it) }

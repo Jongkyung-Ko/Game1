@@ -131,7 +131,12 @@ class CustomArt(
 
         private val HERO_KEYS = listOf("front", "back", "side", "portrait")
         private val BUILDING_KEYS = listOf("forge", "tower", "arena", "camp")
-        private val INTERIOR_KEYS = listOf("home", "shop", "weapon_shop")
+        private val INTERIOR_KEYS = listOf(
+            "home", "shop", "weapon_shop",
+            "inn", "hospital", "church",
+            "blacksmith", "magic_school", "arena",
+            "mercenary", "pub",
+        )
         private val HERO_ANIM_SETS = listOf(
             "walk_side", "walk_down", "slash", "bow", "magic",
             // 용병 애니메이션

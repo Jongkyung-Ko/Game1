@@ -194,7 +194,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.16 Cartoon interiors", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.17 All interiors", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(

@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -30,6 +31,8 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.Facing
@@ -47,7 +50,7 @@ import com.medieval.village.ui.village.drawVillageFollowParty
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import kotlin.math.hypot
 import kotlin.math.min
-
+import kotlin.math.roundToInt
 @Composable
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     val art = rememberCustomArtOrNull()
@@ -95,7 +98,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     translate(offsetX, offsetY)
                     scale(scale, scale, Offset.Zero)
                 }) {
-                    drawPubBackground()
+                    drawPubBackground(art)
                     PubNpcCatalog.all.forEach { npc ->
                         drawPubNpc(npc, vm.pubSpeakerId == npc.id, vm.pubDialogue, art)
                     }
@@ -139,11 +142,25 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-private fun DrawScope.drawPubBackground() {
+private fun DrawScope.drawPubBackground(art: CustomArt?) {
     val w = PubNpcCatalog.WORLD_W
     val h = PubNpcCatalog.WORLD_H
+    val roomArt = art?.interiorOrNull("pub")
+    if (roomArt != null) {
+        drawImage(
+            image = roomArt,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(roomArt.width, roomArt.height),
+            dstOffset = IntOffset.Zero,
+            dstSize = IntSize(w.roundToInt(), h.roundToInt()),
+            filterQuality = FilterQuality.Medium,
+        )
+        drawRect(Color(0x22000000), Offset.Zero, Size(w, h * 0.08f))
+        drawRect(Color(0x33000000), Offset(0f, h * 0.92f), Size(w, h * 0.08f))
+        return
+    }
 
-    // 따뜻한 목조 벽과 석재 하단
+    // 따뜻한 목조 벽과 석재 하단 (폴백)
     drawRect(Color(0xFF5A2F21), size = Size(w, h))
     for (x in 0..10) {
         drawRect(
