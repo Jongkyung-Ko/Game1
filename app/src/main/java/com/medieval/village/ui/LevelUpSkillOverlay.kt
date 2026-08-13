@@ -160,7 +160,7 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
             WoodButton("슬롯 비우기", Modifier.fillMaxWidth()) {
                 vm.clearSpecialSlot(offer.actorKey, selectedSlot)
             }
-            Spacer(modifier.height(6.dp))
+            Spacer(Modifier.height(6.dp))
             WoodButton("완료", Modifier.fillMaxWidth(), highlight = true) {
                 vm.confirmLevelUpSkillOffer()
             }

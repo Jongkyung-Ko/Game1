@@ -156,7 +156,7 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
         Chip(if (p.blessing > 0) "축복 ${p.blessing}일 남음" else "축복 없음")
     }
 
-    Spacer(modifier.height(10.dp))
+    Spacer(Modifier.height(10.dp))
     SectionTitle("익힌 마법")
     if (vm.skills.isEmpty()) {
         Text("아직 없다. 마법학교에 가보자.", color = Palette.ParchmentDim, fontSize = 12.sp)
@@ -166,7 +166,7 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
         }
     }
 
-    Spacer(modifier.height(10.dp))
+    Spacer(Modifier.height(10.dp))
     SectionTitle("특별스킬 슬롯 (전투)")
     Text(
         "레벨 업 시 해금 · 탐험 공격 버튼 위에 최대 3개 장착",
