@@ -32,8 +32,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
+import com.medieval.village.model.ActorClass
 import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.ItemType
+import com.medieval.village.model.SpecialSkillCatalog
 import com.medieval.village.ui.Chip
 import com.medieval.village.ui.EquipmentDoll
 import com.medieval.village.ui.ItemIcon
@@ -154,7 +156,7 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
         Chip(if (p.blessing > 0) "축복 ${p.blessing}일 남음" else "축복 없음")
     }
 
-    Spacer(Modifier.height(10.dp))
+    Spacer(modifier.height(10.dp))
     SectionTitle("익힌 마법")
     if (vm.skills.isEmpty()) {
         Text("아직 없다. 마법학교에 가보자.", color = Palette.ParchmentDim, fontSize = 12.sp)
@@ -162,6 +164,30 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
         vm.skills.forEach { s ->
             ListRow(s.name, "${s.desc} (MP ${s.mpCost})")
         }
+    }
+
+    Spacer(modifier.height(10.dp))
+    SectionTitle("특별스킬 슬롯 (전투)")
+    Text(
+        "레벨 업 시 해금 · 탐험 공격 버튼 위에 최대 3개 장착",
+        color = Palette.ParchmentDim,
+        fontSize = 11.sp,
+    )
+    Spacer(Modifier.height(6.dp))
+    SpecialSkillSlotEditor(
+        vm = vm,
+        actorKey = GameViewModel.HERO_SKILL_KEY,
+        actorLabel = "${vm.player.name} · 모험가",
+        actorClass = ActorClass.ADVENTURER,
+    )
+    vm.activeParty.forEach { merc ->
+        Spacer(Modifier.height(8.dp))
+        SpecialSkillSlotEditor(
+            vm = vm,
+            actorKey = merc.id,
+            actorLabel = "${merc.name} · ${merc.role}",
+            actorClass = SpecialSkillCatalog.actorClassOf(merc),
+        )
     }
 
     Spacer(Modifier.height(10.dp))
@@ -376,4 +402,70 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
         }
     }
     Spacer(Modifier.height(8.dp))
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SpecialSkillSlotEditor(
+    vm: GameViewModel,
+    actorKey: String,
+    actorLabel: String,
+    actorClass: ActorClass,
+) {
+    @Suppress("UNUSED_EXPRESSION")
+    vm.specialSkillRevision
+    var selectedSlot by remember(actorKey) { mutableStateOf(0) }
+    val known = vm.knownSpecialSkills(actorKey)
+    val slots = vm.slottedSpecialIds(actorKey)
+    Text(actorLabel, color = Palette.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    Text(
+        "${actorClass.label} · 해금 ${known.size}/6",
+        color = Palette.ParchmentDim,
+        fontSize = 11.sp,
+    )
+    Spacer(Modifier.height(4.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        slots.forEachIndexed { index, id ->
+            val def = id?.let { SpecialSkillCatalog.byId(it) }
+            val selected = selectedSlot == index
+            Text(
+                text = def?.shortName ?: "슬롯${index + 1}",
+                color = if (selected) Palette.Ink else Palette.Parchment,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .background(
+                        if (selected) Palette.Gold else Color(0xFF2A1C12),
+                        androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    )
+                    .clickable { selectedSlot = index }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            )
+        }
+        WoodButton("비우기") { vm.clearSpecialSlot(actorKey, selectedSlot) }
+    }
+    if (known.isEmpty()) {
+        Text("Lv.2부터 특별스킬이 해금된다.", color = Palette.ParchmentDim, fontSize = 11.sp)
+    } else {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.padding(top = 4.dp),
+        ) {
+            known.forEach { skill ->
+                Text(
+                    text = "${skill.name} ×${"%.1f".format(skill.damageMult)}",
+                    color = Palette.Parchment,
+                    fontSize = 11.sp,
+                    modifier = Modifier
+                        .background(
+                            if (skill.id in slots) Color(0xFF5A4020) else Palette.WoodDark,
+                            androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                        )
+                        .clickable { vm.setSpecialSlot(actorKey, selectedSlot, skill.id) }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+        }
+    }
 }

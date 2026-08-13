@@ -95,7 +95,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.17 Eastern forest",
+        watermark = "v0.4.18 Eastern forest",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -111,7 +111,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.17 Southern desert",
+        watermark = "v0.4.18 Southern desert",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -127,7 +127,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.17 Northern glacier",
+        watermark = "v0.4.18 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -259,10 +259,12 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
 
             DungeonCombatHud(
                 attackLabel = vm.attackLabel(),
-                attackEnabled = vm.attackReady && vm.dungeonFloor != null,
+                attackEnabled = vm.attackReady && vm.dungeonFloor != null && vm.levelUpSkillOffer == null,
+                skillSlots = vm.frontSkillSlotsUi(),
                 onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
                 onPadRelease = { vm.clearDungeonPad() },
                 onAttack = { vm.dungeonAttack() },
+                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
             )
 
             PartySwitchBar(

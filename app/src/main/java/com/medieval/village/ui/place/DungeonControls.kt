@@ -4,8 +4,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,6 +31,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +40,7 @@ import com.medieval.village.game.Facing
 import com.medieval.village.game.MeleeSlashFx
 import com.medieval.village.game.dirX
 import com.medieval.village.game.dirY
+import com.medieval.village.model.SkillSlotUi
 import com.medieval.village.model.WeaponStyle
 import com.medieval.village.ui.theme.Palette
 import kotlin.math.atan2
@@ -150,14 +155,17 @@ fun AttackButton(
 /**
  * 부모 Box 안에서 좌·우 하단에 배치한다.
  * fillMaxSize 오버레이를 쓰지 않아 중앙 맵 탭(상자)이 막히지 않는다.
+ * 공격 버튼 위에 특별스킬 슬롯 최대 3개.
  */
 @Composable
 fun BoxScope.DungeonCombatHud(
     attackLabel: String,
     attackEnabled: Boolean,
+    skillSlots: List<SkillSlotUi> = emptyList(),
     onPad: (Float, Float) -> Unit,
     onPadRelease: () -> Unit,
     onAttack: () -> Unit,
+    onSpecial: (Int) -> Unit = {},
 ) {
     VirtualMovePad(
         onVector = onPad,
@@ -166,14 +174,76 @@ fun BoxScope.DungeonCombatHud(
             .align(Alignment.BottomStart)
             .padding(start = 10.dp, bottom = 10.dp)
     )
-    AttackButton(
-        label = attackLabel,
-        enabled = attackEnabled,
-        onAttack = onAttack,
+    Column(
         modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(end = 12.dp, bottom = 14.dp)
-    )
+            .padding(end = 12.dp, bottom = 14.dp),
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (skillSlots.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                skillSlots.forEach { slot ->
+                    SpecialSkillButton(
+                        slot = slot,
+                        onClick = { onSpecial(slot.slotIndex) },
+                    )
+                }
+            }
+        }
+        AttackButton(
+            label = attackLabel,
+            enabled = attackEnabled,
+            onAttack = onAttack,
+        )
+    }
+}
+
+@Composable
+private fun SpecialSkillButton(
+    slot: SkillSlotUi,
+    onClick: () -> Unit,
+) {
+    val filled = slot.skillId != null
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .background(
+                when {
+                    !filled -> Color(0x442A1C12)
+                    slot.enabled -> Color(0xCC5A3A18)
+                    else -> Color(0x66443322)
+                },
+                CircleShape,
+            )
+            .pointerInput(slot.enabled, slot.skillId) {
+                if (!slot.enabled || !filled) return@pointerInput
+                detectTapGestures(onTap = { onClick() })
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = slot.shortName,
+                color = when {
+                    !filled -> Color(0x66C8B8A0)
+                    slot.enabled -> Palette.Gold
+                    else -> Color(0x88C8B8A0)
+                },
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+            if (filled && slot.mpCost > 0) {
+                Text(
+                    "MP${slot.mpCost}",
+                    color = if (slot.enabled) Palette.Mana else Color(0x6655AACC),
+                    fontSize = 9.sp,
+                )
+            }
+        }
+    }
 }
 
 /** 칼 휘두르기 반달(초승달) 참격 이펙트 */

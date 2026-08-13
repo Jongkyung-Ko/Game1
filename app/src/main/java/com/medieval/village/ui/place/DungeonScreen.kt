@@ -194,15 +194,17 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.17 All interiors", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.18 Special skills", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(
                 attackLabel = vm.attackLabel(),
-                attackEnabled = vm.attackReady && vm.dungeonFloor != null,
+                attackEnabled = vm.attackReady && vm.dungeonFloor != null && vm.levelUpSkillOffer == null,
+                skillSlots = vm.frontSkillSlotsUi(),
                 onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
                 onPadRelease = { vm.clearDungeonPad() },
                 onAttack = { vm.dungeonAttack() },
+                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
             )
 
             PartySwitchBar(

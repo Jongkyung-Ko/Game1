@@ -91,8 +91,13 @@ fun GameRoot(modifier: Modifier = Modifier) {
         }
     }
 
-    BackHandler(enabled = vm.menuTab != MenuTab.NONE || vm.scene == Scene.INTERIOR) {
+    BackHandler(
+        enabled = vm.levelUpSkillOffer != null ||
+            vm.menuTab != MenuTab.NONE ||
+            vm.scene == Scene.INTERIOR,
+    ) {
         when {
+            vm.levelUpSkillOffer != null -> vm.dismissLevelUpSkillOffer()
             vm.menuTab != MenuTab.NONE -> vm.menuTab = MenuTab.NONE
             vm.interiorPanelOpen -> vm.closeInteriorPanel()
             vm.scene == Scene.INTERIOR && vm.currentPlace.isExplorePlace() -> vm.escapeDungeon()
@@ -112,6 +117,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
                 )
             }
             MenuOverlay(vm)
+            LevelUpSkillOverlay(vm)
         }
     }
 }

@@ -31,12 +31,18 @@ import com.medieval.village.model.PlaceId
 import com.medieval.village.model.Player
 import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
+import com.medieval.village.model.ActorClass
+import com.medieval.village.model.LevelUpSkillOffer
 import com.medieval.village.model.Skill
+import com.medieval.village.model.SkillSlotUi
+import com.medieval.village.model.SpecialSkillCatalog
+import com.medieval.village.model.SpecialSkillDef
 import com.medieval.village.model.Village
 import com.medieval.village.model.WeaponStyle
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -70,6 +76,7 @@ class GameViewModel : ViewModel() {
         private const val MELEE_RANGE = 78f
         private const val MELEE_CONE_DOT = 0.35f // ~70° 전방
         private const val ATTACK_COOLDOWN = 0.42f
+        private const val SPECIAL_COOLDOWN = 2.15f
         private const val MAGIC_MP_COST = 6
         private const val PROJECTILE_SPEED = 420f
         private const val KNOCKBACK_DISTANCE = 42f
@@ -78,6 +85,7 @@ class GameViewModel : ViewModel() {
         private const val MONSTER_ATTACK_DURATION = 0.48f
         private const val MONSTER_ATTACK_COOLDOWN = 1.15f
         const val MAX_ACTIVE_MERCENARY = 2
+        const val HERO_SKILL_KEY = "hero"
     }
 
     var player by mutableStateOf(Player())
@@ -97,6 +105,21 @@ class GameViewModel : ViewModel() {
      * 0 = 주인공, 1+ = activeParty[index-1]
      */
     var frontIndex by mutableIntStateOf(0)
+        private set
+
+    /** actorKey("hero"/용병id) → 해금된 특별스킬 id */
+    private val knownSpecialIds = mutableStateMapOf<String, Set<String>>()
+    /** actorKey → 장착 슬롯 3개 (skill id or null) */
+    private val specialSlots = mutableStateMapOf<String, List<String?>>()
+    /** 레벨업 시 슬롯 업데이트 UI */
+    var levelUpSkillOffer by mutableStateOf<LevelUpSkillOffer?>(null)
+        private set
+    /** 특별스킬 쿨다운 (전투 HUD) */
+    var specialReady by mutableStateOf(true)
+        private set
+    private var specialCooldown = 0f
+    /** Compose 구독용 — 슬롯 변경 시 증가 */
+    var specialSkillRevision by mutableIntStateOf(0)
         private set
 
     /** 현재 화면에서 보여줄 대사/결과 로그 */
@@ -255,6 +278,13 @@ class GameViewModel : ViewModel() {
         mercHp.clear()
         frontIndex = 0
         partyTrail.clear()
+        knownSpecialIds.clear()
+        specialSlots.clear()
+        levelUpSkillOffer = null
+        specialCooldown = 0f
+        specialReady = true
+        specialSkillRevision = 0
+        ensureActorSkillState(HERO_SKILL_KEY)
         log.clear()
         path.clear()
         pendingEnter = null
@@ -974,6 +1004,7 @@ class GameViewModel : ViewModel() {
         val hired = merc.copy(level = 1, exp = 0, equipment = emptyMap())
         party.add(hired)
         mercHp[hired.id] = hired.maxHp
+        ensureActorSkillState(hired.id)
         if (activeMercenaryIds.size < MAX_ACTIVE_MERCENARY) {
             activeMercenaryIds.add(merc.id)
             say("${merc.name}이(가) 동료가 되어 원정대에 합류했다! (-${merc.cost}G)")
@@ -988,6 +1019,9 @@ class GameViewModel : ViewModel() {
         party.removeAll { it.id == merc.id }
         activeMercenaryIds.remove(merc.id)
         mercHp.remove(merc.id)
+        knownSpecialIds.remove(merc.id)
+        specialSlots.remove(merc.id)
+        specialSkillRevision++
         clampFrontIndex()
         say("${merc.name}과(와) 작별했다." + if (current.equipment.isNotEmpty()) " 착용 장비는 가방으로 돌아왔다." else "")
     }
@@ -1056,7 +1090,7 @@ class GameViewModel : ViewModel() {
             val idx = party.indexOfFirst { it.id == id }
             if (idx < 0) return@forEach
             var m = party[idx].copy(exp = party[idx].exp + amount)
-            var leveled = false
+            val levelsGained = mutableListOf<Int>()
             while (m.exp >= m.expToNext) {
                 val rest = m.exp - m.expToNext
                 m = m.copy(
@@ -1064,12 +1098,12 @@ class GameViewModel : ViewModel() {
                     exp = rest,
                     basePower = m.basePower + 2,
                 )
-                leveled = true
+                levelsGained += m.level
                 say("${m.name} 레벨 업! Lv.${m.level} · 전투 기여 +${m.power}")
             }
             party[idx] = m
-            if (!leveled) {
-                // 스팸 방지: 상세 로그는 생략, 전투 로그에만 합산 표기
+            if (levelsGained.isNotEmpty()) {
+                onActorLevelUp(id, m.name, SpecialSkillCatalog.actorClassOf(m), levelsGained)
             }
         }
     }
@@ -1123,8 +1157,10 @@ class GameViewModel : ViewModel() {
         meleeSlashFx = null
         dungeonProjectiles.clear()
         attackCooldown = 0f
+        specialCooldown = 0f
         dungeonCombatFrame = 0
         attackReady = true
+        specialReady = true
         heroAnimKind = HeroAnimKind.IDLE
         heroAnimFrame = 0
         heroAnimTime = 0f
@@ -1219,6 +1255,187 @@ class GameViewModel : ViewModel() {
                 }
                 emitSfx("click")
                 spawnProjectile(WeaponStyle.MAGIC, dmg + 3, life = 1.25f)
+            }
+        }
+        refreshAttackReady()
+    }
+
+    // ---------------------------------------------------------------- 특별스킬
+
+    private fun ensureActorSkillState(actorKey: String) {
+        if (knownSpecialIds[actorKey] == null) knownSpecialIds[actorKey] = emptySet()
+        if (specialSlots[actorKey] == null) {
+            specialSlots[actorKey] = List(SpecialSkillCatalog.MAX_SLOTS) { null }
+        }
+    }
+
+    private fun frontActorKey(): String = frontMercenary()?.id ?: HERO_SKILL_KEY
+
+    private fun frontActorClass(): ActorClass = SpecialSkillCatalog.actorClassOf(frontMercenary())
+
+    fun knownSpecialSkills(actorKey: String): List<SpecialSkillDef> {
+        ensureActorSkillState(actorKey)
+        val known = knownSpecialIds[actorKey].orEmpty()
+        return known.mapNotNull { SpecialSkillCatalog.byId(it) }
+            .sortedBy { it.unlockLevel }
+    }
+
+    fun slottedSpecialIds(actorKey: String): List<String?> {
+        ensureActorSkillState(actorKey)
+        return specialSlots[actorKey] ?: List(SpecialSkillCatalog.MAX_SLOTS) { null }
+    }
+
+    fun frontSkillSlotsUi(): List<SkillSlotUi> {
+        @Suppress("UNUSED_EXPRESSION")
+        specialSkillRevision
+        val key = frontActorKey()
+        ensureActorSkillState(key)
+        val slots = slottedSpecialIds(key)
+        return slots.mapIndexed { index, id ->
+            val def = id?.let { SpecialSkillCatalog.byId(it) }
+            val mpOk = def == null || player.mp >= def.mpCost
+            SkillSlotUi(
+                slotIndex = index,
+                skillId = id,
+                shortName = def?.shortName ?: "—",
+                enabled = def != null &&
+                    specialReady &&
+                    attackCooldown <= 0f &&
+                    dungeonFloor != null &&
+                    !dungeonCombatLock &&
+                    mpOk &&
+                    levelUpSkillOffer == null,
+                mpCost = def?.mpCost ?: 0,
+            )
+        }
+    }
+
+    private fun onActorLevelUp(
+        actorKey: String,
+        actorName: String,
+        cls: ActorClass,
+        levelsGained: List<Int>,
+    ) {
+        if (levelsGained.isEmpty()) return
+        val newLevel = levelsGained.last()
+        ensureActorSkillState(actorKey)
+        val newly = levelsGained.flatMap { SpecialSkillCatalog.unlocksAt(cls, it) }
+            .distinctBy { it.id }
+        val known = knownSpecialIds[actorKey].orEmpty().toMutableSet()
+        newly.forEach { known += it.id }
+        // 이전 레벨에서 놓친 해금도 보정
+        SpecialSkillCatalog.unlockedUpTo(cls, newLevel).forEach { known += it.id }
+        knownSpecialIds[actorKey] = known
+        newly.forEach { say("${actorName} 특별스킬 『${it.name}』 해금!") }
+        // 빈 슬롯이 있으면 새 스킬 자동 장착
+        val slots = specialSlots[actorKey].orEmpty().toMutableList()
+        while (slots.size < SpecialSkillCatalog.MAX_SLOTS) slots += null
+        newly.forEach { skill ->
+            val empty = slots.indexOfFirst { it == null }
+            if (empty >= 0 && skill.id !in slots) slots[empty] = skill.id
+        }
+        specialSlots[actorKey] = slots.toList()
+        specialSkillRevision++
+        if (known.isEmpty()) return
+        levelUpSkillOffer = LevelUpSkillOffer(
+            actorKey = actorKey,
+            actorName = actorName,
+            actorClass = cls,
+            newLevel = newLevel,
+            newlyUnlockedIds = newly.map { it.id },
+        )
+        say("특별스킬 슬롯을 업데이트할 수 있다. (최대 ${SpecialSkillCatalog.MAX_SLOTS}개)")
+    }
+
+    fun setSpecialSlot(actorKey: String, slotIndex: Int, skillId: String?) {
+        ensureActorSkillState(actorKey)
+        if (slotIndex !in 0 until SpecialSkillCatalog.MAX_SLOTS) return
+        if (skillId != null) {
+            if (skillId !in knownSpecialIds[actorKey].orEmpty()) return
+            SpecialSkillCatalog.byId(skillId) ?: return
+        }
+        val slots = specialSlots[actorKey].orEmpty().toMutableList()
+        while (slots.size < SpecialSkillCatalog.MAX_SLOTS) slots += null
+        // 같은 스킬이 다른 슬롯에 있으면 제거
+        if (skillId != null) {
+            for (i in slots.indices) if (slots[i] == skillId) slots[i] = null
+        }
+        slots[slotIndex] = skillId
+        specialSlots[actorKey] = slots.toList()
+        specialSkillRevision++
+    }
+
+    fun clearSpecialSlot(actorKey: String, slotIndex: Int) {
+        setSpecialSlot(actorKey, slotIndex, null)
+    }
+
+    fun dismissLevelUpSkillOffer() {
+        levelUpSkillOffer = null
+    }
+
+    fun confirmLevelUpSkillOffer() {
+        val offer = levelUpSkillOffer ?: return
+        val filled = slottedSpecialIds(offer.actorKey).count { it != null }
+        say("${offer.actorName} 특별스킬 ${filled}개를 장착했다.")
+        levelUpSkillOffer = null
+    }
+
+    /** 탐험 중 특별스킬 — 일반 공격의 약 3배 피해 */
+    fun dungeonSpecialAttack(slotIndex: Int) {
+        val map = dungeonFloor ?: return
+        if (dungeonCombatLock || attackCooldown > 0f || specialCooldown > 0f) return
+        if (levelUpSkillOffer != null) return
+        clampFrontIndex()
+        val frontMerc = frontMercenary()
+        if (frontMerc != null && !isMercAlive(frontMerc)) {
+            frontIndex = 0
+        }
+        val key = frontActorKey()
+        ensureActorSkillState(key)
+        val skillId = slottedSpecialIds(key).getOrNull(slotIndex) ?: return
+        val skill = SpecialSkillCatalog.byId(skillId) ?: return
+        if (skill.actorClass != frontActorClass()) {
+            say("지금 선두 직업으로는 쓸 수 없는 스킬이다.")
+            return
+        }
+        if (player.mp < skill.mpCost) {
+            say("마나가 부족하다. (MP ${skill.mpCost})")
+            return
+        }
+        player = player.copy(mp = player.mp - skill.mpCost)
+        attackCooldown = ATTACK_COOLDOWN
+        specialCooldown = SPECIAL_COOLDOWN
+        specialReady = false
+        refreshAttackReady()
+        specialSkillRevision++
+
+        val base = if (frontMercenary() != null) {
+            val m = frontMercenary()!!
+            (m.power + blessBonus() / 2 + Random.nextInt(0, 5)).coerceAtLeast(4)
+        } else {
+            (totalAtk + partyPower / 2 + blessBonus() / 2 + Random.nextInt(0, 5)).coerceAtLeast(4)
+        }
+        val dmg = (base * skill.damageMult).roundToInt().coerceAtLeast(base + 8)
+        say("『${skill.name}』! (×${"%.1f".format(skill.damageMult)} · 피해 $dmg)")
+        startAttackAnim(
+            when (skill.style) {
+                WeaponStyle.MELEE -> HeroAnimKind.SLASH
+                WeaponStyle.BOW -> HeroAnimKind.BOW
+                WeaponStyle.MAGIC -> HeroAnimKind.MAGIC
+            }
+        )
+        when (skill.style) {
+            WeaponStyle.MELEE -> {
+                emitSfx("hit")
+                performMeleeSlash(map, dmg)
+            }
+            WeaponStyle.BOW -> {
+                emitSfx("click")
+                spawnProjectile(WeaponStyle.BOW, dmg, life = 1.2f)
+            }
+            WeaponStyle.MAGIC -> {
+                emitSfx("click")
+                spawnProjectile(WeaponStyle.MAGIC, dmg + 4, life = 1.3f)
             }
         }
         refreshAttackReady()
@@ -1639,6 +1856,13 @@ class GameViewModel : ViewModel() {
             attackCooldown = (attackCooldown - dt).coerceAtLeast(0f)
             if (attackCooldown <= 0f) refreshAttackReady()
         }
+        if (specialCooldown > 0f) {
+            specialCooldown = (specialCooldown - dt).coerceAtLeast(0f)
+            if (specialCooldown <= 0f) {
+                specialReady = true
+                specialSkillRevision++
+            }
+        }
 
         // 1) 가상 패드 우선 이동
         val padLen = hypot(dungeonPadX, dungeonPadY)
@@ -2031,6 +2255,7 @@ class GameViewModel : ViewModel() {
 
     private fun gainExp(amount: Int) {
         var p = player.copy(exp = player.exp + amount)
+        val levelsGained = mutableListOf<Int>()
         while (p.exp >= p.expToNext) {
             val rest = p.exp - p.expToNext
             p = p.copy(
@@ -2046,9 +2271,13 @@ class GameViewModel : ViewModel() {
                 agi = p.agi + 1,
                 intel = p.intel + 1
             )
+            levelsGained += p.level
             log.add("레벨 업! Lv.${p.level} 이(가) 되었다. 몸이 가벼워졌다.")
         }
         player = p
+        if (levelsGained.isNotEmpty()) {
+            onActorLevelUp(HERO_SKILL_KEY, p.name, ActorClass.ADVENTURER, levelsGained)
+        }
     }
 
     // ---------------------------------------------------------------- 표시용
