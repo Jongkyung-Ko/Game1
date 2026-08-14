@@ -37,6 +37,7 @@ import com.medieval.village.model.Skill
 import com.medieval.village.model.SkillSlotUi
 import com.medieval.village.model.SpecialSkillCatalog
 import com.medieval.village.model.SpecialSkillDef
+import com.medieval.village.model.SpecialVfxSpec
 import com.medieval.village.model.Village
 import com.medieval.village.model.WeaponStyle
 import kotlin.math.abs
@@ -203,6 +204,8 @@ class GameViewModel : ViewModel() {
     /** 근접 초승달 참격 연출 (폴백용 — 시트 애니메이션이 있으면 화면에서 생략) */
     var meleeSlashFx by mutableStateOf<MeleeSlashFx?>(null)
         private set
+    /** 특별스킬 스프라이트 FX */
+    val specialSkillFx = mutableStateListOf<SpecialSkillFx>()
     /** 화살·마법 탄환 */
     val dungeonProjectiles = mutableStateListOf<DungeonProjectile>()
     /** 탄환/참격 프레임 갱신용 (Canvas 리컴포즈) */
@@ -216,9 +219,12 @@ class GameViewModel : ViewModel() {
         private set
     var heroAnimFrame by mutableIntStateOf(0)
         private set
+    /** 특별스킬 캐릭터 애니 세트 (adv_smash 등). null이면 일반 slash/bow/magic */
+    var specialAnimSet by mutableStateOf<String?>(null)
+        private set
     private var heroAnimTime = 0f
     private var attackAnimPlaying = false
-    private val attackAnimDuration = 0.42f
+    private var attackAnimDuration = 0.42f
 
     private val path = ArrayDeque<Waypoint>()
     private var pendingEnter: PlaceId? = null
@@ -1155,6 +1161,9 @@ class GameViewModel : ViewModel() {
         dungeonPadX = 0f
         dungeonPadY = 0f
         meleeSlashFx = null
+        specialSkillFx.clear()
+        specialAnimSet = null
+        attackAnimDuration = 0.42f
         dungeonProjectiles.clear()
         attackCooldown = 0f
         specialCooldown = 0f
@@ -1417,31 +1426,69 @@ class GameViewModel : ViewModel() {
         }
         val dmg = (base * skill.damageMult).roundToInt().coerceAtLeast(base + 8)
         say("『${skill.name}』! (×${"%.1f".format(skill.damageMult)} · 피해 $dmg)")
+        val vfx = SpecialSkillCatalog.vfxFor(skill.id)
+        val animKind = when (skill.style) {
+            WeaponStyle.MELEE -> HeroAnimKind.SLASH
+            WeaponStyle.BOW -> HeroAnimKind.BOW
+            WeaponStyle.MAGIC -> HeroAnimKind.MAGIC
+        }
+        // 주인공(모험가)만 전용 특별 애니 — 용병은 일반 공격 시트 + 강화 FX
+        val heroFront = frontMercenary() == null
         startAttackAnim(
-            when (skill.style) {
-                WeaponStyle.MELEE -> HeroAnimKind.SLASH
-                WeaponStyle.BOW -> HeroAnimKind.BOW
-                WeaponStyle.MAGIC -> HeroAnimKind.MAGIC
-            }
+            kind = animKind,
+            duration = vfx?.animDuration ?: 0.52f,
+            specialSet = if (heroFront) vfx?.animSet else null,
         )
+        if (heroFront && vfx != null) {
+            spawnSpecialMeleeFx(vfx)
+        }
         when (skill.style) {
             WeaponStyle.MELEE -> {
                 emitSfx("hit")
-                performMeleeSlash(map, dmg)
+                if (skill.id == "adv_charge" && heroFront) {
+                    lungeForward(map, 36f)
+                }
+                performMeleeSlash(
+                    map = map,
+                    damage = dmg,
+                    emitCrescent = vfx?.meleeFxKey == null,
+                    slashPower = if (vfx?.meleeFxKey == null) 1.45f else 1f,
+                    slashDuration = if (vfx?.meleeFxKey == null) 0.48f else 0.34f,
+                )
             }
             WeaponStyle.BOW -> {
                 emitSfx("click")
-                spawnProjectile(WeaponStyle.BOW, dmg, life = 1.2f)
+                spawnProjectile(
+                    style = WeaponStyle.BOW,
+                    damage = dmg,
+                    life = 1.25f,
+                    fxSpriteKey = vfx?.projectileFxKey,
+                    impactSpriteKey = vfx?.impactFxKey,
+                    radius = if (vfx?.projectileFxKey != null) 22f else 18f,
+                )
             }
             WeaponStyle.MAGIC -> {
                 emitSfx("click")
-                spawnProjectile(WeaponStyle.MAGIC, dmg + 4, life = 1.3f)
+                spawnProjectile(
+                    style = WeaponStyle.MAGIC,
+                    damage = dmg + 4,
+                    life = 1.35f,
+                    fxSpriteKey = vfx?.projectileFxKey,
+                    impactSpriteKey = vfx?.impactFxKey,
+                    radius = if (vfx?.projectileFxKey != null) 24f else 20f,
+                )
             }
         }
         refreshAttackReady()
     }
 
-    private fun startAttackAnim(kind: HeroAnimKind) {
+    private fun startAttackAnim(
+        kind: HeroAnimKind,
+        duration: Float = 0.42f,
+        specialSet: String? = null,
+    ) {
+        specialAnimSet = specialSet
+        attackAnimDuration = duration
         heroAnimKind = kind
         heroAnimFrame = 0
         heroAnimTime = 0f
@@ -1455,6 +1502,8 @@ class GameViewModel : ViewModel() {
             heroAnimFrame = ((heroAnimTime / attackAnimDuration) * 4f).toInt().coerceIn(0, 3)
             if (heroAnimTime >= attackAnimDuration) {
                 attackAnimPlaying = false
+                specialAnimSet = null
+                attackAnimDuration = 0.42f
                 heroAnimKind = if (moving) HeroAnimKind.WALK else HeroAnimKind.IDLE
                 heroAnimFrame = 0
                 heroAnimTime = 0f
@@ -1471,9 +1520,55 @@ class GameViewModel : ViewModel() {
         }
     }
 
-    private fun performMeleeSlash(map: DungeonFloor, damage: Int) {
+    private fun spawnSpecialMeleeFx(vfx: SpecialVfxSpec) {
+        val key = vfx.meleeFxKey ?: return
         val origin = slashFxOrigin()
-        meleeSlashFx = MeleeSlashFx(origin.first, origin.second, facing)
+        specialSkillFx += SpecialSkillFx(
+            x = origin.first,
+            y = origin.second,
+            facing = facing,
+            spriteKey = key,
+            duration = vfx.meleeFxDuration,
+            scale = vfx.meleeFxScale,
+        )
+        // 필살은 빔을 한 줄 더
+        if (key == "adv_fx_finisher") {
+            specialSkillFx += SpecialSkillFx(
+                x = origin.first + facing.dirX() * 40f,
+                y = origin.second + facing.dirY() * 28f,
+                facing = facing,
+                spriteKey = "adv_fx_beam",
+                duration = 0.48f,
+                scale = 1.2f,
+            )
+        }
+        dungeonCombatFrame++
+    }
+
+    private fun lungeForward(map: DungeonFloor, distance: Float) {
+        val nx = dungeonHeroX + facing.dirX() * distance
+        val ny = dungeonHeroY + facing.dirY() * distance
+        tryMoveDungeon(map, nx, ny)
+    }
+
+    private fun performMeleeSlash(
+        map: DungeonFloor,
+        damage: Int,
+        emitCrescent: Boolean = true,
+        slashPower: Float = 1f,
+        slashDuration: Float = 0.34f,
+    ) {
+        val origin = slashFxOrigin()
+        if (emitCrescent) {
+            meleeSlashFx = MeleeSlashFx(
+                x = origin.first,
+                y = origin.second,
+                facing = facing,
+                duration = slashDuration,
+                power = slashPower,
+            )
+        }
+        val range = MELEE_RANGE * (0.92f + 0.18f * slashPower)
         val fx = facing.dirX()
         val fy = facing.dirY()
         val hits = map.monsters.filter { monster ->
@@ -1481,7 +1576,7 @@ class GameViewModel : ViewModel() {
             val dx = monster.x - dungeonHeroX
             val dy = monster.y - dungeonHeroY
             val dist = hypot(dx, dy)
-            if (dist > MELEE_RANGE || dist < 1f) return@filter false
+            if (dist > range || dist < 1f) return@filter false
             val dot = (dx * fx + dy * fy) / dist
             dot >= MELEE_CONE_DOT
         }
@@ -1500,7 +1595,14 @@ class GameViewModel : ViewModel() {
     private fun slashFxOrigin(): Pair<Float, Float> =
         dungeonHeroX + facing.dirX() * 18f to dungeonHeroY + facing.dirY() * 10f - 28f
 
-    private fun spawnProjectile(style: WeaponStyle, damage: Int, life: Float) {
+    private fun spawnProjectile(
+        style: WeaponStyle,
+        damage: Int,
+        life: Float,
+        fxSpriteKey: String? = null,
+        impactSpriteKey: String? = null,
+        radius: Float = 18f,
+    ) {
         val fx = facing.dirX()
         val fy = facing.dirY()
         // 대각 패드 입력 중이면 그 방향으로도 보정
@@ -1522,6 +1624,9 @@ class GameViewModel : ViewModel() {
             style = style,
             damage = damage,
             life = life,
+            radius = radius,
+            fxSpriteKey = fxSpriteKey,
+            impactSpriteKey = impactSpriteKey,
         )
         say(if (style == WeaponStyle.BOW) "화살을 날렸다!" else "마력을 쏘아냈다!")
     }
@@ -1649,6 +1754,9 @@ class GameViewModel : ViewModel() {
         dungeonPadX = 0f
         dungeonPadY = 0f
         meleeSlashFx = null
+        specialSkillFx.clear()
+        specialAnimSet = null
+        attackAnimDuration = 0.42f
         dungeonProjectiles.clear()
         attackCooldown = 0f
         resetPartyTrail(dungeonHeroX, dungeonHeroY)
@@ -1947,13 +2055,26 @@ class GameViewModel : ViewModel() {
     }
 
     private fun tickAttackFx(dt: Float) {
-        val fx = meleeSlashFx ?: return
-        fx.age += dt
-        if (!fx.alive) meleeSlashFx = null
-        else {
-            meleeSlashFx = fx.copy(age = fx.age)
-            dungeonCombatFrame++
+        var dirty = false
+        val slash = meleeSlashFx
+        if (slash != null) {
+            slash.age += dt
+            if (!slash.alive) meleeSlashFx = null
+            else {
+                meleeSlashFx = slash.copy(age = slash.age)
+            }
+            dirty = true
         }
+        if (specialSkillFx.isNotEmpty()) {
+            val doomed = mutableListOf<SpecialSkillFx>()
+            specialSkillFx.forEach { fx ->
+                fx.age += dt
+                if (!fx.alive) doomed += fx
+            }
+            if (doomed.isNotEmpty()) specialSkillFx.removeAll(doomed.toSet())
+            dirty = true
+        }
+        if (dirty) dungeonCombatFrame++
     }
 
     private fun tickProjectiles(map: DungeonFloor, dt: Float) {
@@ -1989,6 +2110,16 @@ class GameViewModel : ViewModel() {
                     knockDy = p.vy,
                     hitSfx = hitSfx,
                 )
+                p.impactSpriteKey?.let { key ->
+                    specialSkillFx += SpecialSkillFx(
+                        x = hit.x,
+                        y = hit.y - 24f,
+                        facing = facing,
+                        spriteKey = key,
+                        duration = 0.42f,
+                        scale = 1.35f,
+                    )
+                }
                 doomed += p
             }
         }

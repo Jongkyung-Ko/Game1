@@ -38,11 +38,14 @@ import androidx.compose.ui.unit.sp
 import com.medieval.village.game.DungeonProjectile
 import com.medieval.village.game.Facing
 import com.medieval.village.game.MeleeSlashFx
+import com.medieval.village.game.SpecialSkillFx
 import com.medieval.village.game.dirX
 import com.medieval.village.game.dirY
 import com.medieval.village.model.SkillSlotUi
 import com.medieval.village.model.WeaponStyle
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.village.CustomArt
+import com.medieval.village.ui.village.drawCustomSprite
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -249,15 +252,16 @@ private fun SpecialSkillButton(
 /** 칼 휘두르기 반달(초승달) 참격 이펙트 */
 fun DrawScope.drawMeleeSlashFx(fx: MeleeSlashFx) {
     val fade = (1f - fx.progress).coerceIn(0f, 1f)
+    val power = fx.power.coerceAtLeast(0.8f)
     val angle = when (fx.facing) {
         Facing.RIGHT -> 0f
         Facing.DOWN -> 90f
         Facing.LEFT -> 180f
         Facing.UP -> 270f
     }
-    val sweep = 130f
+    val sweep = 130f + (power - 1f) * 28f
     val start = angle - sweep / 2f + fx.progress * 22f
-    val outerR = 62f + fx.progress * 22f
+    val outerR = (62f + fx.progress * 22f) * power
     val innerR = outerR * 0.58f
     val glow = Color(0xFFFFF1B0).copy(alpha = 0.35f * fade)
     val blade = Color(0xFFF5F0E4).copy(alpha = 0.92f * fade)
@@ -292,7 +296,7 @@ fun DrawScope.drawMeleeSlashFx(fx: MeleeSlashFx) {
         useCenter = false,
         topLeft = Offset(fx.x - outerR, fx.y - outerR),
         size = Size(outerR * 2f, outerR * 2f),
-        style = Stroke(width = 7f * fade + 2f, cap = StrokeCap.Round)
+        style = Stroke(width = 7f * fade * power + 2f, cap = StrokeCap.Round)
     )
     drawArc(
         color = Color(0xFFFFE29A).copy(alpha = 0.8f * fade),
@@ -301,15 +305,60 @@ fun DrawScope.drawMeleeSlashFx(fx: MeleeSlashFx) {
         useCenter = false,
         topLeft = Offset(fx.x - outerR * 0.88f, fx.y - outerR * 0.88f),
         size = Size(outerR * 1.76f, outerR * 1.76f),
-        style = Stroke(width = 3.5f * fade, cap = StrokeCap.Round)
+        style = Stroke(width = 3.5f * fade * power, cap = StrokeCap.Round)
     )
     val tipAng = Math.toRadians((start + sweep * 0.72f).toDouble())
     val tipX = fx.x + cos(tipAng).toFloat() * outerR
     val tipY = fx.y + sin(tipAng).toFloat() * outerR
-    drawCircle(Color(0xFFFFFFFF).copy(alpha = 0.85f * fade), 6.5f * fade, Offset(tipX, tipY))
+    drawCircle(Color(0xFFFFFFFF).copy(alpha = 0.85f * fade), 6.5f * fade * power, Offset(tipX, tipY))
 }
 
-fun DrawScope.drawDungeonProjectile(p: DungeonProjectile) {
+/** 특별스킬 스프라이트 FX */
+fun DrawScope.drawSpecialSkillFx(fx: SpecialSkillFx, art: CustomArt?) {
+    val fade = (1f - fx.progress * 0.45f).coerceIn(0.35f, 1f)
+    val bmp = art?.heroAnimFrameOrNull(fx.spriteKey, fx.frame)
+    if (bmp != null) {
+        val mirror = fx.facing == Facing.LEFT || fx.facing == Facing.UP
+        val h = 88f * fx.scale * (1f + fx.progress * 0.12f)
+        // drawCustomSprite 은 alpha 미지원 → 크기·위치로 연출
+        drawCustomSprite(
+            image = bmp,
+            cx = fx.x,
+            footY = fx.y + h * 0.45f,
+            worldHeight = h,
+            mirrorX = mirror,
+        )
+        return
+    }
+    // 폴백: 골드 버스트
+    val r = (36f + fx.progress * 28f) * fx.scale
+    drawCircle(Color(0x66FFE29A).copy(alpha = 0.45f * fade), r, Offset(fx.x, fx.y))
+    drawCircle(Color(0xAAFFF8E0).copy(alpha = 0.55f * fade), r * 0.45f, Offset(fx.x, fx.y))
+}
+
+fun DrawScope.drawDungeonProjectile(p: DungeonProjectile, art: CustomArt? = null) {
+    val key = p.fxSpriteKey
+    if (key != null && art != null) {
+        val frame = (((1.4f - p.life) * 8f).toInt() % 4 + 4) % 4
+        val bmp = art.heroAnimFrameOrNull(key, frame)
+        if (bmp != null) {
+            val ang = atan2(p.vy, p.vx)
+            val mirror = cos(ang) < 0f
+            val h = when (p.style) {
+                WeaponStyle.BOW -> 36f
+                WeaponStyle.MAGIC -> 48f
+                else -> 40f
+            }
+            drawCustomSprite(
+                image = bmp,
+                cx = p.x,
+                footY = p.y + h * 0.35f,
+                worldHeight = h,
+                mirrorX = mirror,
+            )
+            return
+        }
+    }
     when (p.style) {
         WeaponStyle.BOW -> {
             val ang = atan2(p.vy, p.vx)

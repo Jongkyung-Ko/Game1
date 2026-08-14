@@ -39,8 +39,63 @@ data class LevelUpSkillOffer(
     val newlyUnlockedIds: List<String>,
 )
 
+/** 주인공 특별스킬 → 애니 시트 / 근접·탄환 FX 매핑 */
+data class SpecialVfxSpec(
+    /** hero_anim 세트명 (캐릭터 포즈). null이면 일반 slash/bow/magic */
+    val animSet: String? = null,
+    /** 시전자 앞 근접 버스트 FX */
+    val meleeFxKey: String? = null,
+    val meleeFxScale: Float = 1.45f,
+    val meleeFxDuration: Float = 0.55f,
+    /** 탄환 스프라이트 */
+    val projectileFxKey: String? = null,
+    /** 탄환 명중 버스트 */
+    val impactFxKey: String? = null,
+    val animDuration: Float = 0.55f,
+)
+
 object SpecialSkillCatalog {
     const val MAX_SLOTS = 3
+
+    fun vfxFor(skillId: String): SpecialVfxSpec? = when (skillId) {
+        "adv_smash" -> SpecialVfxSpec(
+            animSet = "adv_smash",
+            meleeFxKey = "adv_fx_smash",
+            meleeFxScale = 1.55f,
+        )
+        "adv_flurry" -> SpecialVfxSpec(
+            animSet = "adv_flurry",
+            meleeFxKey = "adv_fx_flurry",
+            meleeFxScale = 1.5f,
+            meleeFxDuration = 0.62f,
+            animDuration = 0.58f,
+        )
+        "adv_charge" -> SpecialVfxSpec(
+            animSet = "adv_charge",
+            meleeFxKey = "adv_fx_charge",
+            meleeFxScale = 1.6f,
+            animDuration = 0.52f,
+        )
+        "adv_shot" -> SpecialVfxSpec(
+            animSet = "adv_shot",
+            projectileFxKey = "adv_fx_arrow",
+            animDuration = 0.5f,
+        )
+        "adv_bolt" -> SpecialVfxSpec(
+            animSet = "adv_bolt",
+            projectileFxKey = "adv_fx_firebolt",
+            impactFxKey = "adv_fx_fireburst",
+            animDuration = 0.52f,
+        )
+        "adv_finisher" -> SpecialVfxSpec(
+            animSet = "adv_finisher",
+            meleeFxKey = "adv_fx_finisher",
+            meleeFxScale = 1.75f,
+            meleeFxDuration = 0.65f,
+            animDuration = 0.62f,
+        )
+        else -> null
+    }
 
     val all: List<SpecialSkillDef> = buildList {
         // —— 모험가 (주인공) ——

@@ -43,10 +43,12 @@ fun DrawScope.drawHero(
     art: CustomArt? = null,
     animKind: HeroAnimKind = HeroAnimKind.IDLE,
     animFrame: Int = 0,
+    specialSet: String? = null,
 ) {
     val attacking = animKind == HeroAnimKind.SLASH ||
         animKind == HeroAnimKind.BOW ||
-        animKind == HeroAnimKind.MAGIC
+        animKind == HeroAnimKind.MAGIC ||
+        specialSet != null
     val bob = if (walking && !attacking) sin(phase) * 2.5f else 0f
     if (art != null) {
         drawCustomHero(
@@ -59,6 +61,7 @@ fun DrawScope.drawHero(
             walkPhase = phase,
             animKind = animKind,
             animFrame = animFrame,
+            specialSet = specialSet,
         )
         return
     }

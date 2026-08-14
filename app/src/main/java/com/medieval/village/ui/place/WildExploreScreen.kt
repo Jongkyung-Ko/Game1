@@ -95,7 +95,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.18 Eastern forest",
+        watermark = "v0.4.19 Eastern forest",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -111,7 +111,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.18 Southern desert",
+        watermark = "v0.4.19 Southern desert",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -127,7 +127,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.18 Northern glacier",
+        watermark = "v0.4.19 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -183,10 +183,12 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
             val heroX = vm.dungeonHeroX
             val heroY = vm.dungeonHeroY
             val slashFx = vm.meleeSlashFx
+            val specialFx = vm.specialSkillFx.toList()
             val projectiles = vm.dungeonProjectiles.toList()
             val combatFrame = vm.dungeonCombatFrame
             val heroAnimKind = vm.heroAnimKind
             val heroAnimFrame = vm.heroAnimFrame
+            val specialAnimSet = vm.specialAnimSet
             val partySlots = vm.partyDrawSlots(heroX, heroY)
             val mapZoom = rememberMapZoomState()
             val viewSize = Size(widthPx, heightPx)
@@ -239,7 +241,7 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                         map.monsters.filter { it.alive }.forEach { monster ->
                             drawWildBeast(atlas, art, theme, monster)
                         }
-                        projectiles.forEach { drawDungeonProjectile(it) }
+                        projectiles.forEach { drawDungeonProjectile(it, art) }
                         drawPartySlots(
                             slots = partySlots,
                             walking = walking,
@@ -249,8 +251,10 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                             art = art,
                             scale = 0.88f,
                             rearScaleFactor = 0.78f,
+                            specialAnimSet = specialAnimSet,
                         )
                         slashFx?.let { drawMeleeSlashFx(it) }
+                        specialFx.forEach { drawSpecialSkillFx(it, art) }
                     }
                 }
                 drawWildMinimap(map, theme, heroX, heroY, viewW, viewH)

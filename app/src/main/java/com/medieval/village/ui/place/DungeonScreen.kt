@@ -116,10 +116,12 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val heroX = vm.dungeonHeroX
             val heroY = vm.dungeonHeroY
             val slashFx = vm.meleeSlashFx
+            val specialFx = vm.specialSkillFx.toList()
             val projectiles = vm.dungeonProjectiles.toList()
             val combatFrame = vm.dungeonCombatFrame
             val heroAnimKind = vm.heroAnimKind
             val heroAnimFrame = vm.heroAnimFrame
+            val specialAnimSet = vm.specialAnimSet
             val partySlots = vm.partyDrawSlots(heroX, heroY)
             val mapZoom = rememberMapZoomState()
             val viewSize = Size(widthPx, heightPx)
@@ -178,7 +180,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         map.monsters.filter { it.alive }.forEach { monster ->
                             drawDungeonMonster(atlas, art, monster)
                         }
-                        projectiles.forEach { drawDungeonProjectile(it) }
+                        projectiles.forEach { drawDungeonProjectile(it, art) }
                         drawPartySlots(
                             slots = partySlots,
                             walking = walking,
@@ -188,13 +190,15 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             art = art,
                             scale = 0.88f,
                             rearScaleFactor = 0.78f,
+                            specialAnimSet = specialAnimSet,
                         )
-                        // 캐릭터 위에 반달 참격이 보이도록 나중에 그림
+                        // 캐릭터 위에 반달 참격·특별 FX가 보이도록 나중에 그림
                         slashFx?.let { drawMeleeSlashFx(it) }
+                        specialFx.forEach { drawSpecialSkillFx(it, art) }
                     }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.18 Special skills", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.19 Hero special FX", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(

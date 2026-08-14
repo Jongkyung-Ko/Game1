@@ -9,6 +9,7 @@ import kotlin.math.floor
 /**
  * 히어로 애니메이션 프레임 선택.
  * walk_side / walk_down / slash / bow / magic 시트에서 고른다.
+ * specialSet 이 있으면 특별스킬 전용 시트(adv_smash 등)를 우선한다.
  */
 fun CustomArt.heroAnimSprite(
     kind: HeroAnimKind,
@@ -16,7 +17,11 @@ fun CustomArt.heroAnimSprite(
     walking: Boolean,
     walkPhase: Float,
     animFrame: Int,
+    specialSet: String? = null,
 ): ImageBitmap? {
+    if (!specialSet.isNullOrBlank()) {
+        heroAnimFrameOrNull(specialSet, animFrame)?.let { return it }
+    }
     val attackKey = when (kind) {
         HeroAnimKind.SLASH -> "slash"
         HeroAnimKind.BOW -> "bow"
@@ -64,12 +69,23 @@ fun DrawScope.drawAnimatedHero(
     worldHeight: Float,
     animKind: HeroAnimKind = HeroAnimKind.IDLE,
     animFrame: Int = 0,
+    specialSet: String? = null,
 ) {
-    val sprite = art.heroAnimSprite(animKind, facing, walking, walkPhase, animFrame) ?: return
+    val sprite = art.heroAnimSprite(
+        kind = animKind,
+        facing = facing,
+        walking = walking,
+        walkPhase = walkPhase,
+        animFrame = animFrame,
+        specialSet = specialSet,
+    ) ?: return
     // 공격 시트는 오른쪽 기준 → LEFT 일 때 반전. UP/DOWN 공격도 측면 시트 사용.
-    val mirror = when (animKind) {
-        HeroAnimKind.SLASH, HeroAnimKind.BOW, HeroAnimKind.MAGIC ->
-            facing == Facing.LEFT || facing == Facing.UP
+    val attacking = animKind == HeroAnimKind.SLASH ||
+        animKind == HeroAnimKind.BOW ||
+        animKind == HeroAnimKind.MAGIC ||
+        specialSet != null
+    val mirror = when {
+        attacking -> facing == Facing.LEFT || facing == Facing.UP
         else -> facing == Facing.LEFT
     }
     drawCustomSprite(

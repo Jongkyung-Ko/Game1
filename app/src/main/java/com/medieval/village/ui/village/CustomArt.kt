@@ -139,6 +139,10 @@ class CustomArt(
         )
         private val HERO_ANIM_SETS = listOf(
             "walk_side", "walk_down", "slash", "bow", "magic",
+            // 주인공 특별스킬
+            "adv_smash", "adv_flurry", "adv_charge", "adv_shot", "adv_bolt", "adv_finisher",
+            "adv_fx_smash", "adv_fx_flurry", "adv_fx_charge", "adv_fx_finisher",
+            "adv_fx_arrow", "adv_fx_firebolt", "adv_fx_fireburst", "adv_fx_beam",
             // 용병 애니메이션
             "warrior_walk", "warrior_slash",
             "rogue_walk", "rogue_slash",
@@ -401,6 +405,7 @@ fun DrawScope.drawCustomHero(
     walkPhase: Float = 0f,
     animKind: com.medieval.village.game.HeroAnimKind = com.medieval.village.game.HeroAnimKind.IDLE,
     animFrame: Int = 0,
+    specialSet: String? = null,
 ) {
     drawAnimatedHero(
         art = art,
@@ -412,5 +417,6 @@ fun DrawScope.drawCustomHero(
         worldHeight = worldHeight,
         animKind = animKind,
         animFrame = animFrame,
+        specialSet = specialSet,
     )
 }

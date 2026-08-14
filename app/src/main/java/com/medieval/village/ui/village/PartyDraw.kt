@@ -20,6 +20,7 @@ fun DrawScope.drawPartySlots(
     art: CustomArt?,
     scale: Float = 0.78f,
     rearScaleFactor: Float = 0.82f,
+    specialAnimSet: String? = null,
 ) {
     // 뒤쪽부터 그려 선두가 위에
     for (i in slots.lastIndex downTo 0) {
@@ -29,7 +30,8 @@ fun DrawScope.drawPartySlots(
         val attacking = slot.isFront && (
             frontAnimKind == HeroAnimKind.SLASH ||
                 frontAnimKind == HeroAnimKind.BOW ||
-                frontAnimKind == HeroAnimKind.MAGIC
+                frontAnimKind == HeroAnimKind.MAGIC ||
+                specialAnimSet != null
             )
         val animKind = when {
             attacking -> frontAnimKind
@@ -50,6 +52,7 @@ fun DrawScope.drawPartySlots(
                 art = art,
                 animKind = animKind,
                 animFrame = animFrame,
+                specialSet = if (slot.isFront) specialAnimSet else null,
             )
         } else {
             drawMercenary(
