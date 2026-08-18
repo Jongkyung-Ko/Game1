@@ -447,8 +447,9 @@ private fun SpecialSkillSlotEditor(
             ) {
                 com.medieval.village.ui.SkillIcon(
                     skillId = id,
-                    size = 36.dp,
+                    size = 40.dp,
                     enabled = def != null,
+                    circular = true,
                 )
                 Text(
                     text = when {

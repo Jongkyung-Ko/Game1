@@ -1553,6 +1553,7 @@ class GameViewModel : ViewModel() {
         val dmg = (base * mult).roundToInt().coerceAtLeast(base + 8)
         say("『${skill.name}』 Lv.$rank! (×${"%.1f".format(mult)} · 피해 $dmg)")
         val vfx = SpecialSkillCatalog.vfxFor(skill.id)
+        emitSfx(SpecialSkillCatalog.sfxKeyFor(skill.id))
         val animKind = when (skill.style) {
             WeaponStyle.MELEE -> HeroAnimKind.SLASH
             WeaponStyle.BOW -> HeroAnimKind.BOW
@@ -1569,7 +1570,6 @@ class GameViewModel : ViewModel() {
         }
         when (skill.style) {
             WeaponStyle.MELEE -> {
-                emitSfx("hit")
                 if (skill.id == "adv_charge" && heroFront) {
                     lungeForward(map, 36f)
                 }
@@ -1582,7 +1582,6 @@ class GameViewModel : ViewModel() {
                 )
             }
             WeaponStyle.BOW -> {
-                emitSfx("click")
                 spawnProjectile(
                     style = WeaponStyle.BOW,
                     damage = dmg,
@@ -1593,7 +1592,6 @@ class GameViewModel : ViewModel() {
                 )
             }
             WeaponStyle.MAGIC -> {
-                emitSfx("click")
                 spawnProjectile(
                     style = WeaponStyle.MAGIC,
                     damage = dmg + 4,

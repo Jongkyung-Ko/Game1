@@ -128,6 +128,32 @@ object SpecialSkillCatalog {
         return def.mpCost + (r - 1) * RANK_MP_STEP
     }
 
+    /** 스킬별 효과음 키 (GameRoot → Sfx 매핑) */
+    fun sfxKeyFor(skillId: String): String = when (skillId) {
+        "adv_smash", "war_rage" -> "skill_smash"
+        "adv_flurry", "rog_vital", "pal_slash" -> "skill_slash"
+        "adv_charge", "war_rush" -> "skill_charge"
+        "adv_shot" -> "skill_bow"
+        "adv_bolt", "mag_blast", "mag_meteor" -> "skill_fire"
+        "adv_finisher" -> "skill_finisher"
+        "war_quake" -> "skill_quake"
+        "war_kill", "rog_assassinate" -> "skill_crit"
+        "war_bash" -> "skill_bash"
+        "war_spin" -> "skill_spin"
+        "rog_stab", "rog_execute" -> "skill_execute"
+        "rog_smoke" -> "skill_smoke"
+        "rog_dual" -> "skill_slash"
+        "mag_ice" -> "skill_ice"
+        "mag_chain" -> "skill_lightning"
+        "mag_orb" -> "skill_orb"
+        "mag_ruin", "pal_holy", "pal_smite", "pal_judge", "pal_wrath", "pal_guard" -> "skill_holy"
+        else -> when (byId(skillId)?.style) {
+            WeaponStyle.BOW -> "skill_bow"
+            WeaponStyle.MAGIC -> "skill_orb"
+            else -> "skill_slash"
+        }
+    }
+
     val all: List<SpecialSkillDef> = buildList {
         // —— 모험가: 근접 가지 / 원거리 가지 → 필살 ——
         addAll(

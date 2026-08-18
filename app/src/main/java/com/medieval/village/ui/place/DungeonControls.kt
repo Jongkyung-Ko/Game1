@@ -231,10 +231,11 @@ private fun SpecialSkillButton(
         if (filled) {
             SkillIcon(
                 skillId = slot.skillId,
-                size = 44.dp,
+                size = 52.dp,
                 art = art,
                 enabled = slot.enabled,
-                showBorder = false,
+                showBorder = true,
+                circular = true,
             )
             if (slot.rank > 1) {
                 Text(

@@ -74,6 +74,22 @@ fun GameRoot(modifier: Modifier = Modifier) {
             "magic_hit" -> audio.playSfx(Sfx.MAGIC_HIT)
             "door" -> audio.playSfx(Sfx.DOOR)
             "click" -> audio.playSfx(Sfx.CLICK)
+            "skill_smash" -> audio.playSfx(Sfx.SKILL_SMASH)
+            "skill_slash" -> audio.playSfx(Sfx.SKILL_SLASH)
+            "skill_charge" -> audio.playSfx(Sfx.SKILL_CHARGE)
+            "skill_bow" -> audio.playSfx(Sfx.SKILL_BOW)
+            "skill_fire" -> audio.playSfx(Sfx.SKILL_FIRE)
+            "skill_ice" -> audio.playSfx(Sfx.SKILL_ICE)
+            "skill_lightning" -> audio.playSfx(Sfx.SKILL_LIGHTNING)
+            "skill_holy" -> audio.playSfx(Sfx.SKILL_HOLY)
+            "skill_crit" -> audio.playSfx(Sfx.SKILL_CRIT)
+            "skill_spin" -> audio.playSfx(Sfx.SKILL_SPIN)
+            "skill_bash" -> audio.playSfx(Sfx.SKILL_BASH)
+            "skill_execute" -> audio.playSfx(Sfx.SKILL_EXECUTE)
+            "skill_orb" -> audio.playSfx(Sfx.SKILL_ORB)
+            "skill_smoke" -> audio.playSfx(Sfx.SKILL_SMOKE)
+            "skill_quake" -> audio.playSfx(Sfx.SKILL_QUAKE)
+            "skill_finisher" -> audio.playSfx(Sfx.SKILL_FINISHER)
         }
     }
 

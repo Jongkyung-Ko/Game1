@@ -4,12 +4,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
@@ -22,7 +25,7 @@ import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 
-/** 스킬 아이콘 — 에셋이 없으면 짧은 이름 폴백 */
+/** 스킬 아이콘 — circular=true 면 슬롯용 원형 크롭. */
 @Composable
 fun SkillIcon(
     skillId: String?,
@@ -31,12 +34,14 @@ fun SkillIcon(
     art: CustomArt? = rememberCustomArtOrNull(),
     enabled: Boolean = true,
     showBorder: Boolean = true,
+    circular: Boolean = false,
 ) {
     val bmp = skillId?.let { art?.skillIconOrNull(it) }
-    val shape = RoundedCornerShape(8.dp)
+    val shape = if (circular) CircleShape else RoundedCornerShape(8.dp)
     Box(
         modifier = modifier
             .size(size)
+            .clip(shape)
             .background(
                 if (skillId != null) Color(0xFF2A1C12) else Color(0x442A1C12),
                 shape,
@@ -44,7 +49,7 @@ fun SkillIcon(
             .then(
                 if (showBorder) {
                     Modifier.border(
-                        1.dp,
+                        if (circular) 2.dp else 1.dp,
                         if (enabled && skillId != null) Palette.Gold else Color(0xFF5A4030),
                         shape,
                     )
@@ -58,10 +63,12 @@ fun SkillIcon(
             Image(
                 bitmap = bmp,
                 contentDescription = skillId,
-                contentScale = ContentScale.Fit,
-                filterQuality = FilterQuality.None,
+                contentScale = if (circular) ContentScale.Crop else ContentScale.Fit,
+                filterQuality = FilterQuality.Medium,
                 alpha = if (enabled) 1f else 0.45f,
-                modifier = Modifier.size(size * 0.92f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(shape),
             )
         } else {
             val short = skillId?.let { SpecialSkillCatalog.byId(it)?.shortName } ?: "—"

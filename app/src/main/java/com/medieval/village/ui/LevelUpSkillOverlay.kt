@@ -150,9 +150,10 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
                         Spacer(Modifier.height(4.dp))
                         SkillIcon(
                             skillId = id,
-                            size = 40.dp,
+                            size = 44.dp,
                             art = art,
                             enabled = def != null,
+                            circular = true,
                         )
                         Text(
                             when {
