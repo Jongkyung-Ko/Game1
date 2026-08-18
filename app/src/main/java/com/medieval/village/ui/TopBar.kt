@@ -29,8 +29,9 @@ import com.medieval.village.ui.theme.Palette
 
 private val tabs = listOf(
     MenuTab.STATUS to "Status",
-    MenuTab.INVENTORY to "Inventory",
-    MenuTab.EQUIPMENT to "Equipment",
+    MenuTab.INVENTORY to "Bag",
+    MenuTab.EQUIPMENT to "Equip",
+    MenuTab.WORLD_MAP to "지도",
     MenuTab.SYSTEM to "System"
 )
 
@@ -69,7 +70,7 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
                     Text(
                         text = label,
                         color = if (selected) Palette.Ink else Palette.Parchment,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
                     )

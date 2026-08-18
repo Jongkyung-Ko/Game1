@@ -40,7 +40,6 @@ import com.medieval.village.model.ItemCatalog
 import com.medieval.village.model.MercenaryCatalog
 import com.medieval.village.model.PlaceId
 import com.medieval.village.model.SkillCatalog
-import com.medieval.village.model.Village
 import com.medieval.village.ui.Chip
 import com.medieval.village.ui.ItemIcon
 import com.medieval.village.ui.ListRow
@@ -84,7 +83,7 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
 @Composable
 private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier: Modifier = Modifier) {
     val modifier = Modifier
-    val place = Village.of(id)
+    val place = vm.placeOf(id)
     val atlas = rememberKenneyAtlas()
     val art = rememberCustomArtOrNull()
     val npcs = remember(id) { InteriorNpcCatalog.forPlace(id) }

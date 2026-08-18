@@ -53,7 +53,7 @@ import com.medieval.village.ui.theme.Palette
 @Composable
 fun MenuOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
     val tab = vm.menuTab
-    if (tab == MenuTab.NONE) return
+    if (tab == MenuTab.NONE || tab == MenuTab.WORLD_MAP) return
 
     Box(
         modifier = modifier

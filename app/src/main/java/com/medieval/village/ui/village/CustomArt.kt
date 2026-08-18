@@ -17,13 +17,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.medieval.village.game.Facing
+import com.medieval.village.model.SettlementId
+import com.medieval.village.model.Settlements
 import com.medieval.village.model.SpecialSkillCatalog
 import com.medieval.village.model.Village
 import kotlin.math.roundToInt
 
 /** 커스텀 마을 맵 + 캐릭터·건물 스프라이트. 로딩 실패 시 null을 허용한다. */
 class CustomArt(
-    val villageMap: ImageBitmap,
+    private val villageMaps: Map<SettlementId, ImageBitmap>,
+    val continentMap: ImageBitmap?,
     private val chars: Map<String, ImageBitmap>,
     private val heroes: Map<String, ImageBitmap>,
     private val buildings: Map<String, ImageBitmap>,
@@ -31,6 +34,13 @@ class CustomArt(
     private val heroAnims: Map<String, List<ImageBitmap>>,
     private val skillIcons: Map<String, ImageBitmap> = emptyMap(),
 ) {
+    /** 하위 호환: 기본(오크헤이븐) 맵 */
+    val villageMap: ImageBitmap
+        get() = villageMaps[SettlementId.OAKHAVEN]
+            ?: villageMaps.values.first()
+
+    fun villageMapFor(id: SettlementId): ImageBitmap? =
+        villageMaps[id] ?: villageMaps[SettlementId.OAKHAVEN]
     fun charOrNull(name: String): ImageBitmap? = chars[name]
 
     fun npcSpriteOrNull(key: String): ImageBitmap? = charOrNull(key)
@@ -190,7 +200,20 @@ class CustomArt(
                 synchronized(this) {
                     cached?.let { return it }
                     val app = context.applicationContext
-                    val village = loadVillageMap(app) ?: return null
+                    val villageMaps = LinkedHashMap<SettlementId, ImageBitmap>()
+                    Settlements.all.forEach { settlement ->
+                        loadAsset(app, "custom/${settlement.mapAsset}", cleanEdges = false)?.let {
+                            villageMaps[settlement.id] = it
+                        }
+                    }
+                    // 구 파일명 폴백
+                    if (SettlementId.OAKHAVEN !in villageMaps) {
+                        loadAsset(app, "custom/village_map.png", cleanEdges = false)?.let {
+                            villageMaps[SettlementId.OAKHAVEN] = it
+                        }
+                    }
+                    if (villageMaps.isEmpty()) return null
+                    val continent = loadAsset(app, "custom/continent_map.png", cleanEdges = false)
                     val chars = LinkedHashMap<String, ImageBitmap>()
                     CHAR_NAMES.forEach { name ->
                         loadAsset(app, "custom/chars/$name.png", cleanEdges = true)?.let {
@@ -239,8 +262,10 @@ class CustomArt(
                         )?.let { skillIcons[skill.id] = it }
                     }
                     Log.i(TAG, "Loaded skill icons: ${skillIcons.size}")
+                    Log.i(TAG, "Loaded village maps: ${villageMaps.keys}")
                     val art = CustomArt(
-                        villageMap = village,
+                        villageMaps = villageMaps,
+                        continentMap = continent,
                         chars = chars,
                         heroes = heroes,
                         buildings = buildings,
@@ -255,12 +280,6 @@ class CustomArt(
                 Log.e(TAG, "Failed to load custom art", t)
                 null
             }
-        }
-
-        private fun loadVillageMap(context: Context): ImageBitmap? {
-            // oakhaven_base 우선, 실패 시 village_map
-            return loadAsset(context, "custom/oakhaven_base.png", cleanEdges = false)
-                ?: loadAsset(context, "custom/village_map.png", cleanEdges = false)
         }
 
         private fun loadAsset(context: Context, path: String, cleanEdges: Boolean): ImageBitmap? {
@@ -329,21 +348,31 @@ fun rememberCustomArt(): CustomArt {
         ?: error("Custom art assets missing — rebuild APK with assets/custom")
 }
 
-fun DrawScope.drawCustomVillageMap(art: CustomArt) {
+fun DrawScope.drawCustomVillageMap(
+    art: CustomArt,
+    settlementId: SettlementId = SettlementId.OAKHAVEN,
+    drawOverlays: Boolean = settlementId == SettlementId.OAKHAVEN,
+) {
+    val map = art.villageMapFor(settlementId) ?: art.villageMap
     drawImage(
-        image = art.villageMap,
+        image = map,
         srcOffset = IntOffset.Zero,
-        srcSize = IntSize(art.villageMap.width, art.villageMap.height),
+        srcSize = IntSize(map.width, map.height),
         dstOffset = IntOffset.Zero,
         dstSize = IntSize(Village.W.roundToInt(), Village.H.roundToInt()),
         filterQuality = FilterQuality.Medium,
     )
-    drawVillageBuildingOverlays(art)
+    if (drawOverlays) {
+        drawVillageBuildingOverlays(art, Settlements.of(settlementId).places)
+    }
 }
 
 /** 맵에 없는 합성 건물(대장간·마법탑·대련소·용병캠프)을 핫스팟에 맞춰 그린다. */
-fun DrawScope.drawVillageBuildingOverlays(art: CustomArt) {
-    Village.places.forEach { place ->
+fun DrawScope.drawVillageBuildingOverlays(
+    art: CustomArt,
+    places: List<com.medieval.village.model.Place> = Settlements.oakhaven.places,
+) {
+    places.forEach { place ->
         val key = place.overlayKey ?: return@forEach
         val image = art.buildingOrNull(key) ?: return@forEach
         val aspect = image.width.toFloat() / image.height.toFloat().coerceAtLeast(1f)

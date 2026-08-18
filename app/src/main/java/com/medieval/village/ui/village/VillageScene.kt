@@ -15,12 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
@@ -45,6 +43,8 @@ import kotlin.math.sin
 fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
     val art = rememberCustomArtOrNull()
     val mapZoom = rememberMapZoomState()
+    val settlement = vm.settlement
+    val places = settlement.places
     BoxWithConstraints(modifier.background(Color(0xFF1A140E))) {
         val density = LocalDensity.current
         val wPx = with(density) { maxWidth.toPx() }
@@ -65,12 +65,12 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(s, ox, oy, mapZoom.zoom, mapZoom.pan) {
+                .pointerInput(s, ox, oy, mapZoom.zoom, mapZoom.pan, settlement.id) {
                     detectTapGestures { tap ->
                         val content = mapZoom.screenToContent(tap, viewSize)
                         val wx = (content.x - ox) / s
                         val wy = (content.y - oy) / s
-                        val hit = Village.places.firstOrNull { p ->
+                        val hit = places.firstOrNull { p ->
                             wx >= p.left - 16f && wx <= p.right + 16f &&
                                 wy >= p.top - 24f && wy <= p.doorY + 20f
                         }
@@ -86,7 +86,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                     scale(s, s, Offset.Zero)
                 }) {
                     if (art != null) {
-                        drawCustomVillageMap(art)
+                        drawCustomVillageMap(art, settlement.id)
                     } else {
                         drawRect(Color(0xFF6F9A54), size = Size(Village.W, Village.H))
                         drawRect(
@@ -96,21 +96,14 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         )
                     }
 
-                    // 건물 핫스팟 + 이름 (같은 Canvas 변환으로 정렬)
-                    Village.places.forEach { p ->
-                        drawRoundRect(
-                            color = Color(0x88FFE29A),
-                            topLeft = Offset(p.left, p.top),
-                            size = Size(p.w, p.h),
-                            cornerRadius = CornerRadius(12f, 12f),
-                            style = Stroke(width = 3.5f)
-                        )
+                    // 건물 이름만 표시 (핫스팟 사각형은 숨김)
+                    places.forEach { p ->
                         drawPlaceLabel(p.name, p.cx, p.top - 6f)
                     }
 
                     // 마을 주민
                     if (art != null) {
-                        Village.townsfolk.forEachIndexed { index, (key, x, y) ->
+                        settlement.townsfolk.forEachIndexed { index, (key, x, y) ->
                             val sprite = art.npcSpriteOrNull(key)
                             if (sprite != null) {
                                 val bob = sin(walkPhase * 0.6f + index) * 1.5f
@@ -143,7 +136,11 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = if (art != null) "Oakhaven · v0.4.23" else "Oakhaven · v0.4.23 (맵 로딩 실패)",
+            text = if (art != null) {
+                "${settlement.nameEn} · v0.4.24"
+            } else {
+                "${settlement.nameEn} · v0.4.24 (맵 로딩 실패)"
+            },
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
@@ -161,7 +158,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                 .padding(8.dp),
         )
 
-        val near = Village.places.firstOrNull {
+        val near = places.firstOrNull {
             hypot(vm.heroX - it.doorX, vm.heroY - it.doorY) < 48f
         }
         if (near != null && !walking) {
@@ -202,8 +199,8 @@ private fun DrawScope.drawPlaceLabel(text: String, cx: Float, baselineY: Float) 
             top - padY,
             cx + width / 2f + padX,
             baselineY + padY,
-            8f,
-            8f,
+            10f,
+            10f,
             bg
         )
         canvas.nativeCanvas.drawText(text, cx, baselineY, paint)

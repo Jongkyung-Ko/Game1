@@ -32,6 +32,9 @@ import com.medieval.village.model.Player
 import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.model.ActorClass
+import com.medieval.village.model.Settlement
+import com.medieval.village.model.SettlementId
+import com.medieval.village.model.Settlements
 import com.medieval.village.model.SkillMapOffer
 import com.medieval.village.model.Skill
 import com.medieval.village.model.SkillSlotUi
@@ -51,7 +54,7 @@ enum class Facing { DOWN, UP, LEFT, RIGHT }
 
 enum class Scene { VILLAGE, INTERIOR }
 
-enum class MenuTab { NONE, STATUS, INVENTORY, EQUIPMENT, SYSTEM }
+enum class MenuTab { NONE, STATUS, INVENTORY, EQUIPMENT, SYSTEM, WORLD_MAP }
 
 /** 도보 탐험 바이옴 */
 enum class ExploreBiome { DUNGEON, FOREST, DESERT, GLACIER }
@@ -136,9 +139,18 @@ class GameViewModel : ViewModel() {
         private set
     var menuTab by mutableStateOf(MenuTab.NONE)
 
-    var heroX by mutableFloatStateOf(Village.of(PlaceId.HOME).doorX)
+    /** 현재 머무는 정착지(마을) */
+    var currentSettlement by mutableStateOf(SettlementId.OAKHAVEN)
         private set
-    var heroY by mutableFloatStateOf(Village.of(PlaceId.HOME).doorY)
+
+    val settlement: Settlement get() = Settlements.of(currentSettlement)
+
+    fun placeOf(id: PlaceId): Place =
+        settlement.ofOrNull(id) ?: Settlements.oakhaven.of(id)
+
+    var heroX by mutableFloatStateOf(Settlements.oakhaven.of(PlaceId.HOME).doorX)
+        private set
+    var heroY by mutableFloatStateOf(Settlements.oakhaven.of(PlaceId.HOME).doorY)
         private set
     var facing by mutableStateOf(Facing.DOWN)
         private set
@@ -314,7 +326,8 @@ class GameViewModel : ViewModel() {
         equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.rustySword)
         equipment[ItemType.ARMOR] = EquippedItem(ItemCatalog.leatherArmor)
 
-        val home = Village.of(PlaceId.HOME)
+        currentSettlement = SettlementId.OAKHAVEN
+        val home = placeOf(PlaceId.HOME)
         heroX = home.doorX
         heroY = home.doorY
         facing = Facing.DOWN
@@ -332,6 +345,39 @@ class GameViewModel : ViewModel() {
         say("풍요의 마을… 한때 '신성한 포도주'로 번영했던 이곳에 눈을 떴다.")
         say("몇 년 전 지하 최심부에서 검붉은 '좀비석'이 발굴된 뒤, 마을은 저주에 잠식되고 있다.")
         say("문을 열고, 지상으로 스며드는 재앙의 근원을 마주하자. 실내에서는 화면을 눌러 걸어 다닐 수 있다.")
+    }
+
+    /** 세계지도에서 정착지로 이동한다. */
+    fun travelToSettlement(id: SettlementId) {
+        if (currentPlace.isExplorePlace()) clearDungeonState()
+        path.clear()
+        pendingEnter = null
+        pubTarget = null
+        pendingPubNpc = null
+        interiorTarget = null
+        pendingInteriorNpc = null
+        interiorPanelOpen = false
+        interiorSpeech = null
+        interiorSpeakerId = null
+        walking = false
+        pubWalking = false
+        val moved = currentSettlement != id
+        currentSettlement = id
+        val home = placeOf(PlaceId.HOME)
+        heroX = home.doorX
+        heroY = home.doorY
+        facing = Facing.DOWN
+        scene = Scene.VILLAGE
+        currentPlace = null
+        menuTab = MenuTab.NONE
+        resetPartyTrail(heroX, heroY)
+        emitSfx("door")
+        val s = Settlements.of(id)
+        if (moved) {
+            say("${s.nameKo}(${s.nameEn})에 도착했다. ${s.blurb}")
+        } else {
+            say("${s.nameKo} 지도를 펼쳤다.")
+        }
     }
 
     // ---------------------------------------------------------------- 스탯 계산
@@ -653,7 +699,7 @@ class GameViewModel : ViewModel() {
 
     fun leavePlace() {
         val id = currentPlace ?: return
-        val place = Village.of(id)
+        val place = placeOf(id)
         heroX = place.doorX
         heroY = place.doorY
         facing = Facing.DOWN
@@ -2066,7 +2112,7 @@ class GameViewModel : ViewModel() {
         pubWalking = false
         interiorSpeech = null
         interiorSpeakerId = null
-        val home = Village.of(PlaceId.HOME)
+        val home = placeOf(PlaceId.HOME)
         heroX = home.doorX
         heroY = home.doorY
         facing = Facing.DOWN

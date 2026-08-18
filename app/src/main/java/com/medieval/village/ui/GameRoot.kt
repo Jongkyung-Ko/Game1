@@ -25,6 +25,7 @@ import com.medieval.village.game.MenuTab
 import com.medieval.village.game.Scene
 import com.medieval.village.game.isExplorePlace
 import com.medieval.village.model.PlaceId
+import com.medieval.village.ui.map.WorldMapOverlay
 import com.medieval.village.ui.menu.MenuOverlay
 import com.medieval.village.ui.place.PlaceScreen
 import com.medieval.village.ui.theme.Palette
@@ -133,6 +134,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
                 )
             }
             MenuOverlay(vm)
+            WorldMapOverlay(vm)
             LevelUpSkillOverlay(vm)
         }
     }
