@@ -189,7 +189,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             frontAnimFrame = heroAnimFrame,
                             art = art,
                             scale = 0.88f,
-                            rearScaleFactor = 0.78f,
+                            rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
                             specialAnimSet = specialAnimSet,
                         )
                         // 캐릭터 위에 반달 참격·특별 FX가 보이도록 나중에 그림
@@ -198,7 +198,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.22 Skill SFX", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel("v0.4.23 Party scale", 14f, 28f, 18f, Color(0xFF5A4231))
             }
 
             DungeonCombatHud(

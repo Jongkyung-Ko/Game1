@@ -50,7 +50,8 @@ fun DrawScope.drawMercenary(
             image = sprite,
             cx = x,
             footY = y + bob,
-            worldHeight = 72f * scale,
+            // 주인공과 동일 기준 높이 — 선두/후열 스케일로만 크기 구분
+            worldHeight = 96f * scale,
             mirrorX = mirror,
         )
         return

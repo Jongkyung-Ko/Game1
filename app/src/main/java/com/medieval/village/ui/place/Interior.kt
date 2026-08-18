@@ -91,7 +91,7 @@ fun DrawScope.drawWalkableInterior(
         mercs = companions,
         art = art,
         heroScale = 1.05f,
-        mercScale = 0.80f,
+        mercScale = 0.74f,
         frontIndex = frontIndex,
         slots = partySlots,
     )

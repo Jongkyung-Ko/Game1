@@ -7,9 +7,12 @@ import com.medieval.village.game.PartyDrawSlot
 import com.medieval.village.game.PartyFormation
 import com.medieval.village.model.Mercenary
 
+/** 선두 대비 후열 크기 비율 */
+const val PARTY_REAR_SCALE_FACTOR = 0.70f
+
 /**
  * 궤적 추종 슬롯으로 파티를 그린다.
- * 선두는 크게, 후열은 작게. 각자 슬롯의 facing 사용.
+ * 선두(주인공·용병 공통)는 동일 크기, 후열은 선두의 70%.
  */
 fun DrawScope.drawPartySlots(
     slots: List<PartyDrawSlot>,
@@ -18,8 +21,8 @@ fun DrawScope.drawPartySlots(
     frontAnimKind: HeroAnimKind,
     frontAnimFrame: Int,
     art: CustomArt?,
-    scale: Float = 0.78f,
-    rearScaleFactor: Float = 0.82f,
+    scale: Float = 0.88f,
+    rearScaleFactor: Float = PARTY_REAR_SCALE_FACTOR,
     specialAnimSet: String? = null,
 ) {
     // 뒤쪽부터 그려 선두가 위에
@@ -83,8 +86,8 @@ fun DrawScope.drawBattleLineParty(
     frontAnimKind: HeroAnimKind,
     frontAnimFrame: Int,
     art: CustomArt?,
-    scale: Float = 0.78f,
-    rearScaleFactor: Float = 0.82f,
+    scale: Float = 0.88f,
+    rearScaleFactor: Float = PARTY_REAR_SCALE_FACTOR,
 ) {
     val line = PartyFormation.battleLine(frontIndex, party)
     val slots = line.mapIndexed { i, actor ->
@@ -112,7 +115,8 @@ fun DrawScope.drawVillageFollowParty(
     mercs: List<Mercenary>,
     art: CustomArt?,
     heroScale: Float = 1f,
-    mercScale: Float = 0.82f,
+    /** @deprecated 후열은 항상 선두의 [PARTY_REAR_SCALE_FACTOR] */
+    mercScale: Float = heroScale * PARTY_REAR_SCALE_FACTOR,
     frontIndex: Int = 0,
     frontAnimKind: HeroAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
     frontAnimFrame: Int = 0,
@@ -127,7 +131,7 @@ fun DrawScope.drawVillageFollowParty(
             frontAnimFrame = frontAnimFrame,
             art = art,
             scale = heroScale,
-            rearScaleFactor = if (heroScale <= 0f) 0.82f else mercScale / heroScale,
+            rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
         )
         return
     }
@@ -143,7 +147,7 @@ fun DrawScope.drawVillageFollowParty(
         frontAnimFrame = frontAnimFrame,
         art = art,
         scale = heroScale,
-        rearScaleFactor = if (heroScale <= 0f) 0.82f else mercScale / heroScale,
+        rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
     )
 }
 

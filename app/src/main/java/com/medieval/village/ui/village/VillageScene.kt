@@ -133,7 +133,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         mercs = party,
                         art = art,
                         heroScale = 1.08f,
-                        mercScale = 0.82f,
+                        mercScale = 0.76f  // 선두 대비 ~70% (실제는 PARTY_REAR_SCALE_FACTOR),
                         frontIndex = frontIndex,
                         frontAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
                         slots = partySlots,
@@ -143,7 +143,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = if (art != null) "Oakhaven · v0.4.22" else "Oakhaven · v0.4.22 (맵 로딩 실패)",
+            text = if (art != null) "Oakhaven · v0.4.23" else "Oakhaven · v0.4.23 (맵 로딩 실패)",
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
