@@ -167,9 +167,9 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     }
 
     Spacer(Modifier.height(10.dp))
-    SectionTitle("특별스킬 슬롯 (전투)")
+    SectionTitle("직업 스킬맵 (전투)")
     Text(
-        "레벨 업 시 해금 · 탐험 공격 버튼 위에 최대 3개 장착",
+        "직군별로만 배울 수 있다. 레벨업으로 SP를 모아 스킬을 배우거나 강화한다.",
         color = Palette.ParchmentDim,
         fontSize = 11.sp,
     )
@@ -417,19 +417,29 @@ private fun SpecialSkillSlotEditor(
     var selectedSlot by remember(actorKey) { mutableStateOf(0) }
     val known = vm.knownSpecialSkills(actorKey)
     val slots = vm.slottedSpecialIds(actorKey)
+    val points = vm.skillPointsOf(actorKey)
     Text(actorLabel, color = Palette.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     Text(
-        "${actorClass.label} · 해금 ${known.size}/6",
+        "${actorClass.label} · 습득 ${known.size}/6 · SP $points",
         color = Palette.ParchmentDim,
         fontSize = 11.sp,
     )
     Spacer(Modifier.height(4.dp))
+    WoodButton("스킬맵 열기") {
+        vm.openSkillMap(actorKey = actorKey, actorClass = actorClass, fromLevelUp = false)
+    }
+    Spacer(Modifier.height(4.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         slots.forEachIndexed { index, id ->
             val def = id?.let { SpecialSkillCatalog.byId(it) }
+            val rank = if (id != null) vm.skillRankOf(actorKey, id) else 0
             val selected = selectedSlot == index
             Text(
-                text = def?.shortName ?: "슬롯${index + 1}",
+                text = when {
+                    def == null -> "슬롯${index + 1}"
+                    rank > 1 -> "${def.shortName}$rank"
+                    else -> def.shortName
+                },
                 color = if (selected) Palette.Ink else Palette.Parchment,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
@@ -445,7 +455,7 @@ private fun SpecialSkillSlotEditor(
         WoodButton("비우기") { vm.clearSpecialSlot(actorKey, selectedSlot) }
     }
     if (known.isEmpty()) {
-        Text("Lv.2부터 특별스킬이 해금된다.", color = Palette.ParchmentDim, fontSize = 11.sp)
+        Text("스킬맵에서 SP로 스킬을 배우세요. (Lv.2+)", color = Palette.ParchmentDim, fontSize = 11.sp)
     } else {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -453,8 +463,10 @@ private fun SpecialSkillSlotEditor(
             modifier = Modifier.padding(top = 4.dp),
         ) {
             known.forEach { skill ->
+                val rank = vm.skillRankOf(actorKey, skill.id)
+                val mult = SpecialSkillCatalog.damageMultAt(skill, rank)
                 Text(
-                    text = "${skill.name} ×${"%.1f".format(skill.damageMult)}",
+                    text = "${skill.name} Lv.$rank ×${"%.1f".format(mult)}",
                     color = Palette.Parchment,
                     fontSize = 11.sp,
                     modifier = Modifier

@@ -32,7 +32,7 @@ import com.medieval.village.model.Player
 import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.model.ActorClass
-import com.medieval.village.model.LevelUpSkillOffer
+import com.medieval.village.model.SkillMapOffer
 import com.medieval.village.model.Skill
 import com.medieval.village.model.SkillSlotUi
 import com.medieval.village.model.SpecialSkillCatalog
@@ -108,18 +108,22 @@ class GameViewModel : ViewModel() {
     var frontIndex by mutableIntStateOf(0)
         private set
 
-    /** actorKey("hero"/용병id) → 해금된 특별스킬 id */
-    private val knownSpecialIds = mutableStateMapOf<String, Set<String>>()
+    /** actorKey("hero"/용병id) → 스킬id → 랭크(1..MAX). 없으면 미습득 */
+    private val skillRanks = mutableStateMapOf<String, MutableMap<String, Int>>()
+    /** actorKey → 남은 스킬포인트 */
+    private val skillPoints = mutableStateMapOf<String, Int>()
     /** actorKey → 장착 슬롯 3개 (skill id or null) */
     private val specialSlots = mutableStateMapOf<String, List<String?>>()
-    /** 레벨업 시 슬롯 업데이트 UI */
-    var levelUpSkillOffer by mutableStateOf<LevelUpSkillOffer?>(null)
+    /** 레벨업·메뉴 스킬맵 UI */
+    var levelUpSkillOffer by mutableStateOf<SkillMapOffer?>(null)
         private set
+    /** 여러 캐릭터가 연속 레벨업할 때 대기열 */
+    private val skillMapQueue = ArrayDeque<SkillMapOffer>()
     /** 특별스킬 쿨다운 (전투 HUD) */
     var specialReady by mutableStateOf(true)
         private set
     private var specialCooldown = 0f
-    /** Compose 구독용 — 슬롯 변경 시 증가 */
+    /** Compose 구독용 — 슬롯/랭크 변경 시 증가 */
     var specialSkillRevision by mutableIntStateOf(0)
         private set
 
@@ -284,9 +288,11 @@ class GameViewModel : ViewModel() {
         mercHp.clear()
         frontIndex = 0
         partyTrail.clear()
-        knownSpecialIds.clear()
+        skillRanks.clear()
+        skillPoints.clear()
         specialSlots.clear()
         levelUpSkillOffer = null
+        skillMapQueue.clear()
         specialCooldown = 0f
         specialReady = true
         specialSkillRevision = 0
@@ -1025,7 +1031,8 @@ class GameViewModel : ViewModel() {
         party.removeAll { it.id == merc.id }
         activeMercenaryIds.remove(merc.id)
         mercHp.remove(merc.id)
-        knownSpecialIds.remove(merc.id)
+        skillRanks.remove(merc.id)
+        skillPoints.remove(merc.id)
         specialSlots.remove(merc.id)
         specialSkillRevision++
         clampFrontIndex()
@@ -1269,10 +1276,11 @@ class GameViewModel : ViewModel() {
         refreshAttackReady()
     }
 
-    // ---------------------------------------------------------------- 특별스킬
+    // ---------------------------------------------------------------- 특별스킬 / 스킬맵
 
     private fun ensureActorSkillState(actorKey: String) {
-        if (knownSpecialIds[actorKey] == null) knownSpecialIds[actorKey] = emptySet()
+        if (skillRanks[actorKey] == null) skillRanks[actorKey] = mutableMapOf()
+        if (skillPoints[actorKey] == null) skillPoints[actorKey] = 0
         if (specialSlots[actorKey] == null) {
             specialSlots[actorKey] = List(SpecialSkillCatalog.MAX_SLOTS) { null }
         }
@@ -1282,11 +1290,32 @@ class GameViewModel : ViewModel() {
 
     private fun frontActorClass(): ActorClass = SpecialSkillCatalog.actorClassOf(frontMercenary())
 
+    private fun actorLevelOf(actorKey: String): Int {
+        if (actorKey == HERO_SKILL_KEY) return player.level
+        return party.firstOrNull { it.id == actorKey }?.level ?: 1
+    }
+
+    private fun actorClassOfKey(actorKey: String): ActorClass {
+        if (actorKey == HERO_SKILL_KEY) return ActorClass.ADVENTURER
+        return SpecialSkillCatalog.actorClassOf(party.firstOrNull { it.id == actorKey })
+    }
+
+    fun skillPointsOf(actorKey: String): Int {
+        ensureActorSkillState(actorKey)
+        return skillPoints[actorKey] ?: 0
+    }
+
+    fun skillRankOf(actorKey: String, skillId: String): Int {
+        ensureActorSkillState(actorKey)
+        return skillRanks[actorKey]?.get(skillId) ?: 0
+    }
+
     fun knownSpecialSkills(actorKey: String): List<SpecialSkillDef> {
         ensureActorSkillState(actorKey)
-        val known = knownSpecialIds[actorKey].orEmpty()
-        return known.mapNotNull { SpecialSkillCatalog.byId(it) }
-            .sortedBy { it.unlockLevel }
+        val ranks = skillRanks[actorKey].orEmpty()
+        return ranks.filterValues { it > 0 }.keys
+            .mapNotNull { SpecialSkillCatalog.byId(it) }
+            .sortedWith(compareBy({ it.mapCol }, { it.mapRow }))
     }
 
     fun slottedSpecialIds(actorKey: String): List<String?> {
@@ -1302,11 +1331,17 @@ class GameViewModel : ViewModel() {
         val slots = slottedSpecialIds(key)
         return slots.mapIndexed { index, id ->
             val def = id?.let { SpecialSkillCatalog.byId(it) }
-            val mpOk = def == null || player.mp >= def.mpCost
+            val rank = if (id != null) skillRankOf(key, id) else 0
+            val mp = if (def != null) SpecialSkillCatalog.mpCostAt(def, rank.coerceAtLeast(1)) else 0
+            val mpOk = def == null || player.mp >= mp
             SkillSlotUi(
                 slotIndex = index,
                 skillId = id,
-                shortName = def?.shortName ?: "—",
+                shortName = when {
+                    def == null -> "—"
+                    rank > 1 -> "${def.shortName}$rank"
+                    else -> def.shortName
+                },
                 enabled = def != null &&
                     specialReady &&
                     attackCooldown <= 0f &&
@@ -1314,9 +1349,69 @@ class GameViewModel : ViewModel() {
                     !dungeonCombatLock &&
                     mpOk &&
                     levelUpSkillOffer == null,
-                mpCost = def?.mpCost ?: 0,
+                mpCost = mp,
+                rank = rank,
             )
         }
+    }
+
+    /** 선행·레벨·직군 조건을 만족하면 true (포인트는 별도 검사) */
+    fun canUnlockSkill(actorKey: String, skillId: String): Boolean {
+        ensureActorSkillState(actorKey)
+        val def = SpecialSkillCatalog.byId(skillId) ?: return false
+        if (def.actorClass != actorClassOfKey(actorKey)) return false
+        if (skillRankOf(actorKey, skillId) > 0) return false
+        if (actorLevelOf(actorKey) < def.unlockLevel) return false
+        return def.requires.all { skillRankOf(actorKey, it) > 0 }
+    }
+
+    fun canRankUpSkill(actorKey: String, skillId: String): Boolean {
+        val def = SpecialSkillCatalog.byId(skillId) ?: return false
+        if (def.actorClass != actorClassOfKey(actorKey)) return false
+        val rank = skillRankOf(actorKey, skillId)
+        return rank in 1 until def.maxRank
+    }
+
+    fun learnSpecialSkill(actorKey: String, skillId: String): Boolean {
+        ensureActorSkillState(actorKey)
+        val def = SpecialSkillCatalog.byId(skillId) ?: return false
+        if (!canUnlockSkill(actorKey, skillId)) return false
+        val pts = skillPoints[actorKey] ?: 0
+        if (pts < def.learnCost) {
+            say("스킬포인트가 부족하다. (필요 ${def.learnCost})")
+            return false
+        }
+        skillPoints[actorKey] = pts - def.learnCost
+        skillRanks.getOrPut(actorKey) { mutableMapOf() }[skillId] = 1
+        // 빈 슬롯에 자동 장착
+        val slots = specialSlots[actorKey].orEmpty().toMutableList()
+        while (slots.size < SpecialSkillCatalog.MAX_SLOTS) slots += null
+        val empty = slots.indexOfFirst { it == null }
+        if (empty >= 0 && skillId !in slots) {
+            slots[empty] = skillId
+            specialSlots[actorKey] = slots.toList()
+        }
+        specialSkillRevision++
+        say("『${def.name}』을(를) 배웠다! (Lv.1)")
+        return true
+    }
+
+    fun rankUpSpecialSkill(actorKey: String, skillId: String): Boolean {
+        ensureActorSkillState(actorKey)
+        val def = SpecialSkillCatalog.byId(skillId) ?: return false
+        if (!canRankUpSkill(actorKey, skillId)) return false
+        val pts = skillPoints[actorKey] ?: 0
+        if (pts < def.rankUpCost) {
+            say("스킬포인트가 부족하다. (필요 ${def.rankUpCost})")
+            return false
+        }
+        val next = skillRankOf(actorKey, skillId) + 1
+        skillPoints[actorKey] = pts - def.rankUpCost
+        skillRanks.getOrPut(actorKey) { mutableMapOf() }[skillId] = next
+        specialSkillRevision++
+        val mult = SpecialSkillCatalog.damageMultAt(def, next)
+        say("『${def.name}』 랭크 업! Lv.$next · ×${"%.1f".format(mult)}")
+        return true
     }
 
     private fun onActorLevelUp(
@@ -1328,44 +1423,71 @@ class GameViewModel : ViewModel() {
         if (levelsGained.isEmpty()) return
         val newLevel = levelsGained.last()
         ensureActorSkillState(actorKey)
-        val newly = levelsGained.flatMap { SpecialSkillCatalog.unlocksAt(cls, it) }
-            .distinctBy { it.id }
-        val known = knownSpecialIds[actorKey].orEmpty().toMutableSet()
-        newly.forEach { known += it.id }
-        // 이전 레벨에서 놓친 해금도 보정
-        SpecialSkillCatalog.unlockedUpTo(cls, newLevel).forEach { known += it.id }
-        knownSpecialIds[actorKey] = known
-        newly.forEach { say("${actorName} 특별스킬 『${it.name}』 해금!") }
-        // 빈 슬롯이 있으면 새 스킬 자동 장착
-        val slots = specialSlots[actorKey].orEmpty().toMutableList()
-        while (slots.size < SpecialSkillCatalog.MAX_SLOTS) slots += null
-        newly.forEach { skill ->
-            val empty = slots.indexOfFirst { it == null }
-            if (empty >= 0 && skill.id !in slots) slots[empty] = skill.id
-        }
-        specialSlots[actorKey] = slots.toList()
+        val gained = levelsGained.size
+        skillPoints[actorKey] = (skillPoints[actorKey] ?: 0) + gained
         specialSkillRevision++
-        if (known.isEmpty()) return
-        levelUpSkillOffer = LevelUpSkillOffer(
+        say("$actorName 스킬포인트 +$gained (보유 ${skillPoints[actorKey]})")
+        openSkillMap(
             actorKey = actorKey,
             actorName = actorName,
             actorClass = cls,
-            newLevel = newLevel,
-            newlyUnlockedIds = newly.map { it.id },
+            actorLevel = newLevel,
+            pointsGranted = gained,
+            fromLevelUp = true,
         )
-        say("특별스킬 슬롯을 업데이트할 수 있다. (최대 ${SpecialSkillCatalog.MAX_SLOTS}개)")
+    }
+
+    fun openSkillMap(
+        actorKey: String,
+        actorName: String = if (actorKey == HERO_SKILL_KEY) player.name
+        else party.firstOrNull { it.id == actorKey }?.name ?: actorKey,
+        actorClass: ActorClass = actorClassOfKey(actorKey),
+        actorLevel: Int = actorLevelOf(actorKey),
+        pointsGranted: Int = 0,
+        fromLevelUp: Boolean = false,
+    ) {
+        ensureActorSkillState(actorKey)
+        val offer = SkillMapOffer(
+            actorKey = actorKey,
+            actorName = actorName,
+            actorClass = actorClass,
+            actorLevel = actorLevel,
+            pointsGranted = pointsGranted,
+            fromLevelUp = fromLevelUp,
+        )
+        if (levelUpSkillOffer == null) {
+            levelUpSkillOffer = offer
+        } else if (
+            levelUpSkillOffer?.actorKey == actorKey &&
+            levelUpSkillOffer?.fromLevelUp == true &&
+            fromLevelUp
+        ) {
+            // 같은 캐릭터 연속 레벨업이면 최신 레벨로 갱신·SP는 이미 합산됨
+            levelUpSkillOffer = offer.copy(
+                pointsGranted = (levelUpSkillOffer?.pointsGranted ?: 0) + pointsGranted,
+            )
+        } else if (fromLevelUp) {
+            skillMapQueue.addLast(offer)
+        } else {
+            // 메뉴에서 연 경우 현재 세션을 덮어씀
+            levelUpSkillOffer = offer
+        }
+        specialSkillRevision++
+        if (fromLevelUp) {
+            say("스킬맵에서 배울 스킬·강화할 스킬을 고르세요.")
+        }
     }
 
     fun setSpecialSlot(actorKey: String, slotIndex: Int, skillId: String?) {
         ensureActorSkillState(actorKey)
         if (slotIndex !in 0 until SpecialSkillCatalog.MAX_SLOTS) return
         if (skillId != null) {
-            if (skillId !in knownSpecialIds[actorKey].orEmpty()) return
-            SpecialSkillCatalog.byId(skillId) ?: return
+            if (skillRankOf(actorKey, skillId) <= 0) return
+            val def = SpecialSkillCatalog.byId(skillId) ?: return
+            if (def.actorClass != actorClassOfKey(actorKey)) return
         }
         val slots = specialSlots[actorKey].orEmpty().toMutableList()
         while (slots.size < SpecialSkillCatalog.MAX_SLOTS) slots += null
-        // 같은 스킬이 다른 슬롯에 있으면 제거
         if (skillId != null) {
             for (i in slots.indices) if (slots[i] == skillId) slots[i] = null
         }
@@ -1379,17 +1501,18 @@ class GameViewModel : ViewModel() {
     }
 
     fun dismissLevelUpSkillOffer() {
-        levelUpSkillOffer = null
+        levelUpSkillOffer = skillMapQueue.removeFirstOrNull()
     }
 
     fun confirmLevelUpSkillOffer() {
         val offer = levelUpSkillOffer ?: return
         val filled = slottedSpecialIds(offer.actorKey).count { it != null }
-        say("${offer.actorName} 특별스킬 ${filled}개를 장착했다.")
-        levelUpSkillOffer = null
+        val learned = knownSpecialSkills(offer.actorKey).size
+        say("${offer.actorName} 스킬맵 완료 · 습득 ${learned} · 장착 ${filled}/${SpecialSkillCatalog.MAX_SLOTS} · SP ${skillPointsOf(offer.actorKey)}")
+        levelUpSkillOffer = skillMapQueue.removeFirstOrNull()
     }
 
-    /** 탐험 중 특별스킬 — 일반 공격의 약 3배 피해 */
+    /** 탐험 중 특별스킬 — 랭크에 따라 피해 상승 */
     fun dungeonSpecialAttack(slotIndex: Int) {
         val map = dungeonFloor ?: return
         if (dungeonCombatLock || attackCooldown > 0f || specialCooldown > 0f) return
@@ -1407,11 +1530,13 @@ class GameViewModel : ViewModel() {
             say("지금 선두 직업으로는 쓸 수 없는 스킬이다.")
             return
         }
-        if (player.mp < skill.mpCost) {
-            say("마나가 부족하다. (MP ${skill.mpCost})")
+        val rank = skillRankOf(key, skillId).coerceAtLeast(1)
+        val mpCost = SpecialSkillCatalog.mpCostAt(skill, rank)
+        if (player.mp < mpCost) {
+            say("마나가 부족하다. (MP $mpCost)")
             return
         }
-        player = player.copy(mp = player.mp - skill.mpCost)
+        player = player.copy(mp = player.mp - mpCost)
         attackCooldown = ATTACK_COOLDOWN
         specialCooldown = SPECIAL_COOLDOWN
         specialReady = false
@@ -1424,15 +1549,15 @@ class GameViewModel : ViewModel() {
         } else {
             (totalAtk + partyPower / 2 + blessBonus() / 2 + Random.nextInt(0, 5)).coerceAtLeast(4)
         }
-        val dmg = (base * skill.damageMult).roundToInt().coerceAtLeast(base + 8)
-        say("『${skill.name}』! (×${"%.1f".format(skill.damageMult)} · 피해 $dmg)")
+        val mult = SpecialSkillCatalog.damageMultAt(skill, rank)
+        val dmg = (base * mult).roundToInt().coerceAtLeast(base + 8)
+        say("『${skill.name}』 Lv.$rank! (×${"%.1f".format(mult)} · 피해 $dmg)")
         val vfx = SpecialSkillCatalog.vfxFor(skill.id)
         val animKind = when (skill.style) {
             WeaponStyle.MELEE -> HeroAnimKind.SLASH
             WeaponStyle.BOW -> HeroAnimKind.BOW
             WeaponStyle.MAGIC -> HeroAnimKind.MAGIC
         }
-        // 주인공(모험가)만 전용 특별 애니 — 용병은 일반 공격 시트 + 강화 FX
         val heroFront = frontMercenary() == null
         startAttackAnim(
             kind = animKind,
