@@ -55,6 +55,7 @@ import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
+import com.medieval.village.ui.village.PARTY_REAR_SCALE_FACTOR
 import com.medieval.village.ui.village.drawPartySlots
 import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawKenneySprite

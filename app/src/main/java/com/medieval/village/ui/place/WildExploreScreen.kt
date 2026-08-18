@@ -52,6 +52,7 @@ import com.medieval.village.ui.withMapZoom
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
+import com.medieval.village.ui.village.PARTY_REAR_SCALE_FACTOR
 import com.medieval.village.ui.village.TownTiles
 import com.medieval.village.ui.village.drawPartySlots
 import com.medieval.village.ui.village.drawCustomSprite
