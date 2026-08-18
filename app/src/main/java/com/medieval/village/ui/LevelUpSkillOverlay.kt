@@ -41,6 +41,7 @@ import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.SpecialSkillCatalog
 import com.medieval.village.model.SpecialSkillDef
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.village.rememberCustomArtOrNull
 
 /**
  * 직군별 스킬맵 — 레벨업/메뉴에서 스킬을 배우거나 랭크업하고, 전투 슬롯에 장착한다.
@@ -50,6 +51,7 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
     val offer = vm.levelUpSkillOffer ?: return
     @Suppress("UNUSED_EXPRESSION")
     vm.specialSkillRevision
+    val art = rememberCustomArtOrNull()
 
     val tree = remember(offer.actorClass) { SpecialSkillCatalog.forClass(offer.actorClass) }
     var selectedId by remember(offer.actorKey, offer.actorLevel) {
@@ -103,6 +105,7 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
                 vm = vm,
                 selectedId = selectedId,
                 onSelect = { selectedId = it },
+                art = art,
             )
 
             Spacer(Modifier.height(10.dp))
@@ -115,6 +118,7 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
                     points = points,
                     vm = vm,
                     selectedSlot = selectedSlot,
+                    art = art,
                 )
             }
 
@@ -143,14 +147,21 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text("슬롯 ${index + 1}", color = Palette.ParchmentDim, fontSize = 10.sp)
+                        Spacer(Modifier.height(4.dp))
+                        SkillIcon(
+                            skillId = id,
+                            size = 40.dp,
+                            art = art,
+                            enabled = def != null,
+                        )
                         Text(
                             when {
                                 def == null -> "비움"
-                                r > 1 -> "${def.shortName}$r"
+                                r > 1 -> "Lv.$r"
                                 else -> def.shortName
                             },
                             color = if (def != null) Palette.Gold else Palette.ParchmentDim,
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
                         )
@@ -188,6 +199,7 @@ private fun SkillDetailPanel(
     points: Int,
     vm: GameViewModel,
     selectedSlot: Int,
+    art: com.medieval.village.ui.village.CustomArt?,
 ) {
     val learned = rank > 0
     val canLearn = vm.canUnlockSkill(actorKey, skill.id)
@@ -204,9 +216,15 @@ private fun SkillDetailPanel(
             .border(1.dp, Color(0xFF6A5040), RoundedCornerShape(10.dp))
             .padding(10.dp)
     ) {
-        Text(skill.name, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-        Text(skill.desc, color = Palette.ParchmentDim, fontSize = 11.sp)
-        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SkillIcon(skillId = skill.id, size = 52.dp, art = art, enabled = learned || canLearn)
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(skill.name, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(skill.desc, color = Palette.ParchmentDim, fontSize = 11.sp)
+            }
+        }
+        Spacer(Modifier.height(6.dp))
         Text(
             when {
                 learned -> "랭크 $rank/${skill.maxRank} · ×${"%.1f".format(multNow)} · MP $mpNow"
@@ -262,11 +280,12 @@ private fun SkillMapGraph(
     vm: GameViewModel,
     selectedId: String?,
     onSelect: (String) -> Unit,
+    art: com.medieval.village.ui.village.CustomArt?,
 ) {
     val cols = (skills.maxOfOrNull { it.mapCol } ?: 0) + 1
     val rows = (skills.maxOfOrNull { it.mapRow } ?: 0) + 1
-    val cellW = 78.dp
-    val cellH = 64.dp
+    val cellW = 86.dp
+    val cellH = 92.dp
     val byPos = skills.associateBy { it.mapCol to it.mapRow }
 
     Box(
@@ -307,7 +326,7 @@ private fun SkillMapGraph(
                     val learned = rank > 0
                     val available = vm.canUnlockSkill(actorKey, skill.id)
                     val selected = selectedId == skill.id
-                    Box(
+                    Column(
                         modifier = Modifier
                             .offset(x = cellW * c, y = cellH * r)
                             .size(cellW, cellH)
@@ -331,34 +350,42 @@ private fun SkillMapGraph(
                                 },
                                 RoundedCornerShape(10.dp),
                             )
-                            .clickable { onSelect(skill.id) },
-                        contentAlignment = Alignment.Center,
+                            .clickable { onSelect(skill.id) }
+                            .padding(4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                skill.shortName,
-                                color = when {
-                                    learned || available -> Palette.Parchment
-                                    else -> Color(0xFF6A5A4A)
-                                },
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                            )
-                            Text(
-                                when {
-                                    learned -> "Lv.$rank"
-                                    available -> "배움"
-                                    else -> "Lv.${skill.unlockLevel}"
-                                },
-                                color = when {
-                                    learned -> Palette.Gold
-                                    available -> Palette.Mana
-                                    else -> Color(0xFF5A4A3A)
-                                },
-                                fontSize = 10.sp,
-                            )
-                        }
+                        SkillIcon(
+                            skillId = skill.id,
+                            size = 40.dp,
+                            art = art,
+                            enabled = learned || available,
+                            showBorder = false,
+                        )
+                        Text(
+                            skill.shortName,
+                            color = when {
+                                learned || available -> Palette.Parchment
+                                else -> Color(0xFF6A5A4A)
+                            },
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                        )
+                        Text(
+                            when {
+                                learned -> "Lv.$rank"
+                                available -> "배움"
+                                else -> "Lv.${skill.unlockLevel}"
+                            },
+                            color = when {
+                                learned -> Palette.Gold
+                                available -> Palette.Mana
+                                else -> Color(0xFF5A4A3A)
+                            },
+                            fontSize = 9.sp,
+                        )
                     }
                 }
             }

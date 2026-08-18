@@ -43,9 +43,11 @@ import com.medieval.village.game.dirX
 import com.medieval.village.game.dirY
 import com.medieval.village.model.SkillSlotUi
 import com.medieval.village.model.WeaponStyle
+import com.medieval.village.ui.SkillIcon
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.drawCustomSprite
+import com.medieval.village.ui.village.rememberCustomArtOrNull
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -208,9 +210,10 @@ private fun SpecialSkillButton(
     onClick: () -> Unit,
 ) {
     val filled = slot.skillId != null
+    val art = rememberCustomArtOrNull()
     Box(
         modifier = Modifier
-            .size(52.dp)
+            .size(56.dp)
             .background(
                 when {
                     !filled -> Color(0x442A1C12)
@@ -225,26 +228,33 @@ private fun SpecialSkillButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = slot.shortName,
-                color = when {
-                    !filled -> Color(0x66C8B8A0)
-                    slot.enabled -> Palette.Gold
-                    else -> Color(0x88C8B8A0)
-                },
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
+        if (filled) {
+            SkillIcon(
+                skillId = slot.skillId,
+                size = 44.dp,
+                art = art,
+                enabled = slot.enabled,
+                showBorder = false,
             )
-            if (filled && slot.mpCost > 0) {
+            if (slot.rank > 1) {
                 Text(
-                    "MP${slot.mpCost}",
-                    color = if (slot.enabled) Palette.Mana else Color(0x6655AACC),
+                    "Lv${slot.rank}",
+                    color = if (slot.enabled) Palette.Gold else Color(0x88C8B8A0),
                     fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .background(Color(0xAA1A120C), CircleShape)
+                        .padding(horizontal = 4.dp, vertical = 1.dp),
                 )
             }
+        } else {
+            Text(
+                text = "—",
+                color = Color(0x66C8B8A0),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+            )
         }
     }
 }

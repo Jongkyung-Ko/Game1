@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.medieval.village.game.Facing
+import com.medieval.village.model.SpecialSkillCatalog
 import com.medieval.village.model.Village
 import kotlin.math.roundToInt
 
@@ -28,6 +29,7 @@ class CustomArt(
     private val buildings: Map<String, ImageBitmap>,
     private val interiors: Map<String, ImageBitmap>,
     private val heroAnims: Map<String, List<ImageBitmap>>,
+    private val skillIcons: Map<String, ImageBitmap> = emptyMap(),
 ) {
     fun charOrNull(name: String): ImageBitmap? = chars[name]
 
@@ -38,6 +40,8 @@ class CustomArt(
     fun buildingOrNull(key: String): ImageBitmap? = buildings[key]
 
     fun interiorOrNull(key: String): ImageBitmap? = interiors[key]
+
+    fun skillIconOrNull(skillId: String): ImageBitmap? = skillIcons[skillId]
 
     fun heroAnimFrameOrNull(set: String, frame: Int): ImageBitmap? {
         val list = heroAnims[set] ?: return null
@@ -226,6 +230,15 @@ class CustomArt(
                         if (frames.isNotEmpty()) heroAnims[set] = frames
                     }
                     Log.i(TAG, "Loaded hero anim sets: ${heroAnims.keys}")
+                    val skillIcons = LinkedHashMap<String, ImageBitmap>()
+                    SpecialSkillCatalog.all.forEach { skill ->
+                        loadAsset(
+                            app,
+                            "custom/skills/${skill.id}.png",
+                            cleanEdges = true,
+                        )?.let { skillIcons[skill.id] = it }
+                    }
+                    Log.i(TAG, "Loaded skill icons: ${skillIcons.size}")
                     val art = CustomArt(
                         villageMap = village,
                         chars = chars,
@@ -233,6 +246,7 @@ class CustomArt(
                         buildings = buildings,
                         interiors = interiors,
                         heroAnims = heroAnims,
+                        skillIcons = skillIcons,
                     )
                     cached = art
                     art

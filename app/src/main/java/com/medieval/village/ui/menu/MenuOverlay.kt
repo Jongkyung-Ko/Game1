@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -434,23 +435,32 @@ private fun SpecialSkillSlotEditor(
             val def = id?.let { SpecialSkillCatalog.byId(it) }
             val rank = if (id != null) vm.skillRankOf(actorKey, id) else 0
             val selected = selectedSlot == index
-            Text(
-                text = when {
-                    def == null -> "슬롯${index + 1}"
-                    rank > 1 -> "${def.shortName}$rank"
-                    else -> def.shortName
-                },
-                color = if (selected) Palette.Ink else Palette.Parchment,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .background(
-                        if (selected) Palette.Gold else Color(0xFF2A1C12),
+                        if (selected) Color(0xFF5A4020) else Color(0xFF2A1C12),
                         androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
                     )
                     .clickable { selectedSlot = index }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            )
+                    .padding(6.dp),
+            ) {
+                com.medieval.village.ui.SkillIcon(
+                    skillId = id,
+                    size = 36.dp,
+                    enabled = def != null,
+                )
+                Text(
+                    text = when {
+                        def == null -> "빈칸"
+                        rank > 1 -> "Lv$rank"
+                        else -> def.shortName
+                    },
+                    color = if (selected) Palette.Gold else Palette.Parchment,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
         WoodButton("비우기") { vm.clearSpecialSlot(actorKey, selectedSlot) }
     }
@@ -465,18 +475,28 @@ private fun SpecialSkillSlotEditor(
             known.forEach { skill ->
                 val rank = vm.skillRankOf(actorKey, skill.id)
                 val mult = SpecialSkillCatalog.damageMultAt(skill, rank)
-                Text(
-                    text = "${skill.name} Lv.$rank ×${"%.1f".format(mult)}",
-                    color = Palette.Parchment,
-                    fontSize = 11.sp,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .background(
                             if (skill.id in slots) Color(0xFF5A4020) else Palette.WoodDark,
                             androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
                         )
                         .clickable { vm.setSpecialSlot(actorKey, selectedSlot, skill.id) }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                )
+                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                ) {
+                    com.medieval.village.ui.SkillIcon(
+                        skillId = skill.id,
+                        size = 28.dp,
+                        showBorder = false,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "${skill.name} Lv.$rank ×${"%.1f".format(mult)}",
+                        color = Palette.Parchment,
+                        fontSize = 11.sp,
+                    )
+                }
             }
         }
     }
