@@ -141,6 +141,7 @@ private fun npcSpriteKey(npc: InteriorNpc): String =
         PlaceId.HOME -> "farmer"
         PlaceId.PUB -> "merchant"
         PlaceId.DUNGEON -> "warrior"
+        PlaceId.GRAY_CASTLE -> "paladin"
         PlaceId.EAST_FOREST -> "rogue"
         PlaceId.SOUTH_DESERT -> "rogue"
         PlaceId.NORTH_GLACIER -> "mage"

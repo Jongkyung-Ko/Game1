@@ -762,6 +762,7 @@ class GameViewModel : ViewModel() {
         PlaceId.PUB -> "포도주 향 사이로, 좀비석과 영주를 향한 낮은 원성이 섞여 들린다."
         PlaceId.ARENA -> "\"지상에서라도 칼날을 갈아야지. 지하에선 실수가 곧 죽음이야.\""
         PlaceId.DUNGEON -> "축축한 하수도 바람이 얼굴을 스친다. 저주의 둥지가 발밑에서 숨 쉰다."
+        PlaceId.GRAY_CASTLE -> "회색 돌문이 열린다. 해골과 유령의 숨결이 성채 심층에서 흘러나온다."
         PlaceId.EAST_FOREST -> "나뭇잎 사이로 바람이 스친다. 동쪽으로 갈수록 짐승의 울음이 가까워진다."
         PlaceId.SOUTH_DESERT -> "뜨거운 모래바람이 얼굴을 때린다. 전갈과 낙타거미가 모래 아래 숨는다."
         PlaceId.NORTH_GLACIER -> "칼바람과 함께 하얀 침묵이 내려앉는다. 북극의 짐승들이 얼음 너머에서 지켜본다."
