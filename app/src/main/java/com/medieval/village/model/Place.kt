@@ -3,7 +3,9 @@ package com.medieval.village.model
 enum class PlaceId {
     HOME, SHOP, WEAPON_SHOP, HOSPITAL, CHURCH, INN,
     PUB, ARENA, DUNGEON, EAST_FOREST, SOUTH_DESERT, NORTH_GLACIER,
-    BLACKSMITH, MAGIC_SCHOOL, MERCENARY
+    BLACKSMITH, MAGIC_SCHOOL, MERCENARY,
+    /** Gray Castle 고성 던전 입구 (저주가 풀리면 사용하지 않음) */
+    GRAY_CASTLE,
 }
 
 /** 건물 외형 종류 (Canvas 렌더링 분기용) */

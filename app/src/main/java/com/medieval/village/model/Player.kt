@@ -26,7 +26,11 @@ data class Player(
     /** 도달한 남쪽 사막 최고 지대 */
     val desertDepth: Int = 0,
     /** 도달한 북쪽 빙하 최고 지대 */
-    val glacierDepth: Int = 0
+    val glacierDepth: Int = 0,
+    /** 도달한 Gray Castle 최고 층 */
+    val castleDepth: Int = 0,
+    /** Gray Castle 10층 클리어 — White Castle로 해방 */
+    val castleCleared: Boolean = false,
 ) {
     val expToNext: Int get() = 60 + (level - 1) * 45
     val hpRatio: Float get() = if (maxHp <= 0) 0f else hp.toFloat() / maxHp

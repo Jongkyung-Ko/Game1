@@ -25,7 +25,7 @@ import kotlin.math.roundToInt
 
 /** 커스텀 마을 맵 + 캐릭터·건물 스프라이트. 로딩 실패 시 null을 허용한다. */
 class CustomArt(
-    private val villageMaps: Map<SettlementId, ImageBitmap>,
+    private val villageMaps: Map<String, ImageBitmap>,
     val continentMap: ImageBitmap?,
     private val chars: Map<String, ImageBitmap>,
     private val heroes: Map<String, ImageBitmap>,
@@ -36,11 +36,17 @@ class CustomArt(
 ) {
     /** 하위 호환: 기본(오크헤이븐) 맵 */
     val villageMap: ImageBitmap
-        get() = villageMaps[SettlementId.OAKHAVEN]
+        get() = villageMaps["oakhaven_base.png"]
+            ?: villageMaps["village_map.png"]
             ?: villageMaps.values.first()
 
-    fun villageMapFor(id: SettlementId): ImageBitmap? =
-        villageMaps[id] ?: villageMaps[SettlementId.OAKHAVEN]
+    fun villageMapFor(id: SettlementId): ImageBitmap? {
+        val asset = Settlements.of(id).mapAsset
+        return villageMaps[asset] ?: villageMaps["oakhaven_base.png"]
+    }
+
+    fun villageMapForAsset(mapAsset: String): ImageBitmap? =
+        villageMaps[mapAsset] ?: villageMapFor(SettlementId.OAKHAVEN)
     fun charOrNull(name: String): ImageBitmap? = chars[name]
 
     fun npcSpriteOrNull(key: String): ImageBitmap? = charOrNull(key)
@@ -72,6 +78,10 @@ class CustomArt(
         "boss_warden" -> charOrNull("zombie_boss_warden")
         "boss_abomination" -> charOrNull("zombie_boss_abomination")
         "boss_lich" -> charOrNull("zombie_boss_lich")
+        "skel_soldier" -> charOrNull("skel_soldier")
+        "ghost_cavalry" -> charOrNull("ghost_cavalry")
+        "skel_archer" -> charOrNull("skel_archer")
+        "boss_skel_king" -> charOrNull("boss_skel_king")
         else -> charOrNull("zombie_shambler")
     }
 
@@ -80,6 +90,8 @@ class CustomArt(
         // 던전 좀비
         "shambler", "runner", "bloater", "armored", "blacksmith", "farmer", "golem" -> kind
         "boss_warden", "boss_abomination", "boss_lich" -> kind
+        // Gray Castle
+        "skel_soldier", "ghost_cavalry", "skel_archer", "boss_skel_king" -> kind
         // 숲
         "wolf", "dire_wolf" -> "wolf"
         "bear" -> "bear"
@@ -141,6 +153,8 @@ class CustomArt(
             "zombie_shambler", "zombie_runner", "zombie_bloater", "zombie_armored",
             "zombie_blacksmith", "zombie_farmer", "golem_teacher",
             "zombie_boss_warden", "zombie_boss_abomination", "zombie_boss_lich",
+            // Gray Castle 언데드
+            "skel_soldier", "ghost_cavalry", "skel_archer", "boss_skel_king",
         )
 
         private val HERO_KEYS = listOf("front", "back", "side", "portrait")
@@ -174,6 +188,11 @@ class CustomArt(
             "boss_warden_walk", "boss_warden_attack",
             "boss_abomination_walk", "boss_abomination_attack",
             "boss_lich_walk", "boss_lich_attack",
+            // Gray Castle
+            "skel_soldier_walk", "skel_soldier_attack",
+            "ghost_cavalry_walk", "ghost_cavalry_attack",
+            "skel_archer_walk", "skel_archer_attack",
+            "boss_skel_king_walk", "boss_skel_king_attack",
             // 야외 몬스터 걷기/공격
             "wolf_walk", "wolf_attack",
             "bear_walk", "bear_attack",
@@ -200,17 +219,19 @@ class CustomArt(
                 synchronized(this) {
                     cached?.let { return it }
                     val app = context.applicationContext
-                    val villageMaps = LinkedHashMap<SettlementId, ImageBitmap>()
-                    Settlements.all.forEach { settlement ->
-                        loadAsset(app, "custom/${settlement.mapAsset}", cleanEdges = false)?.let {
-                            villageMaps[settlement.id] = it
+                    val villageMaps = LinkedHashMap<String, ImageBitmap>()
+                    val mapAssets = buildSet {
+                        Settlements.all(false).forEach { add(it.mapAsset) }
+                        add(Settlements.castle(true).mapAsset)
+                        add("village_map.png")
+                    }
+                    mapAssets.forEach { asset ->
+                        loadAsset(app, "custom/$asset", cleanEdges = false)?.let {
+                            villageMaps[asset] = it
                         }
                     }
-                    // 구 파일명 폴백
-                    if (SettlementId.OAKHAVEN !in villageMaps) {
-                        loadAsset(app, "custom/village_map.png", cleanEdges = false)?.let {
-                            villageMaps[SettlementId.OAKHAVEN] = it
-                        }
+                    if ("oakhaven_base.png" !in villageMaps && "village_map.png" in villageMaps) {
+                        villageMaps["oakhaven_base.png"] = villageMaps.getValue("village_map.png")
                     }
                     if (villageMaps.isEmpty()) return null
                     val continent = loadAsset(app, "custom/continent_map.png", cleanEdges = false)
@@ -351,9 +372,12 @@ fun rememberCustomArt(): CustomArt {
 fun DrawScope.drawCustomVillageMap(
     art: CustomArt,
     settlementId: SettlementId = SettlementId.OAKHAVEN,
+    mapAsset: String? = null,
     drawOverlays: Boolean = settlementId == SettlementId.OAKHAVEN,
 ) {
-    val map = art.villageMapFor(settlementId) ?: art.villageMap
+    val map = mapAsset?.let { art.villageMapForAsset(it) }
+        ?: art.villageMapFor(settlementId)
+        ?: art.villageMap
     drawImage(
         image = map,
         srcOffset = IntOffset.Zero,

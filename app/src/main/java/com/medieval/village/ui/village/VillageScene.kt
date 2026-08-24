@@ -86,7 +86,11 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                     scale(s, s, Offset.Zero)
                 }) {
                     if (art != null) {
-                        drawCustomVillageMap(art, settlement.id)
+                        drawCustomVillageMap(
+                            art = art,
+                            settlementId = settlement.id,
+                            mapAsset = settlement.mapAsset,
+                        )
                     } else {
                         drawRect(Color(0xFF6F9A54), size = Size(Village.W, Village.H))
                         drawRect(
@@ -137,9 +141,9 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
 
         Text(
             text = if (art != null) {
-                "${settlement.nameEn} · v0.4.24"
+                "${settlement.nameEn} · v0.4.25"
             } else {
-                "${settlement.nameEn} · v0.4.24 (맵 로딩 실패)"
+                "${settlement.nameEn} · v0.4.25 (맵 로딩 실패)"
             },
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,

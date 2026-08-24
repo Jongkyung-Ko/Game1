@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.medieval.village.model.CastleFactory
 import com.medieval.village.model.DesertFactory
 import com.medieval.village.model.DungeonFactory
 import com.medieval.village.model.DungeonFloor
@@ -57,7 +58,7 @@ enum class Scene { VILLAGE, INTERIOR }
 enum class MenuTab { NONE, STATUS, INVENTORY, EQUIPMENT, SYSTEM, WORLD_MAP }
 
 /** 도보 탐험 바이옴 */
-enum class ExploreBiome { DUNGEON, FOREST, DESERT, GLACIER }
+enum class ExploreBiome { DUNGEON, FOREST, DESERT, GLACIER, CASTLE }
 
 private data class Waypoint(val x: Float, val y: Float)
 
@@ -66,6 +67,7 @@ fun PlaceId?.exploreBiome(): ExploreBiome? = when (this) {
     PlaceId.EAST_FOREST -> ExploreBiome.FOREST
     PlaceId.SOUTH_DESERT -> ExploreBiome.DESERT
     PlaceId.NORTH_GLACIER -> ExploreBiome.GLACIER
+    PlaceId.GRAY_CASTLE -> ExploreBiome.CASTLE
     else -> null
 }
 
@@ -143,7 +145,7 @@ class GameViewModel : ViewModel() {
     var currentSettlement by mutableStateOf(SettlementId.OAKHAVEN)
         private set
 
-    val settlement: Settlement get() = Settlements.of(currentSettlement)
+    val settlement: Settlement get() = Settlements.of(currentSettlement, player.castleCleared)
 
     fun placeOf(id: PlaceId): Place =
         settlement.ofOrNull(id) ?: Settlements.oakhaven.of(id)
@@ -1844,7 +1846,7 @@ class GameViewModel : ViewModel() {
     private fun rewardMonsterKill(monster: DungeonMonster) {
         val floor = dungeonFloorNumber
         val biome = currentBiome()
-        val wild = biome != ExploreBiome.DUNGEON
+        val wild = biome != ExploreBiome.DUNGEON && biome != ExploreBiome.CASTLE
         val bossMult = if (monster.isBoss) 3 else 1
         val gold = ((if (wild) 14 else 18) + floor * (if (wild) 11 else 14) + Random.nextInt(0, 16)) * bossMult
         val exp = ((if (wild) 16 else 20) + floor * (if (wild) 10 else 12)) * bossMult
@@ -1859,6 +1861,7 @@ class GameViewModel : ViewModel() {
             ExploreBiome.DESERT -> if (floor > player.desertDepth) player = player.copy(desertDepth = floor)
             ExploreBiome.GLACIER -> if (floor > player.glacierDepth) player = player.copy(glacierDepth = floor)
             ExploreBiome.DUNGEON -> if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
+            ExploreBiome.CASTLE -> if (floor > player.castleDepth) player = player.copy(castleDepth = floor)
         }
         gainExp(exp)
         gainMercExp(exp)
@@ -1871,7 +1874,7 @@ class GameViewModel : ViewModel() {
                 ExploreBiome.FOREST -> ItemCatalog.forestLoot.random()
                 ExploreBiome.DESERT -> ItemCatalog.desertLoot.random()
                 ExploreBiome.GLACIER -> ItemCatalog.glacierLoot.random()
-                ExploreBiome.DUNGEON -> ItemCatalog.dungeonLoot.random()
+                ExploreBiome.DUNGEON, ExploreBiome.CASTLE -> ItemCatalog.dungeonLoot.random()
             }
             addItem(loot)
             say(
@@ -1880,6 +1883,7 @@ class GameViewModel : ViewModel() {
                     biome == ExploreBiome.FOREST -> "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
                     biome == ExploreBiome.DESERT -> "모래 속에서 ${loot.name}을(를) 주웠다."
                     biome == ExploreBiome.GLACIER -> "얼음 틈에서 ${loot.name}을(를) 챙겼다."
+                    biome == ExploreBiome.CASTLE -> "해골 더미에서 ${loot.name}을(를) 챙겼다."
                     else -> "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
                 }
             )
@@ -1891,9 +1895,49 @@ class GameViewModel : ViewModel() {
                     ExploreBiome.DESERT -> "이 지대의 괴물이 잠잠해졌다. 더 깊은 모래길을 찾아보자."
                     ExploreBiome.GLACIER -> "이 지대의 극지 짐승이 잠잠해졌다. 더 깊은 빙하를 찾아보자."
                     ExploreBiome.DUNGEON -> "이 층의 좀비가 잠잠해졌다. 심층의 계단을 찾아보자."
+                    ExploreBiome.CASTLE ->
+                        if (floor >= CastleFactory.MAX_FLOOR) {
+                            "고성의 심층이 고요해진다. 저주의 핵이 흔들린다…"
+                        } else {
+                            "이 층의 언데드가 잠잠해졌다. 더 높은 성채로 올라가 보자."
+                        }
                 }
             )
+            maybeLiberateCastle()
         }
+    }
+
+    /** Gray Castle 10층을 모두 정리하면 White Castle로 해방한다. */
+    private fun maybeLiberateCastle() {
+        if (currentBiome() != ExploreBiome.CASTLE) return
+        if (dungeonFloorNumber < CastleFactory.MAX_FLOOR) return
+        if (!mapCleared()) return
+        if (player.castleCleared) return
+        liberateCastle()
+    }
+
+    private fun liberateCastle() {
+        player = player.copy(
+            castleCleared = true,
+            castleDepth = CastleFactory.MAX_FLOOR,
+        )
+        clearDungeonState()
+        path.clear()
+        pendingEnter = null
+        walking = false
+        currentSettlement = SettlementId.GRAY_CASTLE
+        currentPlace = null
+        scene = Scene.VILLAGE
+        menuTab = MenuTab.NONE
+        val home = placeOf(PlaceId.HOME)
+        heroX = home.doorX
+        heroY = home.doorY
+        facing = Facing.DOWN
+        resetPartyTrail(heroX, heroY)
+        emitSfx("door")
+        say("해골 왕의 왕관이 빛과 함께 산산이 부서진다!")
+        say("저주가 풀렸다 — Gray Castle이 White Castle로 되살아난다.")
+        say("해방된 사람들이 성으로 돌아와 다시 삶을 시작한다.")
     }
 
     /** 몬스터 위치/사망 등 내부 변이 후 Compose 재구성을 유도한다. */
@@ -1909,6 +1953,7 @@ class GameViewModel : ViewModel() {
             ExploreBiome.DESERT -> DesertFactory.generate(floor)
             ExploreBiome.GLACIER -> GlacierFactory.generate(floor)
             ExploreBiome.DUNGEON -> DungeonFactory.generate(floor)
+            ExploreBiome.CASTLE -> CastleFactory.generate(floor)
         }
         dungeonFloor = map
         dungeonFloorNumber = floor
@@ -1975,6 +2020,18 @@ class GameViewModel : ViewModel() {
                     else -> say("더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다.")
                 }
             }
+            ExploreBiome.CASTLE -> {
+                if (floor > player.castleDepth) player = player.copy(castleDepth = floor)
+                say("─── Gray Castle · ${floor}층 ───")
+                when {
+                    CastleFactory.isFinalFloor(floor) ->
+                        say("왕좌의 방. 해골 왕이 저주의 핵을 움켜쥐고 있다. 쓰러뜨리면 성이 되살아난다.")
+                    floor == 1 ->
+                        say("회색 돌벽 사이로 해골병사와 유령기마병의 발소리가 울린다.")
+                    else ->
+                        say("성채가 더 깊어진다. 해골궁수의 시위 소리가 복도를 훑는다.")
+                }
+            }
         }
     }
 
@@ -2010,12 +2067,19 @@ class GameViewModel : ViewModel() {
                     ExploreBiome.DESERT -> "더 깊은 사막길로 이어지는 표식 위에 서야 한다."
                     ExploreBiome.GLACIER -> "더 깊은 빙하로 이어지는 표식 위에 서야 한다."
                     ExploreBiome.DUNGEON -> "아래층으로 이어지는 계단 위에 서야 한다."
+                    ExploreBiome.CASTLE -> "더 높은 성채로 이어지는 계단 위에 서야 한다."
                 }
             )
             return
         }
         if (player.hp <= player.maxHp * 0.15f) {
             say("몸 상태로는 더 들어갈 수 없다. 물약을 쓰거나 마을로 돌아가자.")
+            return
+        }
+        if (currentBiome() == ExploreBiome.CASTLE &&
+            dungeonFloorNumber >= CastleFactory.MAX_FLOOR
+        ) {
+            say("이곳이 Gray Castle의 최심층이다. 언데드를 모두 처치해 저주를 끊어라.")
             return
         }
         emitSfx("door")
@@ -2029,6 +2093,7 @@ class GameViewModel : ViewModel() {
                 ExploreBiome.DESERT -> "마을 쪽 공기가 폐를 채운다. 모래 아래 괴물들은 여전히 숨 쉰다."
                 ExploreBiome.GLACIER -> "마을 쪽 온기가 손을 녹인다. 극지의 짐승들은 여전히 얼음 너머에 있다."
                 ExploreBiome.DUNGEON -> "지상의 공기가 폐를 채운다. 저주는 아직 지하에 웅크리고 있다."
+                ExploreBiome.CASTLE -> "성문 밖 바람이 폐를 채운다. 고성의 저주는 아직 심층에 남았다."
             }
         )
         emitSfx("door")
@@ -2079,7 +2144,7 @@ class GameViewModel : ViewModel() {
             ExploreBiome.FOREST -> ItemCatalog.forestLoot
             ExploreBiome.DESERT -> ItemCatalog.desertLoot
             ExploreBiome.GLACIER -> ItemCatalog.glacierLoot
-            ExploreBiome.DUNGEON -> ItemCatalog.dungeonLoot
+            ExploreBiome.DUNGEON, ExploreBiome.CASTLE -> ItemCatalog.dungeonLoot
         }
         val deep = listOf(
             ItemCatalog.hiPotion,
@@ -2332,6 +2397,10 @@ class GameViewModel : ViewModel() {
         "boss_warden" -> 48f
         "boss_abomination" -> 36f
         "boss_lich" -> 44f
+        "ghost_cavalry" -> 105f
+        "skel_archer" -> 70f
+        "skel_soldier" -> 64f
+        "boss_skel_king" -> 50f
         else -> 58f
     }
 
@@ -2466,6 +2535,7 @@ class GameViewModel : ViewModel() {
                 biome == ExploreBiome.FOREST -> "${monster.name}이(가) 덮친다! (HP -$dmg)"
                 biome == ExploreBiome.DESERT -> "${monster.name}이(가) 찌른다! (HP -$dmg)"
                 biome == ExploreBiome.GLACIER -> "${monster.name}이(가) 할퀸다! (HP -$dmg)"
+                biome == ExploreBiome.CASTLE -> "${monster.name}이(가) 덮쳐온다! (HP -$dmg)"
                 else -> "${monster.name}이(가) 물어뜯는다! (HP -$dmg)"
             }
         )

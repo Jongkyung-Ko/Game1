@@ -4,6 +4,7 @@ package com.medieval.village.model
 enum class SettlementId {
     OAKHAVEN,
     ASHBROOK,
+    GRAY_CASTLE,
 }
 
 data class Settlement(
@@ -207,10 +208,116 @@ object Settlements {
         wellY = 500f,
     )
 
-    val all: List<Settlement> = listOf(oakhaven, ashbrook)
+    /** 저주에 잠긴 고성 — 세계지도 핀 (북동 산록) */
+    private val grayCastle: Settlement = Settlement(
+        id = SettlementId.GRAY_CASTLE,
+        nameKo = "회색 성",
+        nameEn = "Gray Castle",
+        mapAsset = "gray_castle_base.png",
+        mapX = 900f,
+        mapY = 260f,
+        blurb = "저주에 잠긴 고성 · 해골과 유령이 군림한다",
+        places = listOf(
+            Place(
+                PlaceId.HOME, "야영지", "성문 앞 임시 천막",
+                760f, 880f, 200f, 140f, BuildingStyle.CAMP, 0xFF4E5A3A, 0xFF8B9668
+            ),
+            Place(
+                PlaceId.CHURCH, "폐예배당", "부서진 종탑",
+                420f, 320f, 180f, 170f, BuildingStyle.CHURCH, 0xFF6A6A72, 0xFFC8C4B8
+            ),
+            Place(
+                PlaceId.GRAY_CASTLE, "성채 입구", "고성의 심층 · Gray Keep",
+                780f, 420f, 280f, 240f, BuildingStyle.CAVE, 0xFF3B3630, 0xFF56504A
+            ),
+            Place(
+                PlaceId.BLACKSMITH, "버려진 무기고", "녹슨 갑옷이 쌓인 곳",
+                1100f, 560f, 160f, 140f, BuildingStyle.ARMORY, 0xFF5A4132, 0xFF9B8266
+            ),
+        ),
+        townsfolk = emptyList(),
+        wellX = 700f,
+        wellY = 620f,
+    )
 
-    fun of(id: SettlementId): Settlement = when (id) {
+    /** 저주가 풀린 뒤 — 해방된 사람들이 사는 White Castle */
+    private val whiteCastle: Settlement = Settlement(
+        id = SettlementId.GRAY_CASTLE,
+        nameKo = "하얀 성",
+        nameEn = "White Castle",
+        mapAsset = "white_castle_base.png",
+        mapX = 900f,
+        mapY = 260f,
+        blurb = "저주에서 풀린 사람들 · 되살아난 성",
+        places = listOf(
+            Place(
+                PlaceId.HOME, "왕실 숙소", "해방된 성의 거처",
+                780f, 780f, 240f, 180f, BuildingStyle.HOUSE, 0xFF9C4A34, 0xFFE8D4AC
+            ),
+            Place(
+                PlaceId.CHURCH, "성당", "되찾은 예배당",
+                480f, 300f, 200f, 190f, BuildingStyle.CHURCH, 0xFF8C8FA6, 0xFFE6E1D3
+            ),
+            Place(
+                PlaceId.PUB, "연회장", "축제의 홀",
+                320f, 520f, 220f, 180f, BuildingStyle.PUB, 0xFF713B2A, 0xFFD0A66E
+            ),
+            Place(
+                PlaceId.INN, "여관", "성안 여인숙",
+                520f, 560f, 130f, 100f, BuildingStyle.INN, 0xFF8A5A2B, 0xFFE3CFA4
+            ),
+            Place(
+                PlaceId.SHOP, "시장", "성안 광장 노점",
+                780f, 540f, 160f, 120f, BuildingStyle.STORE, 0xFFB4573F, 0xFFEBD9B4
+            ),
+            Place(
+                PlaceId.WEAPON_SHOP, "병기점", "왕실 병기",
+                980f, 520f, 130f, 110f, BuildingStyle.ARMORY, 0xFF6B3A2E, 0xFFD8C49B
+            ),
+            Place(
+                PlaceId.BLACKSMITH, "대장간", "성 대장간",
+                1120f, 480f, 160f, 140f, BuildingStyle.FORGE, 0xFF5A4132, 0xFF9B8266
+            ),
+            Place(
+                PlaceId.HOSPITAL, "의무실", "치유의 방",
+                300f, 720f, 160f, 130f, BuildingStyle.CLINIC, 0xFFB0B6C4, 0xFFF2F0E6
+            ),
+            Place(
+                PlaceId.ARENA, "훈련장", "기사 훈련장",
+                1100f, 780f, 170f, 130f, BuildingStyle.ARENA, 0xFF7A5230, 0xFFC9A87C
+            ),
+            Place(
+                PlaceId.MERCENARY, "기사단", "해방된 기사단 막사",
+                1280f, 700f, 170f, 130f, BuildingStyle.CAMP, 0xFF4E5A3A, 0xFF8B9668
+            ),
+            Place(
+                PlaceId.MAGIC_SCHOOL, "마법당", "왕실 연구실",
+                980f, 280f, 140f, 150f, BuildingStyle.TOWER, 0xFF4B3B8F, 0xFFCFC7E8
+            ),
+        ),
+        townsfolk = listOf(
+            Triple("farmer", 620f, 600f),
+            Triple("merchant", 800f, 560f),
+            Triple("shopkeeper", 740f, 540f),
+            Triple("teacher", 1000f, 340f),
+            Triple("chef", 360f, 560f),
+            Triple("doctor", 340f, 760f),
+            Triple("paladin", 1180f, 740f),
+            Triple("warrior", 1080f, 800f),
+        ),
+        wellX = 760f,
+        wellY = 500f,
+    )
+
+    fun all(castleCleared: Boolean = false): List<Settlement> =
+        listOf(oakhaven, ashbrook, castle(castleCleared))
+
+    fun castle(cleared: Boolean): Settlement =
+        if (cleared) whiteCastle else grayCastle
+
+    fun of(id: SettlementId, castleCleared: Boolean = false): Settlement = when (id) {
         SettlementId.OAKHAVEN -> oakhaven
         SettlementId.ASHBROOK -> ashbrook
+        SettlementId.GRAY_CASTLE -> castle(castleCleared)
     }
 }

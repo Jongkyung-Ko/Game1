@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
+import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
 import com.medieval.village.model.Village
 import com.medieval.village.ui.theme.Palette
@@ -77,7 +78,7 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
                         detectTapGestures { tap ->
                             val wx = (tap.x - ox) / s
                             val wy = (tap.y - oy) / s
-                            val hit = Settlements.all.minByOrNull { st ->
+            val hit = Settlements.all(vm.player.castleCleared).minByOrNull { st ->
                                 hypot(wx - st.mapX, wy - st.mapY)
                             }
                             if (hit != null && hypot(wx - hit.mapX, wy - hit.mapY) < 70f) {
@@ -108,9 +109,14 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
                         )
                     }
 
-                    Settlements.all.forEach { st ->
+                    Settlements.all(vm.player.castleCleared).forEach { st ->
                         val here = st.id == currentId
-                        val pinColor = if (here) Color(0xFFFFD76A) else Color(0xFFE85A3C)
+                        val pinColor = when {
+                            st.id == SettlementId.GRAY_CASTLE && vm.player.castleCleared ->
+                                Color(0xFFE8F0FF)
+                            here -> Color(0xFFFFD76A)
+                            else -> Color(0xFFE85A3C)
+                        }
                         val r = if (here) 22f else 18f
                         drawCircle(pinColor, radius = r, center = Offset(st.mapX, st.mapY))
                         drawCircle(

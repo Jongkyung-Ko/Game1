@@ -61,7 +61,7 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         PubScreen(vm = vm, modifier = modifier)
         return
     }
-    if (id == PlaceId.DUNGEON) {
+    if (id == PlaceId.DUNGEON || id == PlaceId.GRAY_CASTLE) {
         DungeonScreen(vm = vm, modifier = modifier)
         return
     }

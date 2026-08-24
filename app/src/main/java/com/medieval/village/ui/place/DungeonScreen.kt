@@ -199,7 +199,17 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
-                drawLabel("v0.4.24 World map", 14f, 28f, 18f, Color(0xFF5A4231))
+                drawLabel(
+                    if (vm.currentPlace == com.medieval.village.model.PlaceId.GRAY_CASTLE) {
+                        "v0.4.25 Gray Castle"
+                    } else {
+                        "v0.4.25 Undead nest"
+                    },
+                    14f,
+                    28f,
+                    18f,
+                    Color(0xFF5A4231),
+                )
             }
 
             DungeonCombatHud(
@@ -593,7 +603,8 @@ private fun DrawScope.drawDungeonMonster(atlas: KenneyAtlas?, art: CustomArt?, m
             "runner" -> DungeonTiles.BAT
             "armored", "blacksmith", "boss_warden" -> DungeonTiles.ORC
             "farmer" -> DungeonTiles.SPIDER
-            "golem", "boss_lich" -> DungeonTiles.SKELETON
+            "golem", "boss_lich",
+            "skel_soldier", "skel_archer", "ghost_cavalry", "boss_skel_king" -> DungeonTiles.SKELETON
             else -> DungeonTiles.SLIME
         }
         val static = art?.zombieSpriteOrNull(monster.kind)
