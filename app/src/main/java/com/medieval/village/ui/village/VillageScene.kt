@@ -141,9 +141,9 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
 
         Text(
             text = if (art != null) {
-                "${settlement.nameEn} · v0.4.26"
+                "${settlement.nameEn} · v0.4.27"
             } else {
-                "${settlement.nameEn} · v0.4.26 (맵 로딩 실패)"
+                "${settlement.nameEn} · v0.4.27 (맵 로딩 실패)"
             },
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,

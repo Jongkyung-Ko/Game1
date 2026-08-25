@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -158,10 +160,59 @@ fun AttackButton(
 }
 
 /**
- * 부모 Box 안에서 좌·우 하단에 배치한다.
- * fillMaxSize 오버레이를 쓰지 않아 중앙 맵 탭(상자)이 막히지 않는다.
- * 공격 버튼 위에 특별스킬 슬롯 최대 3개.
+ * 맵 위에는 반투명 특별스킬만 남기고,
+ * 이동 패드·공격 버튼은 맵 바깥(하단 컨트롤 바)에 둔다.
  */
+@Composable
+fun BoxScope.DungeonSpecialSkillOverlay(
+    skillSlots: List<SkillSlotUi>,
+    onSpecial: (Int) -> Unit,
+) {
+    if (skillSlots.isEmpty()) return
+    Row(
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(end = 10.dp, bottom = 10.dp)
+            .alpha(0.58f),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        skillSlots.forEach { slot ->
+            SpecialSkillButton(
+                slot = slot,
+                onClick = { onSpecial(slot.slotIndex) },
+            )
+        }
+    }
+}
+
+/** 맵 바깥용 — 이동 패드 + 공격 버튼 */
+@Composable
+fun DungeonCombatControls(
+    attackLabel: String,
+    attackEnabled: Boolean,
+    onPad: (Float, Float) -> Unit,
+    onPadRelease: () -> Unit,
+    onAttack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        VirtualMovePad(
+            onVector = onPad,
+            onRelease = onPadRelease,
+        )
+        AttackButton(
+            label = attackLabel,
+            enabled = attackEnabled,
+            onAttack = onAttack,
+        )
+    }
+}
+
+/** @deprecated 하위 호환 — 특별스킬 오버레이 + 하단 컨트롤로 분리됨 */
 @Composable
 fun BoxScope.DungeonCombatHud(
     attackLabel: String,
@@ -172,36 +223,8 @@ fun BoxScope.DungeonCombatHud(
     onAttack: () -> Unit,
     onSpecial: (Int) -> Unit = {},
 ) {
-    VirtualMovePad(
-        onVector = onPad,
-        onRelease = onPadRelease,
-        modifier = Modifier
-            .align(Alignment.BottomStart)
-            .padding(start = 10.dp, bottom = 10.dp)
-    )
-    Column(
-        modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(end = 12.dp, bottom = 14.dp),
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (skillSlots.isNotEmpty()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                skillSlots.forEach { slot ->
-                    SpecialSkillButton(
-                        slot = slot,
-                        onClick = { onSpecial(slot.slotIndex) },
-                    )
-                }
-            }
-        }
-        AttackButton(
-            label = attackLabel,
-            enabled = attackEnabled,
-            onAttack = onAttack,
-        )
-    }
+    DungeonSpecialSkillOverlay(skillSlots = skillSlots, onSpecial = onSpecial)
+    // 패드는 맵에 두지 않음 — 호출측에서 DungeonCombatControls 사용
 }
 
 @Composable
@@ -216,9 +239,9 @@ private fun SpecialSkillButton(
             .size(56.dp)
             .background(
                 when {
-                    !filled -> Color(0x442A1C12)
-                    slot.enabled -> Color(0xCC5A3A18)
-                    else -> Color(0x66443322)
+                    !filled -> Color(0x332A1C12)
+                    slot.enabled -> Color(0x885A3A18)
+                    else -> Color(0x55443322)
                 },
                 CircleShape,
             )

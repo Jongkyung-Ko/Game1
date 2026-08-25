@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -370,13 +371,76 @@ private fun ColumnScope.EquipmentTab(vm: GameViewModel) {
 @Composable
 private fun ColumnScope.SystemTab(vm: GameViewModel) {
     var confirmNew by remember { mutableStateOf(false) }
+    var confirmLoad by remember { mutableStateOf<Int?>(null) }
+    var confirmDelete by remember { mutableStateOf<Int?>(null) }
+    @Suppress("UNUSED_VARIABLE")
+    val saveTick = vm.saveRevision
+    val slots = remember(saveTick) { vm.saveSlotInfos() }
+
+    SectionTitle("저장 / 불러오기")
+    Text(
+        "슬롯 5개에 진행 상황을 저장할 수 있습니다. 탐험 중 저장하면 마을로 정리된 뒤 저장됩니다.",
+        color = Palette.ParchmentDim,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+    )
+    Spacer(Modifier.height(8.dp))
+    slots.forEach { slot ->
+        val summary = if (slot.empty) {
+            "비어 있음"
+        } else {
+            "${slot.playerName} · Lv.${slot.level} · ${slot.day}일 · ${slot.gold}G\n${slot.settlementName} · ${slot.placeLabel}"
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0x332A1C12), RoundedCornerShape(8.dp))
+                .padding(8.dp)
+        ) {
+            Text("슬롯 ${slot.slot}", color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(summary, color = Palette.Parchment, fontSize = 11.sp, lineHeight = 15.sp)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                WoodButton("저장", highlight = true) { vm.saveGame(slot.slot) }
+                WoodButton("불러오기", enabled = !slot.empty) { confirmLoad = slot.slot }
+                WoodButton("삭제", enabled = !slot.empty) { confirmDelete = slot.slot }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+
+    confirmLoad?.let { slot ->
+        Text("슬롯 $slot 을(를) 불러올까요? 현재 진행은 사라집니다.", color = Palette.Health, fontSize = 12.sp)
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WoodButton("불러오기", highlight = true) {
+                vm.loadGame(slot)
+                confirmLoad = null
+            }
+            WoodButton("취소") { confirmLoad = null }
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+    confirmDelete?.let { slot ->
+        Text("슬롯 $slot 저장을 지울까요?", color = Palette.Health, fontSize = 12.sp)
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            WoodButton("삭제", highlight = true) {
+                vm.deleteSave(slot)
+                confirmDelete = null
+            }
+            WoodButton("취소") { confirmDelete = null }
+        }
+        Spacer(Modifier.height(10.dp))
+    }
 
     SectionTitle("조작 방법")
     Text(
         "· 마을 화면에서 건물을 누르면 그곳까지 걸어가 자동으로 들어갑니다.\n" +
             "· 빈 땅을 누르면 길을 따라 그 지점으로 이동합니다.\n" +
             "· 문 앞에 서면 아래에 '들어가기' 버튼이 나타납니다.\n" +
-            "· 상단 메뉴로 상태·가방·장비를 언제든 확인할 수 있습니다.",
+            "· 상단 메뉴로 상태·가방·장비를 언제든 확인할 수 있습니다.\n" +
+            "· 던전에서는 맵 아래 패드로 이동하고, 반투명 특별스킬·하단 공격 버튼으로 싸웁니다.",
         color = Palette.Parchment,
         fontSize = 12.sp,
         lineHeight = 18.sp
@@ -385,7 +449,7 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
     Spacer(Modifier.height(12.dp))
     SectionTitle("게임 정보")
     Text(
-        "중세마을 이야기 v0.1.0\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
+        "중세마을 이야기 v0.4.27\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
         color = Palette.ParchmentDim,
         fontSize = 12.sp,
         lineHeight = 17.sp

@@ -1,5 +1,6 @@
 package com.medieval.village.game
 
+import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -7,7 +8,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import com.medieval.village.model.CastleFactory
 import com.medieval.village.model.DesertFactory
 import com.medieval.village.model.DungeonFactory
@@ -27,6 +28,7 @@ import com.medieval.village.model.Item
 import com.medieval.village.model.ItemCatalog
 import com.medieval.village.model.ItemType
 import com.medieval.village.model.Mercenary
+import com.medieval.village.model.MercenaryCatalog
 import com.medieval.village.model.Place
 import com.medieval.village.model.PlaceId
 import com.medieval.village.model.Player
@@ -38,12 +40,15 @@ import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
 import com.medieval.village.model.SkillMapOffer
 import com.medieval.village.model.Skill
+import com.medieval.village.model.SkillCatalog
 import com.medieval.village.model.SkillSlotUi
 import com.medieval.village.model.SpecialSkillCatalog
 import com.medieval.village.model.SpecialSkillDef
 import com.medieval.village.model.SpecialVfxSpec
 import com.medieval.village.model.Village
 import com.medieval.village.model.WeaponStyle
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -74,7 +79,7 @@ fun PlaceId?.exploreBiome(): ExploreBiome? = when (this) {
 /** 도보 탐험 지역(던전·숲·사막·빙하) 여부 */
 fun PlaceId?.isExplorePlace(): Boolean = exploreBiome() != null
 
-class GameViewModel : ViewModel() {
+class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val WALK_SPEED = 360f
@@ -93,6 +98,8 @@ class GameViewModel : ViewModel() {
         const val MAX_ACTIVE_MERCENARY = 2
         const val HERO_SKILL_KEY = "hero"
     }
+
+    private val saveStore = GameSaveStore(application)
 
     var player by mutableStateOf(Player())
         private set
@@ -291,6 +298,319 @@ class GameViewModel : ViewModel() {
     }
 
     // ---------------------------------------------------------------- 세이브/리셋
+
+    fun saveSlotInfos(): List<SaveSlotInfo> = saveStore.allSlotInfo()
+
+    /** Compose 갱신용 — 저장/로드/삭제 시 증가 */
+    var saveRevision by mutableIntStateOf(0)
+        private set
+
+    fun saveGame(slot: Int): Boolean {
+        val s = slot.coerceIn(1, GameSaveStore.SLOT_COUNT)
+        return try {
+            // 탐험 중이면 마을/실내로 정리해 안전하게 저장
+            if (currentPlace.isExplorePlace()) {
+                clearDungeonState()
+                scene = Scene.VILLAGE
+                currentPlace = null
+            }
+            saveStore.write(s, buildSaveJson())
+            saveRevision++
+            menuTab = MenuTab.NONE
+            say("슬롯 $s 에 저장했다.")
+            true
+        } catch (t: Throwable) {
+            say("저장에 실패했다.")
+            false
+        }
+    }
+
+    fun loadGame(slot: Int): Boolean {
+        val s = slot.coerceIn(1, GameSaveStore.SLOT_COUNT)
+        val json = saveStore.read(s) ?: run {
+            say("슬롯 $s 에 저장된 데이터가 없다.")
+            return false
+        }
+        return try {
+            applySaveJson(json)
+            saveRevision++
+            menuTab = MenuTab.NONE
+            say("슬롯 $s 에서 불러왔다.")
+            true
+        } catch (t: Throwable) {
+            say("불러오기에 실패했다.")
+            false
+        }
+    }
+
+    fun deleteSave(slot: Int) {
+        val s = slot.coerceIn(1, GameSaveStore.SLOT_COUNT)
+        saveStore.clear(s)
+        saveRevision++
+        say("슬롯 $s 저장을 지웠다.")
+    }
+
+    private fun buildSaveJson(): JSONObject {
+        val settlement = Settlements.of(currentSettlement, player.castleCleared)
+        return JSONObject().apply {
+            put("version", 1)
+            put("savedAtMs", System.currentTimeMillis())
+            put("settlementId", currentSettlement.name)
+            put("settlementName", settlement.nameKo)
+            put("scene", scene.name)
+            put("currentPlace", currentPlace?.name)
+            put("placeLabel", currentPlace?.let { placeOf(it).name } ?: "마을")
+            put("heroX", heroX.toDouble())
+            put("heroY", heroY.toDouble())
+            put("facing", facing.name)
+            put("pubHeroX", pubHeroX.toDouble())
+            put("pubHeroY", pubHeroY.toDouble())
+            put("arenaWins", arenaWins)
+            put("arenaLosses", arenaLosses)
+            put("frontIndex", frontIndex)
+            put("player", JSONObject().apply {
+                put("name", player.name)
+                put("title", player.title)
+                put("level", player.level)
+                put("exp", player.exp)
+                put("hp", player.hp)
+                put("maxHp", player.maxHp)
+                put("mp", player.mp)
+                put("maxMp", player.maxMp)
+                put("baseAtk", player.baseAtk)
+                put("baseDef", player.baseDef)
+                put("str", player.str)
+                put("agi", player.agi)
+                put("intel", player.intel)
+                put("luck", player.luck)
+                put("gold", player.gold)
+                put("day", player.day)
+                put("blessing", player.blessing)
+                put("dungeonDepth", player.dungeonDepth)
+                put("forestDepth", player.forestDepth)
+                put("desertDepth", player.desertDepth)
+                put("glacierDepth", player.glacierDepth)
+                put("castleDepth", player.castleDepth)
+                put("castleCleared", player.castleCleared)
+            })
+            put("inventory", JSONArray().apply {
+                inventory.forEach { entry ->
+                    put(JSONObject().apply {
+                        put("id", entry.item.id)
+                        put("count", entry.count)
+                    })
+                }
+            })
+            put("equipment", JSONObject().apply {
+                equipment.forEach { (type, eq) ->
+                    put(type.name, JSONObject().apply {
+                        put("id", eq.item.id)
+                        put("plus", eq.plus)
+                    })
+                }
+            })
+            put("skills", JSONArray().apply {
+                skills.forEach { put(it.id) }
+            })
+            put("activeMercenaryIds", JSONArray().apply {
+                activeMercenaryIds.forEach { put(it) }
+            })
+            put("party", JSONArray().apply {
+                party.forEach { merc ->
+                    put(JSONObject().apply {
+                        put("id", merc.id)
+                        put("level", merc.level)
+                        put("exp", merc.exp)
+                        put("hp", mercHp[merc.id] ?: merc.maxHp)
+                        put("equipment", JSONObject().apply {
+                            merc.equipment.forEach { (type, eq) ->
+                                put(type.name, JSONObject().apply {
+                                    put("id", eq.item.id)
+                                    put("plus", eq.plus)
+                                })
+                            }
+                        })
+                    })
+                }
+            })
+            put("skillPoints", JSONObject().apply {
+                skillPoints.forEach { (k, v) -> put(k, v) }
+            })
+            put("skillRanks", JSONObject().apply {
+                skillRanks.forEach { (actor, ranks) ->
+                    put(actor, JSONObject().apply {
+                        ranks.forEach { (sid, rank) -> put(sid, rank) }
+                    })
+                }
+            })
+            put("specialSlots", JSONObject().apply {
+                specialSlots.forEach { (actor, slots) ->
+                    put(actor, JSONArray().apply {
+                        slots.forEach { id ->
+                            if (id == null) put(JSONObject.NULL) else put(id)
+                        }
+                    })
+                }
+            })
+        }
+    }
+
+    private fun applySaveJson(json: JSONObject) {
+        clearDungeonState()
+        path.clear()
+        pendingEnter = null
+        pubTarget = null
+        pendingPubNpc = null
+        interiorTarget = null
+        pendingInteriorNpc = null
+        interiorPanelOpen = false
+        interiorSpeech = null
+        interiorSpeakerId = null
+        pubDialogue = null
+        pubSpeakerId = null
+        walking = false
+        pubWalking = false
+        levelUpSkillOffer = null
+        skillMapQueue.clear()
+        specialCooldown = 0f
+        specialReady = true
+        log.clear()
+
+        val p = json.getJSONObject("player")
+        player = Player(
+            name = p.optString("name", "아서"),
+            title = p.optString("title", "견습 모험가"),
+            level = p.optInt("level", 1),
+            exp = p.optInt("exp", 0),
+            hp = p.optInt("hp", 60),
+            maxHp = p.optInt("maxHp", 60),
+            mp = p.optInt("mp", 20),
+            maxMp = p.optInt("maxMp", 20),
+            baseAtk = p.optInt("baseAtk", 8),
+            baseDef = p.optInt("baseDef", 4),
+            str = p.optInt("str", 8),
+            agi = p.optInt("agi", 6),
+            intel = p.optInt("intel", 5),
+            luck = p.optInt("luck", 5),
+            gold = p.optInt("gold", 300),
+            day = p.optInt("day", 1),
+            blessing = p.optInt("blessing", 0),
+            dungeonDepth = p.optInt("dungeonDepth", 0),
+            forestDepth = p.optInt("forestDepth", 0),
+            desertDepth = p.optInt("desertDepth", 0),
+            glacierDepth = p.optInt("glacierDepth", 0),
+            castleDepth = p.optInt("castleDepth", 0),
+            castleCleared = p.optBoolean("castleCleared", false),
+        )
+
+        inventory.clear()
+        val inv = json.optJSONArray("inventory") ?: JSONArray()
+        for (i in 0 until inv.length()) {
+            val e = inv.getJSONObject(i)
+            val item = ItemCatalog.byId(e.getString("id")) ?: continue
+            inventory.add(InventoryEntry(item, e.optInt("count", 1).coerceAtLeast(1)))
+        }
+
+        equipment.clear()
+        val eq = json.optJSONObject("equipment") ?: JSONObject()
+        EQUIP_SLOTS.forEach { type ->
+            val node = eq.optJSONObject(type.name) ?: return@forEach
+            val item = ItemCatalog.byId(node.getString("id")) ?: return@forEach
+            equipment[type] = EquippedItem(item, node.optInt("plus", 0))
+        }
+
+        skills.clear()
+        val sk = json.optJSONArray("skills") ?: JSONArray()
+        for (i in 0 until sk.length()) {
+            SkillCatalog.byId(sk.getString(i))?.let { skills.add(it) }
+        }
+
+        party.clear()
+        mercHp.clear()
+        activeMercenaryIds.clear()
+        val partyArr = json.optJSONArray("party") ?: JSONArray()
+        for (i in 0 until partyArr.length()) {
+            val node = partyArr.getJSONObject(i)
+            val base = MercenaryCatalog.byId(node.getString("id")) ?: continue
+            val mercEq = mutableMapOf<ItemType, EquippedItem>()
+            val eqNode = node.optJSONObject("equipment") ?: JSONObject()
+            EQUIP_SLOTS.forEach { type ->
+                val e = eqNode.optJSONObject(type.name) ?: return@forEach
+                val item = ItemCatalog.byId(e.getString("id")) ?: return@forEach
+                mercEq[type] = EquippedItem(item, e.optInt("plus", 0))
+            }
+            val merc = base.copy(
+                level = node.optInt("level", 1),
+                exp = node.optInt("exp", 0),
+                equipment = mercEq,
+            )
+            party.add(merc)
+            mercHp[merc.id] = node.optInt("hp", merc.maxHp).coerceIn(1, merc.maxHp)
+        }
+        val act = json.optJSONArray("activeMercenaryIds") ?: JSONArray()
+        for (i in 0 until act.length()) {
+            val id = act.getString(i)
+            if (party.any { it.id == id } && activeMercenaryIds.size < MAX_ACTIVE_MERCENARY) {
+                activeMercenaryIds.add(id)
+            }
+        }
+
+        skillRanks.clear()
+        skillPoints.clear()
+        specialSlots.clear()
+        val sp = json.optJSONObject("skillPoints") ?: JSONObject()
+        sp.keys().forEach { key -> skillPoints[key] = sp.optInt(key, 0) }
+        val ranks = json.optJSONObject("skillRanks") ?: JSONObject()
+        ranks.keys().forEach { actor ->
+            val map = mutableMapOf<String, Int>()
+            val node = ranks.getJSONObject(actor)
+            node.keys().forEach { sid -> map[sid] = node.optInt(sid, 0) }
+            skillRanks[actor] = map
+        }
+        val slots = json.optJSONObject("specialSlots") ?: JSONObject()
+        slots.keys().forEach { actor ->
+            val arr = slots.getJSONArray(actor)
+            specialSlots[actor] = arr.toNullableStringList()
+                .let { list ->
+                    List(SpecialSkillCatalog.MAX_SLOTS) { i -> list.getOrNull(i) }
+                }
+        }
+        ensureActorSkillState(HERO_SKILL_KEY)
+        party.forEach { ensureActorSkillState(it.id) }
+        specialSkillRevision++
+
+        arenaWins = json.optInt("arenaWins", 0)
+        arenaLosses = json.optInt("arenaLosses", 0)
+        frontIndex = json.optInt("frontIndex", 0)
+        clampFrontIndex()
+
+        currentSettlement = runCatching {
+            SettlementId.valueOf(json.optString("settlementId", SettlementId.OAKHAVEN.name))
+        }.getOrDefault(SettlementId.OAKHAVEN)
+
+        heroX = json.optDouble("heroX", placeOf(PlaceId.HOME).doorX.toDouble()).toFloat()
+        heroY = json.optDouble("heroY", placeOf(PlaceId.HOME).doorY.toDouble()).toFloat()
+        facing = runCatching {
+            Facing.valueOf(json.optString("facing", Facing.DOWN.name))
+        }.getOrDefault(Facing.DOWN)
+        pubHeroX = json.optDouble("pubHeroX", InteriorRoom.SPAWN_X.toDouble()).toFloat()
+        pubHeroY = json.optDouble("pubHeroY", InteriorRoom.SPAWN_Y.toDouble()).toFloat()
+
+        val placeName = json.optString("currentPlace", "")
+        val loadedPlace = placeName.takeIf { it.isNotEmpty() }?.let {
+            runCatching { PlaceId.valueOf(it) }.getOrNull()
+        }
+        // 탐험 장소는 맵 상태가 없으므로 마을로 복귀
+        if (loadedPlace != null && !loadedPlace.isExplorePlace()) {
+            currentPlace = loadedPlace
+            scene = Scene.INTERIOR
+            resetPartyTrail(pubHeroX, pubHeroY)
+        } else {
+            currentPlace = null
+            scene = Scene.VILLAGE
+            resetPartyTrail(heroX, heroY)
+        }
+    }
 
     fun newGame() {
         player = Player()

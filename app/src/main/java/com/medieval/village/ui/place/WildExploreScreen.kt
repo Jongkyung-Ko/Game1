@@ -96,7 +96,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.26 Eastern forest",
+        watermark = "v0.4.27 Eastern forest",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -112,7 +112,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.26 Southern desert",
+        watermark = "v0.4.27 Southern desert",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -128,7 +128,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.26 Northern glacier",
+        watermark = "v0.4.27 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -159,7 +159,7 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(ui.title, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Text(ui.subtitle, color = Palette.ParchmentDim, fontSize = 10.sp)
             }
@@ -167,6 +167,31 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 Chip(ui.recordLabel(record), Palette.WoodLight)
                 Chip(ui.foeLabel, ui.foeChip)
             }
+            PartySwitchBar(
+                vm = vm,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 2.dp)
+                .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text(
+                when (vm.dungeonHint) {
+                    "stairs_up" -> ui.exitHint
+                    "stairs_down" -> ui.deepHint
+                    "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
+                    "chest" -> "◆ 은닉 상자 — 아래에서 ‘열기’ 또는 상자를 탭"
+                    "chest_open" -> "이미 열어 본 상자"
+                    else -> ui.moveHint
+                },
+                color = Palette.Parchment,
+                fontSize = 11.sp
+            )
         }
 
         BoxWithConstraints(
@@ -262,47 +287,22 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 wildLabel(ui.watermark, 14f, 28f, 18f, ui.border)
             }
 
-            DungeonCombatHud(
+            DungeonSpecialSkillOverlay(
+                skillSlots = vm.frontSkillSlotsUi(),
+                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
+            )
+        }
+
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            DungeonCombatControls(
                 attackLabel = vm.attackLabel(),
                 attackEnabled = vm.attackReady && vm.dungeonFloor != null && vm.levelUpSkillOffer == null,
-                skillSlots = vm.frontSkillSlotsUi(),
                 onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
                 onPadRelease = { vm.clearDungeonPad() },
                 onAttack = { vm.dungeonAttack() },
-                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
             )
-
-            PartySwitchBar(
-                vm = vm,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 8.dp),
-            )
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 8.dp)
-                    .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Text(
-                    when (vm.dungeonHint) {
-                        "stairs_up" -> ui.exitHint
-                        "stairs_down" -> ui.deepHint
-                        "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
-                        "chest" -> "◆ 은닉 상자 — 아래에서 ‘열기’ 또는 상자를 탭"
-                        "chest_open" -> "이미 열어 본 상자"
-                        else -> ui.moveHint
-                    },
-                    color = Palette.Parchment,
-                    fontSize = 11.sp
-                )
-            }
-        }
-
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            MessageLog(vm.log, mod.height(78.dp))
+            Spacer(mod.height(6.dp))
+            MessageLog(vm.log, mod.height(72.dp))
             Spacer(mod.height(7.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (vm.dungeonHint) {

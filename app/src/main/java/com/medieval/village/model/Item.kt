@@ -149,4 +149,6 @@ object ItemCatalog {
 
     val all: List<Item> = (generalGoods + weaponGoods + dungeonLoot + forestLoot + desertLoot + glacierLoot)
         .distinctBy { it.id }
+
+    fun byId(id: String): Item? = all.firstOrNull { it.id == id }
 }

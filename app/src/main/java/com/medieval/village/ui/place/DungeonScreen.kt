@@ -79,7 +79,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     "잊혀진 지하 · ${vm.dungeonFloorNumber}층",
                     color = Palette.Gold,
@@ -100,6 +100,31 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     Chip("보스!", Palette.Blood)
                 }
             }
+            PartySwitchBar(
+                vm = vm,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 2.dp)
+                .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text(
+                when (vm.dungeonHint) {
+                    "stairs_up" -> "↑ 지상 출구 — 아래에서 ‘탈출’"
+                    "stairs_down" -> "↓ 더 깊은 층 — 아래에서 ‘내려가기’"
+                    "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
+                    "chest" -> "◆ 보물상자 — 아래에서 ‘열기’ 또는 상자를 탭"
+                    "chest_open" -> "이미 열어 본 보물상자"
+                    else -> vm.dungeonMoveHint()
+                },
+                color = Palette.Parchment,
+                fontSize = 11.sp
+            )
         }
 
         BoxWithConstraints(
@@ -201,9 +226,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     if (vm.currentPlace == com.medieval.village.model.PlaceId.GRAY_CASTLE) {
-                        "v0.4.26 Gray Castle"
+                        "v0.4.27 Gray Castle"
                     } else {
-                        "v0.4.26 Undead nest"
+                        "v0.4.27 Undead nest"
                     },
                     14f,
                     28f,
@@ -212,47 +237,22 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 )
             }
 
-            DungeonCombatHud(
+            DungeonSpecialSkillOverlay(
+                skillSlots = vm.frontSkillSlotsUi(),
+                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
+            )
+        }
+
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            DungeonCombatControls(
                 attackLabel = vm.attackLabel(),
                 attackEnabled = vm.attackReady && vm.dungeonFloor != null && vm.levelUpSkillOffer == null,
-                skillSlots = vm.frontSkillSlotsUi(),
                 onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
                 onPadRelease = { vm.clearDungeonPad() },
                 onAttack = { vm.dungeonAttack() },
-                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
             )
-
-            PartySwitchBar(
-                vm = vm,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 8.dp),
-            )
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 8.dp)
-                    .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Text(
-                    when (vm.dungeonHint) {
-                        "stairs_up" -> "↑ 지상 출구 — 아래에서 ‘탈출’"
-                        "stairs_down" -> "↓ 더 깊은 층 — 아래에서 ‘내려가기’"
-                        "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
-                        "chest" -> "◆ 보물상자 — 아래에서 ‘열기’ 또는 상자를 탭"
-                        "chest_open" -> "이미 열어 본 보물상자"
-                        else -> vm.dungeonMoveHint()
-                    },
-                    color = Palette.Parchment,
-                    fontSize = 11.sp
-                )
-            }
-        }
-
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            MessageLog(vm.log, Modifier.height(78.dp))
+            Spacer(modifier.height(6.dp))
+            MessageLog(vm.log, Modifier.height(72.dp))
             Spacer(Modifier.height(7.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when (vm.dungeonHint) {

@@ -54,6 +54,8 @@ object SkillCatalog {
         Skill("thunder", "번개창", 620, 16, 34, "상급 공격 마법."),
         Skill("barrier", "마법 방벽", 480, 12, 0, "피해를 줄여준다.")
     )
+
+    fun byId(id: String): Skill? = all.firstOrNull { it.id == id }
 }
 
 data class Mercenary(
@@ -93,4 +95,6 @@ object MercenaryCatalog {
         Mercenary("elara", "엘라라", "성기사", 420, 18, "태양의 방패를 든 성기사.", "paladin"),
         Mercenary("aldric", "알드릭", "마법사", 560, 22, "해독과 화염을 다루는 노련한 마법사.", "mage"),
     )
+
+    fun byId(id: String): Mercenary? = all.firstOrNull { it.id == id }
 }
