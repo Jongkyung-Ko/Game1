@@ -42,5 +42,6 @@ object DesertFactory {
             basePower = 9,
             powerPerFloor = 7,
             sewerChance = 0.16f,
+            midBoss = "giant_scorpion" to "모래폭풍의 전갈왕",
         )
 }

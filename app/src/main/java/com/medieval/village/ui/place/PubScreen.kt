@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -40,12 +41,14 @@ import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.NpcKind
 import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
+import com.medieval.village.model.SettlementId
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.drawCustomSprite
+import com.medieval.village.ui.village.drawLevelUpBurst
 import com.medieval.village.ui.village.drawVillageFollowParty
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import kotlin.math.hypot
@@ -54,9 +57,18 @@ import kotlin.math.roundToInt
 @Composable
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     val art = rememberCustomArtOrNull()
+    val pubNpcs = remember(vm.currentSettlement, vm.player.castleCleared) {
+        PubNpcCatalog.forSettlement(vm.currentSettlement, vm.player.castleCleared)
+    }
+    val pubTitle = when (vm.currentSettlement) {
+        SettlementId.ASHBROOK -> "PUB · 강변의 재 선술집"
+        SettlementId.GRAY_CASTLE ->
+            if (vm.player.castleCleared) "PUB · 해방 연회장" else "PUB · 저주의 잔향"
+        else -> "PUB · 신성한 잔 선술집"
+    }
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
         Text(
-            text = "PUB · 신성한 잔 선술집",
+            text = pubTitle,
             color = Palette.Gold,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
@@ -79,15 +91,16 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val facing = vm.facing
             val walking = vm.pubWalking
             val walkPhase = vm.walkPhase
+            val partySlots = vm.partyDrawSlots(vm.pubHeroX, vm.pubHeroY)
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(scale, offsetX, offsetY) {
+                    .pointerInput(scale, offsetX, offsetY, pubNpcs) {
                         detectTapGestures { tap ->
                             val x = (tap.x - offsetX) / scale
                             val y = (tap.y - offsetY) / scale
-                            val npc = PubNpcCatalog.all.minByOrNull {
+                            val npc = pubNpcs.minByOrNull {
                                 hypot(x - it.x, y - it.y)
                             }?.takeIf { hypot(x - it.x, y - it.y) < 95f }
                             if (npc != null) vm.approachPubNpc(npc) else vm.walkInPub(x, y)
@@ -99,7 +112,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     scale(scale, scale, Offset.Zero)
                 }) {
                     drawPubBackground(art)
-                    PubNpcCatalog.all.forEach { npc ->
+                    pubNpcs.forEach { npc ->
                         drawPubNpc(npc, vm.pubSpeakerId == npc.id, vm.pubDialogue, art)
                     }
                     drawVillageFollowParty(
@@ -113,8 +126,18 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         heroScale = 1.08f,
                         mercScale = 0.76f,
                         frontIndex = vm.frontIndex,
-                        slots = vm.partyDrawSlots(vm.pubHeroX, vm.pubHeroY),
+                        slots = partySlots,
                     )
+                    val fxKey = vm.levelUpFxActorKey
+                    if (fxKey != null) {
+                        val slot = partySlots.firstOrNull { it.actorKey == fxKey }
+                            ?: partySlots.firstOrNull()
+                        if (slot != null) {
+                            val rem = (vm.levelUpFxUntil - vm.animTime).coerceAtLeast(0f)
+                            val progress = (1f - rem / 2f).coerceIn(0f, 1f)
+                            drawLevelUpBurst(slot.x, slot.y, progress, vm.animTime)
+                        }
+                    }
                 }
             }
 

@@ -20,6 +20,8 @@ enum class Sfx {
     MAGIC_HIT,
     DOOR,
     CLICK,
+    /** 레벨업 */
+    LEVEL_UP,
     // —— 특별스킬 ——
     SKILL_SMASH,
     SKILL_SLASH,
@@ -72,6 +74,7 @@ class GameAudioEngine(context: Context) {
             Sfx.MAGIC_HIT to hit,
             Sfx.DOOR to pool.load(appContext, R.raw.sfx_door, 1),
             Sfx.CLICK to pool.load(appContext, R.raw.sfx_click, 1),
+            Sfx.LEVEL_UP to pool.load(appContext, R.raw.sfx_level_up, 1),
             Sfx.SKILL_SMASH to pool.load(appContext, R.raw.sfx_skill_smash, 1),
             Sfx.SKILL_SLASH to pool.load(appContext, R.raw.sfx_skill_slash, 1),
             Sfx.SKILL_CHARGE to pool.load(appContext, R.raw.sfx_skill_charge, 1),
@@ -149,6 +152,7 @@ class GameAudioEngine(context: Context) {
             Sfx.ARROW_HIT -> 0.75f to 1.35f
             Sfx.MAGIC_HIT -> 0.8f to 0.72f
             Sfx.HIT -> 0.75f to 1f
+            Sfx.LEVEL_UP -> 0.92f to 1f
             Sfx.SKILL_SMASH, Sfx.SKILL_CRIT, Sfx.SKILL_QUAKE, Sfx.SKILL_BASH -> 0.9f to 1f
             Sfx.SKILL_SLASH, Sfx.SKILL_SPIN, Sfx.SKILL_CHARGE -> 0.85f to 1f
             Sfx.SKILL_BOW -> 0.8f to 1f

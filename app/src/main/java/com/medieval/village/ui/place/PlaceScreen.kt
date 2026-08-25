@@ -86,7 +86,9 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
     val place = vm.placeOf(id)
     val atlas = rememberKenneyAtlas()
     val art = rememberCustomArtOrNull()
-    val npcs = remember(id) { InteriorNpcCatalog.forPlace(id) }
+    val npcs = remember(id, vm.currentSettlement, vm.player.castleCleared) {
+        InteriorNpcCatalog.forPlace(id, vm.currentSettlement, vm.player.castleCleared)
+    }
     val panelOpen = vm.interiorPanelOpen
 
     Column(modifier = rootModifier.fillMaxSize().background(Palette.WoodDark)) {
@@ -146,6 +148,10 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
                         speechText = vm.interiorSpeech,
                         frontIndex = vm.frontIndex,
                         partySlots = vm.partyDrawSlots(vm.pubHeroX, vm.pubHeroY),
+                        settlementId = vm.currentSettlement,
+                        castleCleared = vm.player.castleCleared,
+                        levelUpFxActorKey = vm.levelUpFxActorKey,
+                        levelUpFxUntil = vm.levelUpFxUntil,
                     )
                 }
             }

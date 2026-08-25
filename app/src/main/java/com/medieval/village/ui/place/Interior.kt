@@ -19,12 +19,14 @@ import com.medieval.village.model.InteriorNpcKind
 import com.medieval.village.model.InteriorRoom
 import com.medieval.village.model.Mercenary
 import com.medieval.village.model.PlaceId
+import com.medieval.village.model.SettlementId
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.TownTiles
 import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawKenneyTile
+import com.medieval.village.ui.village.drawLevelUpBurst
 import com.medieval.village.ui.village.drawVillageFollowParty
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -47,6 +49,10 @@ fun DrawScope.drawWalkableInterior(
     speechText: String? = null,
     frontIndex: Int = 0,
     partySlots: List<PartyDrawSlot>? = null,
+    settlementId: SettlementId = SettlementId.OAKHAVEN,
+    castleCleared: Boolean = false,
+    levelUpFxActorKey: String? = null,
+    levelUpFxUntil: Float = 0f,
 ) {
     val w = InteriorRoom.WORLD_W
     val h = InteriorRoom.WORLD_H
@@ -56,7 +62,7 @@ fun DrawScope.drawWalkableInterior(
         drawInteriorFurniture(id)
     }
 
-    InteriorNpcCatalog.forPlace(id).forEachIndexed { index, npc ->
+    InteriorNpcCatalog.forPlace(id, settlementId, castleCleared).forEachIndexed { index, npc ->
         val bob = sin(animTime * 2.6f + index) * 2f
         val cx = npc.worldX
         val footY = npc.worldY + bob
@@ -95,6 +101,15 @@ fun DrawScope.drawWalkableInterior(
         frontIndex = frontIndex,
         slots = partySlots,
     )
+    if (levelUpFxActorKey != null) {
+        val slots = partySlots.orEmpty()
+        val slot = slots.firstOrNull { it.actorKey == levelUpFxActorKey }
+            ?: slots.firstOrNull()
+            ?: PartyDrawSlot(null, heroX, heroY, facing, true)
+        val rem = (levelUpFxUntil - animTime).coerceAtLeast(0f)
+        val progress = (1f - rem / 2f).coerceIn(0f, 1f)
+        drawLevelUpBurst(slot.x, slot.y, progress, animTime)
+    }
 }
 
 private fun DrawScope.drawCleanNpcFallback(cx: Float, footY: Float, kind: InteriorNpcKind) {

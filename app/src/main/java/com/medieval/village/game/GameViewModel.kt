@@ -34,6 +34,7 @@ import com.medieval.village.model.PlaceId
 import com.medieval.village.model.Player
 import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
+import com.medieval.village.model.RegionDialogue
 import com.medieval.village.model.ActorClass
 import com.medieval.village.model.Settlement
 import com.medieval.village.model.SettlementId
@@ -128,6 +129,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val specialSlots = mutableStateMapOf<String, List<String?>>()
     /** 레벨업·메뉴 스킬맵 UI */
     var levelUpSkillOffer by mutableStateOf<SkillMapOffer?>(null)
+        private set
+    /** 레벨업 특수 연출 (캐릭터 위 이펙트) */
+    var levelUpFxActorKey by mutableStateOf<String?>(null)
+        private set
+    var levelUpFxUntil by mutableFloatStateOf(0f)
         private set
     /** 여러 캐릭터가 연속 레벨업할 때 대기열 */
     private val skillMapQueue = ArrayDeque<SkillMapOffer>()
@@ -694,7 +700,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         menuTab = MenuTab.NONE
         resetPartyTrail(heroX, heroY)
         emitSfx("door")
-        val s = Settlements.of(id)
+        val s = Settlements.of(id, player.castleCleared)
         if (moved) {
             say("${s.nameKo}(${s.nameEn})에 도착했다. ${s.blurb}")
         } else {
@@ -777,6 +783,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun tick(dt: Float) {
         animTime += dt
+        if (levelUpFxActorKey != null && animTime >= levelUpFxUntil) {
+            levelUpFxActorKey = null
+        }
         if (interiorSpeech != null && animTime >= interiorSpeechUntil) {
             interiorSpeech = null
             interiorSpeakerId = null
@@ -1045,7 +1054,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 실내 입장 시 NPC들이 번갈아 인사한다. */
     private fun greetInteriorNpcs(id: PlaceId) {
-        val npcs = InteriorNpcCatalog.forPlace(id)
+        val npcs = InteriorNpcCatalog.forPlace(id, currentSettlement, player.castleCleared)
         if (npcs.isEmpty()) {
             say(greetingOf(id))
             return
@@ -1063,7 +1072,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun talkToInteriorNpc(npcId: String) {
-        val npc = InteriorNpcCatalog.all.firstOrNull { it.id == npcId } ?: return
+        val npc = InteriorNpcCatalog.forPlace(
+            currentPlace ?: return,
+            currentSettlement,
+            player.castleCleared,
+        ).firstOrNull { it.id == npcId }
+            ?: InteriorNpcCatalog.all.firstOrNull { it.id == npcId }
+            ?: return
         val line = npc.lines.random()
         say("${npc.name}: $line")
         interiorSpeakerId = npc.id
@@ -1072,23 +1087,26 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         emitSfx("click")
     }
 
-    private fun greetingOf(id: PlaceId): String = when (id) {
-        PlaceId.HOME -> "창문 너머로도 하수구 냄새가 스며든다. 그래도 여기는 나의 오두막이다."
-        PlaceId.SHOP -> "\"어서 오세요… 횃불이랑 붕대는 늘 비치해 둡니다. 요즘엔 필수죠.\""
-        PlaceId.WEAPON_SHOP -> "\"좀비 뼈라도 가를 쇠를 찾나? 잘 왔네.\""
-        PlaceId.HOSPITAL -> "\"물린 상처입니까, 아니면… 좀비석 기운입니까?\""
-        PlaceId.CHURCH -> "\"저주가 지상을 핥고 있소. 빛의 가호가 그대와 함께하기를.\""
-        PlaceId.INN -> "\"문은 꼭 잠그세요. 밤엔 하수도 쪽에서 기척이 들립니다.\""
-        PlaceId.PUB -> "포도주 향 사이로, 좀비석과 영주를 향한 낮은 원성이 섞여 들린다."
-        PlaceId.ARENA -> "\"지상에서라도 칼날을 갈아야지. 지하에선 실수가 곧 죽음이야.\""
-        PlaceId.DUNGEON -> "축축한 하수도 바람이 얼굴을 스친다. 저주의 둥지가 발밑에서 숨 쉰다."
-        PlaceId.GRAY_CASTLE -> "회색 돌문이 열린다. 해골과 유령의 숨결이 성채 심층에서 흘러나온다."
-        PlaceId.EAST_FOREST -> "나뭇잎 사이로 바람이 스친다. 동쪽으로 갈수록 짐승의 울음이 가까워진다."
-        PlaceId.SOUTH_DESERT -> "뜨거운 모래바람이 얼굴을 때린다. 전갈과 낙타거미가 모래 아래 숨는다."
-        PlaceId.NORTH_GLACIER -> "칼바람과 함께 하얀 침묵이 내려앉는다. 북극의 짐승들이 얼음 너머에서 지켜본다."
-        PlaceId.BLACKSMITH -> "\"좀비 이빨에 안 깨지려면, 쇠는 더 두들겨야지.\""
-        PlaceId.MAGIC_SCHOOL -> "\"연금술사들이 손을 댄 그 돌… 우리는 이제 해독만 연구한다네.\""
-        PlaceId.MERCENARY -> "\"좀비 둥지 안내라면 돈만 주면 붙여주지. 목숨값은 별도야.\""
+    private fun greetingOf(id: PlaceId): String {
+        RegionDialogue.placeGreeting(currentSettlement, player.castleCleared, id)?.let { return it }
+        return when (id) {
+            PlaceId.HOME -> "창문 너머로도 하수구 냄새가 스며든다. 그래도 여기는 나의 오두막이다."
+            PlaceId.SHOP -> "\"어서 오세요… 횃불이랑 붕대는 늘 비치해 둡니다. 요즘엔 필수죠.\""
+            PlaceId.WEAPON_SHOP -> "\"좀비 뼈라도 가를 쇠를 찾나? 잘 왔네.\""
+            PlaceId.HOSPITAL -> "\"물린 상처입니까, 아니면… 좀비석 기운입니까?\""
+            PlaceId.CHURCH -> "\"저주가 지상을 핥고 있소. 빛의 가호가 그대와 함께하기를.\""
+            PlaceId.INN -> "\"문은 꼭 잠그세요. 밤엔 하수도 쪽에서 기척이 들립니다.\""
+            PlaceId.PUB -> "포도주 향 사이로, 좀비석과 영주를 향한 낮은 원성이 섞여 들린다."
+            PlaceId.ARENA -> "\"지상에서라도 칼날을 갈아야지. 지하에선 실수가 곧 죽음이야.\""
+            PlaceId.DUNGEON -> "축축한 하수도 바람이 얼굴을 스친다. 저주의 둥지가 발밑에서 숨 쉰다."
+            PlaceId.GRAY_CASTLE -> "회색 돌문이 열린다. 해골과 유령의 숨결이 성채 심층에서 흘러나온다."
+            PlaceId.EAST_FOREST -> "나뭇잎 사이로 바람이 스친다. 동쪽으로 갈수록 짐승의 울음이 가까워진다."
+            PlaceId.SOUTH_DESERT -> "뜨거운 모래바람이 얼굴을 때린다. 전갈과 낙타거미가 모래 아래 숨는다."
+            PlaceId.NORTH_GLACIER -> "칼바람과 함께 하얀 침묵이 내려앉는다. 북극의 짐승들이 얼음 너머에서 지켜본다."
+            PlaceId.BLACKSMITH -> "\"좀비 이빨에 안 깨지려면, 쇠는 더 두들겨야지.\""
+            PlaceId.MAGIC_SCHOOL -> "\"연금술사들이 손을 댄 그 돌… 우리는 이제 해독만 연구한다네.\""
+            PlaceId.MERCENARY -> "\"좀비 둥지 안내라면 돈만 주면 붙여주지. 목숨값은 별도야.\""
+        }
     }
 
     private fun emitSfx(name: String) {
@@ -1795,6 +1813,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val gained = levelsGained.size
         skillPoints[actorKey] = (skillPoints[actorKey] ?: 0) + gained
         specialSkillRevision++
+        emitSfx("level_up")
+        levelUpFxActorKey = actorKey
+        levelUpFxUntil = animTime + 2.0f
         say("$actorName 스킬포인트 +$gained (보유 ${skillPoints[actorKey]})")
         openSkillMap(
             actorKey = actorKey,
@@ -2133,9 +2154,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (!monster.alive) return
         if (hitSfx != null) emitSfx(hitSfx)
         applyKnockback(monster, knockDx, knockDy)
-        monster.hp -= damage
+        val mitigated = (damage - monster.armor).coerceAtLeast(1)
+        monster.hp -= mitigated
         if (monster.hp > 0) {
-            say("${monster.name}에게 ${damage} 피해! (HP ${monster.hp}/${monster.maxHp})")
+            val armorNote = if (monster.armor > 0) " · 방어 -${monster.armor}" else ""
+            say("${monster.name}에게 ${mitigated} 피해! (HP ${monster.hp}/${monster.maxHp}$armorNote)")
             refreshDungeonFloor()
             return
         }
@@ -2408,6 +2431,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun escapeDungeon() {
+        val map = dungeonFloor
+        if (map != null && map.tileKindAt(dungeonHeroX, dungeonHeroY) != DungeonTile.STAIRS_UP) {
+            say("상부로 가는 통로·계단에서만 탈출할 수 있다.")
+            return
+        }
         say(
             when (currentBiome()) {
                 ExploreBiome.FOREST -> "마을 쪽 바람이 폐를 채운다. 숲속 짐승들은 여전히 깊은 곳에서 숨 쉰다."
@@ -2707,22 +2735,26 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun monsterChaseSpeed(kind: String): Float = when (kind) {
-        "runner" -> 110f
-        "farmer" -> 72f
-        "shambler" -> 62f
-        "blacksmith" -> 58f
-        "armored" -> 52f
-        "golem" -> 46f
-        "bloater" -> 42f
-        "boss_warden" -> 48f
-        "boss_abomination" -> 36f
-        "boss_lich" -> 44f
-        "ghost_cavalry" -> 105f
-        "skel_archer" -> 70f
-        "skel_soldier" -> 64f
-        "boss_skel_king" -> 50f
-        else -> 58f
+    private fun monsterChaseSpeed(monster: DungeonMonster): Float {
+        val base = when (monster.kind) {
+            "runner" -> 110f
+            "farmer" -> 72f
+            "shambler" -> 62f
+            "blacksmith" -> 58f
+            "armored" -> 52f
+            "golem" -> 46f
+            "bloater" -> 42f
+            "boss_warden" -> 78f
+            "boss_abomination" -> 62f
+            "boss_lich" -> 74f
+            "ghost_cavalry" -> 105f
+            "skel_archer" -> 70f
+            "skel_soldier" -> 64f
+            "boss_skel_king" -> 82f
+            "bear", "polar_bear", "giant_scorpion" -> 68f
+            else -> 58f
+        }
+        return if (monster.isBoss) base * 1.28f + 14f else base
     }
 
     private fun monsterAggroRange(monster: DungeonMonster): Float =
@@ -2734,12 +2766,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun monsterAttackCooldown(monster: DungeonMonster): Float =
         if (monster.isBoss) MONSTER_ATTACK_COOLDOWN + 0.35f else MONSTER_ATTACK_COOLDOWN
 
+    /** 가방·장비·스킬맵 등 UI가 열려 있으면 몬스터 AI를 멈춘다. */
+    private fun dungeonMenusPauseMonsters(): Boolean =
+        menuTab != MenuTab.NONE || levelUpSkillOffer != null
+
     /**
      * 주인공이 가까이 오면 추격하고, 사거리에 들어오면 공격 애니와 함께 타격한다.
      * 멀리 있는 적은 가끔 배회한다.
      */
     private fun tickMonsters(map: DungeonFloor, dt: Float) {
-        if (dungeonCombatLock) return
+        if (dungeonCombatLock || dungeonMenusPauseMonsters()) return
         var dirty = false
         monsterWanderAcc += dt
         val doWander = monsterWanderAcc >= 0.55f
@@ -2789,7 +2825,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     monster.attackCooldown = monsterAttackCooldown(monster)
                     dirty = true
                 } else {
-                    val speed = monsterChaseSpeed(monster.kind)
+                    val speed = monsterChaseSpeed(monster)
                     val nx = monster.x + dx / dist * speed * dt
                     val ny = monster.y + dy / dist * speed * dt
                     if (tryMoveMonster(map, monster, nx, ny)) {
@@ -2848,7 +2884,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun resolveMonsterAttackHit(monster: DungeonMonster) {
         val base = (monster.power - totalDef).coerceAtLeast(3) + Random.nextInt(0, 4)
-        val dmg = if (monster.isBoss) (base * 1.35f).toInt().coerceAtLeast(base + 4) else base
+        val dmg = if (monster.isBoss) {
+            (base * 1.55f).toInt().coerceAtLeast(base + 8)
+        } else {
+            base
+        }
         val biome = currentBiome()
         say(
             when {

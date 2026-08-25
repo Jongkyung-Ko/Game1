@@ -75,6 +75,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
             "magic_hit" -> audio.playSfx(Sfx.MAGIC_HIT)
             "door" -> audio.playSfx(Sfx.DOOR)
             "click" -> audio.playSfx(Sfx.CLICK)
+            "level_up" -> audio.playSfx(Sfx.LEVEL_UP)
             "skill_smash" -> audio.playSfx(Sfx.SKILL_SMASH)
             "skill_slash" -> audio.playSfx(Sfx.SKILL_SLASH)
             "skill_charge" -> audio.playSfx(Sfx.SKILL_CHARGE)

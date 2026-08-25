@@ -127,9 +127,9 @@ object CastleFactory {
             if (monsters.any { hypot(it.x - x, it.y - y) < TILE * 1.4f }) continue
             val (kind, name) = undeadKinds.random(rng)
             val kindBonus = when (kind) {
-                "ghost_cavalry" -> 7
-                "skel_archer" -> 4
-                else -> 2
+                "ghost_cavalry" -> 9
+                "skel_archer" -> 5
+                else -> 3
             }
             monsters += DungeonMonster(
                 id = "c${f}_${monsters.size}",
@@ -137,14 +137,15 @@ object CastleFactory {
                 kind = kind,
                 x = x,
                 y = y,
-                power = 12 + f * 9 + kindBonus + rng.nextInt(0, 8)
+                power = 16 + f * 11 + kindBonus + rng.nextInt(0, 10),
+                armor = 2 + f / 3,
             )
         }
 
         if (finalFloor) {
             val (kind, name) = boss
-            val power = 40 + f * 18 + rng.nextInt(0, 12)
-            val maxHp = (power * 12).coerceAtLeast(220)
+            val power = 62 + f * 24 + rng.nextInt(0, 16)
+            val maxHp = (power * 15).coerceAtLeast(360)
             val offsets = listOf(
                 -TILE * 1.6f to 0f,
                 TILE * 1.6f to 0f,
@@ -159,7 +160,7 @@ object CastleFactory {
                 if (hypot(bx - spawnX, by - spawnY) < TILE * 3f) continue
                 monsters += DungeonMonster(
                     id = "boss_castle_$f",
-                    name = name,
+                    name = "중간 보스 · $name",
                     kind = kind,
                     x = bx,
                     y = by,
@@ -167,6 +168,7 @@ object CastleFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
+                    armor = 12,
                 )
                 placed = true
                 break
@@ -174,7 +176,7 @@ object CastleFactory {
             if (!placed) {
                 monsters += DungeonMonster(
                     id = "boss_castle_$f",
-                    name = name,
+                    name = "중간 보스 · $name",
                     kind = kind,
                     x = downX,
                     y = downY,
@@ -182,6 +184,7 @@ object CastleFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
+                    armor = 12,
                 )
             }
         }

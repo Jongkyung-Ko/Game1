@@ -44,5 +44,6 @@ object ForestFactory {
                     else -> 0
                 }
             },
+            midBoss = "bear" to "숲의 수호자",
         )
 }

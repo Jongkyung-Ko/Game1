@@ -135,15 +135,25 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         frontAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
                         slots = partySlots,
                     )
+                    val fxKey = vm.levelUpFxActorKey
+                    if (fxKey != null) {
+                        val slot = partySlots.firstOrNull { it.actorKey == fxKey }
+                            ?: partySlots.firstOrNull()
+                        if (slot != null) {
+                            val rem = (vm.levelUpFxUntil - vm.animTime).coerceAtLeast(0f)
+                            val progress = (1f - rem / 2f).coerceIn(0f, 1f)
+                            drawLevelUpBurst(slot.x, slot.y, progress, vm.animTime)
+                        }
+                    }
                 }
             }
         }
 
         Text(
             text = if (art != null) {
-                "${settlement.nameEn} · v0.4.27"
+                "${settlement.nameEn} · v0.4.28"
             } else {
-                "${settlement.nameEn} · v0.4.27 (맵 로딩 실패)"
+                "${settlement.nameEn} · v0.4.28 (맵 로딩 실패)"
             },
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,

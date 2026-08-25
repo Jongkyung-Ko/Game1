@@ -56,6 +56,7 @@ import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
 import com.medieval.village.ui.village.PARTY_REAR_SCALE_FACTOR
+import com.medieval.village.ui.village.drawLevelUpBurst
 import com.medieval.village.ui.village.drawPartySlots
 import com.medieval.village.ui.village.drawCustomSprite
 import com.medieval.village.ui.village.drawKenneySprite
@@ -218,6 +219,16 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
                             specialAnimSet = specialAnimSet,
                         )
+                        val fxKey = vm.levelUpFxActorKey
+                        if (fxKey != null) {
+                            val slot = partySlots.firstOrNull { it.actorKey == fxKey }
+                                ?: partySlots.firstOrNull()
+                            if (slot != null) {
+                                val rem = (vm.levelUpFxUntil - vm.animTime).coerceAtLeast(0f)
+                                val progress = (1f - rem / 2f).coerceIn(0f, 1f)
+                                drawLevelUpBurst(slot.x, slot.y, progress, vm.animTime)
+                            }
+                        }
                         // 캐릭터 위에 반달 참격·특별 FX가 보이도록 나중에 그림
                         slashFx?.let { drawMeleeSlashFx(it) }
                         specialFx.forEach { drawSpecialSkillFx(it, art) }
@@ -226,9 +237,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     if (vm.currentPlace == com.medieval.village.model.PlaceId.GRAY_CASTLE) {
-                        "v0.4.27 Gray Castle"
+                        "v0.4.28 Gray Castle"
                     } else {
-                        "v0.4.27 Undead nest"
+                        "v0.4.28 Undead nest"
                     },
                     14f,
                     28f,
@@ -268,7 +279,11 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     "chest" -> WoodButton("열기", Modifier.weight(1f), highlight = true) {
                         vm.openDungeonChest()
                     }
-                    else -> WoodButton("탈출", Modifier.weight(1f)) { vm.escapeDungeon() }
+                    else -> WoodButton(
+                        "탈출 (상부 계단)",
+                        Modifier.weight(1f),
+                        enabled = false,
+                    ) {}
                 }
                 val portalStone = vm.inventory.toList().firstOrNull {
                     it.item.id == ItemCatalog.portalStone.id && it.count > 0

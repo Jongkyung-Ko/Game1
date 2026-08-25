@@ -129,4 +129,6 @@ data class PartyDrawSlot(
     val y: Float,
     val facing: Facing,
     val isFront: Boolean,
-)
+) {
+    val actorKey: String get() = mercenary?.id ?: "hero"
+}

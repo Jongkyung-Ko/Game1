@@ -30,6 +30,8 @@ data class DungeonMonster(
     var alive: Boolean = true,
     var hp: Int = (power * 4).coerceAtLeast(24),
     val maxHp: Int = (power * 4).coerceAtLeast(24),
+    /** 받는 피해 감소 (방어 역할) */
+    val armor: Int = 0,
     /** 연출·AI 상태 (탐험 중 갱신) */
     var facingLeft: Boolean = false,
     var moving: Boolean = false,
@@ -224,10 +226,10 @@ object DungeonFactory {
             if (monsters.any { hypot(it.x - x, it.y - y) < TILE * 1.4f }) continue
             val (kind, name) = zombieKinds.random(rng)
             val kindBonus = when (kind) {
-                "bloater", "armored", "blacksmith" -> 6
-                "runner" -> 3
-                "golem" -> 4
-                else -> 0
+                "bloater", "armored", "blacksmith" -> 8
+                "runner" -> 4
+                "golem" -> 5
+                else -> 1
             }
             monsters += DungeonMonster(
                 id = "z${floor}_${monsters.size}",
@@ -235,14 +237,15 @@ object DungeonFactory {
                 kind = kind,
                 x = x,
                 y = y,
-                power = 10 + floor * 8 + kindBonus + rng.nextInt(0, 8)
+                power = 14 + floor * 10 + kindBonus + rng.nextInt(0, 10),
+                armor = 1 + floor / 4,
             )
         }
 
         if (bossFloor) {
             val (kind, name) = bossForFloor(floor)
-            val power = 28 + floor * 16 + rng.nextInt(0, 12)
-            val maxHp = (power * 11).coerceAtLeast(180)
+            val power = 48 + floor * 22 + rng.nextInt(0, 16)
+            val maxHp = (power * 14).coerceAtLeast(280)
             // 하층 계단 근처 끝방 — 내려가기 전 마주치게
             val offsets = listOf(
                 -TILE * 1.6f to 0f,
@@ -258,7 +261,7 @@ object DungeonFactory {
                 if (hypot(bx - spawnX, by - spawnY) < TILE * 3f) continue
                 monsters += DungeonMonster(
                     id = "boss_${floor}",
-                    name = name,
+                    name = "중간 보스 · $name",
                     kind = kind,
                     x = bx,
                     y = by,
@@ -266,6 +269,7 @@ object DungeonFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
+                    armor = 8 + floor / 2,
                 )
                 placed = true
                 break
@@ -275,7 +279,7 @@ object DungeonFactory {
                 val by = downY.coerceIn(TILE * 1.5f, (ROWS - 1.5f) * TILE)
                 monsters += DungeonMonster(
                     id = "boss_${floor}",
-                    name = name,
+                    name = "중간 보스 · $name",
                     kind = kind,
                     x = bx,
                     y = by,
@@ -283,6 +287,7 @@ object DungeonFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
+                    armor = 8 + floor / 2,
                 )
             }
         }

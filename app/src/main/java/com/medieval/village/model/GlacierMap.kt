@@ -42,5 +42,6 @@ object GlacierFactory {
             basePower = 9,
             powerPerFloor = 8,
             sewerChance = 0.20f,
+            midBoss = "polar_bear" to "빙하의 군주",
         )
 }

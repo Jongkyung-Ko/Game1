@@ -24,6 +24,8 @@ object WildZoneGenerator {
         basePower: Int = 8,
         powerPerFloor: Int = 7,
         sewerChance: Float = 0.18f,
+        /** 10층 중간 보스 (kind to 표시명). null이면 보스 없음 */
+        midBoss: Pair<String, String>? = null,
     ): DungeonFloor {
         val rng = Random(seed)
         val tiles = Array(COLS * ROWS) { DungeonTile.WALL }
@@ -125,8 +127,63 @@ object WildZoneGenerator {
                 kind = kind,
                 x = x,
                 y = y,
-                power = basePower + floor * powerPerFloor + kindBonus(kind) + rng.nextInt(0, 7)
+                power = basePower + floor * powerPerFloor + kindBonus(kind) + rng.nextInt(0, 9),
+                armor = 1 + floor / 5,
             )
+        }
+
+        // 10층마다 중간 보스
+        if (midBoss != null && floor > 0 && floor % 10 == 0) {
+            val (kind, name) = midBoss
+            val power = 44 + floor * 20 + rng.nextInt(0, 14)
+            val maxHp = (power * 13).coerceAtLeast(260)
+            val offsets = listOf(
+                -TILE * 1.6f to 0f,
+                TILE * 1.6f to 0f,
+                0f to -TILE * 1.4f,
+                0f to TILE * 1.4f,
+            )
+            var placed = false
+            fun walkable(x: Float, y: Float): Boolean {
+                val c = (x / TILE).toInt()
+                val r = (y / TILE).toInt()
+                if (c !in 0 until COLS || r !in 0 until ROWS) return false
+                return tiles[r * COLS + c] != DungeonTile.WALL
+            }
+            for ((ox, oy) in offsets.shuffled(rng)) {
+                val bx = (downX + ox).coerceIn(TILE * 1.5f, (COLS - 1.5f) * TILE)
+                val by = (downY + oy).coerceIn(TILE * 1.5f, (ROWS - 1.5f) * TILE)
+                if (!walkable(bx, by)) continue
+                if (hypot(bx - spawnX, by - spawnY) < TILE * 3f) continue
+                monsters += DungeonMonster(
+                    id = "${idPrefix}boss_$floor",
+                    name = "중간 보스 · $name",
+                    kind = kind,
+                    x = bx,
+                    y = by,
+                    power = power,
+                    isBoss = true,
+                    hp = maxHp,
+                    maxHp = maxHp,
+                    armor = 9 + floor / 2,
+                )
+                placed = true
+                break
+            }
+            if (!placed) {
+                monsters += DungeonMonster(
+                    id = "${idPrefix}boss_$floor",
+                    name = "중간 보스 · $name",
+                    kind = kind,
+                    x = downX,
+                    y = downY,
+                    power = power,
+                    isBoss = true,
+                    hp = maxHp,
+                    maxHp = maxHp,
+                    armor = 9 + floor / 2,
+                )
+            }
         }
 
         return DungeonFloor(

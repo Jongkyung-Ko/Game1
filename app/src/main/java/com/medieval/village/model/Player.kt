@@ -32,7 +32,12 @@ data class Player(
     /** Gray Castle 10층 클리어 — White Castle로 해방 */
     val castleCleared: Boolean = false,
 ) {
-    val expToNext: Int get() = 60 + (level - 1) * 45
+    val expToNext: Int
+        get() {
+            // 레벨이 오를수록 급격히 늘어나는 경험치 (초반 완화 · 후반 가파름)
+            val lv = level.coerceAtLeast(1)
+            return 90 + (lv - 1) * 70 + (lv - 1) * (lv - 1) * 18
+        }
     val hpRatio: Float get() = if (maxHp <= 0) 0f else hp.toFloat() / maxHp
     val mpRatio: Float get() = if (maxMp <= 0) 0f else mp.toFloat() / maxMp
     val expRatio: Float get() = exp.toFloat() / expToNext
@@ -72,7 +77,11 @@ data class Mercenary(
     val exp: Int = 0,
     val equipment: Map<ItemType, EquippedItem> = emptyMap(),
 ) {
-    val expToNext: Int get() = 40 + (level - 1) * 30
+    val expToNext: Int
+        get() {
+            val lv = level.coerceAtLeast(1)
+            return 70 + (lv - 1) * 50 + (lv - 1) * (lv - 1) * 14
+        }
     val expRatio: Float get() = if (expToNext <= 0) 0f else exp.toFloat() / expToNext
     val equipAtk: Int get() = equipment.values.sumOf { it.atk }
     val equipDef: Int get() = equipment.values.sumOf { it.def }

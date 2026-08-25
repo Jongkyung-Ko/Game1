@@ -22,7 +22,8 @@ object PubNpcCatalog {
     const val WORLD_W = 1000f
     const val WORLD_H = 700f
 
-    val all = listOf(
+    /** 오크헤이븐 기본 선술집 NPC (하위 호환용 all 별칭) */
+    val oakhavenBase = listOf(
         PubNpc(
             id = "owner",
             name = "보릭",
@@ -80,4 +81,9 @@ object PubNpcCatalog {
             )
         )
     )
+
+    val all: List<PubNpc> get() = oakhavenBase
+
+    fun forSettlement(settlementId: SettlementId, castleCleared: Boolean = false): List<PubNpc> =
+        RegionDialogue.pubNpcs(settlementId, castleCleared)
 }

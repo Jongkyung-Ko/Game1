@@ -40,8 +40,8 @@ class CustomArt(
             ?: villageMaps["village_map.png"]
             ?: villageMaps.values.first()
 
-    fun villageMapFor(id: SettlementId): ImageBitmap? {
-        val asset = Settlements.of(id).mapAsset
+    fun villageMapFor(id: SettlementId, castleCleared: Boolean = false): ImageBitmap? {
+        val asset = Settlements.of(id, castleCleared).mapAsset
         return villageMaps[asset] ?: villageMaps["oakhaven_base.png"]
     }
 

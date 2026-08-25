@@ -25,7 +25,14 @@ data class InteriorNpc(
 
 object InteriorNpcCatalog {
 
-    fun forPlace(placeId: PlaceId): List<InteriorNpc> = all.filter { it.placeId == placeId }
+    fun forPlace(
+        placeId: PlaceId,
+        settlementId: SettlementId = SettlementId.OAKHAVEN,
+        castleCleared: Boolean = false,
+    ): List<InteriorNpc> = all.filter { it.placeId == placeId }.map { npc ->
+        val lines = RegionDialogue.interiorLines(settlementId, castleCleared, npc)
+        if (lines === npc.lines) npc else npc.copy(lines = lines)
+    }
 
     val all: List<InteriorNpc> = listOf(
         // ----- 집 -----
