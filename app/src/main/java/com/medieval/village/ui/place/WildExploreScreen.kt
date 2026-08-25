@@ -97,7 +97,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.28 Eastern forest",
+        watermark = "v0.4.29 Eastern forest",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -113,7 +113,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.28 Southern desert",
+        watermark = "v0.4.29 Southern desert",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -129,7 +129,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.28 Northern glacier",
+        watermark = "v0.4.29 Northern glacier",
         exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
         deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -164,14 +164,13 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 Text(ui.title, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 Text(ui.subtitle, color = Palette.ParchmentDim, fontSize = 10.sp)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Chip(ui.recordLabel(record), Palette.WoodLight)
                 Chip(ui.foeLabel, ui.foeChip)
             }
-            PartySwitchBar(
-                vm = vm,
-                modifier = Modifier.padding(start = 8.dp),
-            )
         }
 
         Box(
@@ -188,7 +187,7 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                     "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
                     "chest" -> "◆ 은닉 상자 — 아래에서 ‘열기’ 또는 상자를 탭"
                     "chest_open" -> "이미 열어 본 상자"
-                    else -> ui.moveHint
+                    else -> "상부 출구에서만 탈출 가능 · ${ui.moveHint}"
                 },
                 color = Palette.Parchment,
                 fontSize = 11.sp
@@ -298,6 +297,12 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 wildLabel(ui.watermark, 14f, 28f, 18f, ui.border)
             }
 
+            PartySwitchBar(
+                vm = vm,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp),
+            )
             DungeonSpecialSkillOverlay(
                 skillSlots = vm.frontSkillSlotsUi(),
                 onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
@@ -311,17 +316,21 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
                 onPadRelease = { vm.clearDungeonPad() },
                 onAttack = { vm.dungeonAttack() },
+                logContent = {
+                    MessageLog(vm.log, mod.fillMaxWidth().height(88.dp))
+                },
             )
             Spacer(mod.height(6.dp))
-            MessageLog(vm.log, mod.height(72.dp))
-            Spacer(mod.height(7.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = mod.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 when (vm.dungeonHint) {
                     "stairs_up" -> WoodButton("탈출", mod.weight(1f), highlight = true) { vm.escapeDungeon() }
                     "stairs_down" -> WoodButton(ui.deepButton, mod.weight(1f), highlight = true) { vm.descendDungeon() }
                     "portal" -> WoodButton("집으로", mod.weight(1f), highlight = true) { vm.enterHomePortal() }
                     "chest" -> WoodButton("열기", mod.weight(1f), highlight = true) { vm.openDungeonChest() }
-                    else -> WoodButton("탈출 (상부 계단)", mod.weight(1f), enabled = false) {}
+                    else -> WoodButton("탈출", mod.weight(1f), enabled = false) {}
                 }
                 val portalStone = vm.inventory.toList().firstOrNull {
                     it.item.id == ItemCatalog.portalStone.id && it.count > 0

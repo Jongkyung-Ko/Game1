@@ -185,7 +185,7 @@ fun BoxScope.DungeonSpecialSkillOverlay(
     }
 }
 
-/** 맵 바깥용 — 이동 패드 + 공격 버튼 */
+/** 맵 바깥용 — 이동 패드 + (선택) 로그 + 공격 버튼 */
 @Composable
 fun DungeonCombatControls(
     attackLabel: String,
@@ -194,6 +194,7 @@ fun DungeonCombatControls(
     onPadRelease: () -> Unit,
     onAttack: () -> Unit,
     modifier: Modifier = Modifier,
+    logContent: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -204,6 +205,15 @@ fun DungeonCombatControls(
             onVector = onPad,
             onRelease = onPadRelease,
         )
+        if (logContent != null) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+            ) {
+                logContent()
+            }
+        }
         AttackButton(
             label = attackLabel,
             enabled = attackEnabled,

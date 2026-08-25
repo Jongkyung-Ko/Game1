@@ -93,7 +93,10 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     fontSize = 10.sp
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Chip("기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
                 Chip("좀비 ${floor?.monsters?.count { it.alive } ?: 0}", Palette.Blood)
                 val bossAlive = floor?.monsters?.any { it.isBoss && it.alive } == true
@@ -101,10 +104,6 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     Chip("보스!", Palette.Blood)
                 }
             }
-            PartySwitchBar(
-                vm = vm,
-                modifier = Modifier.padding(start = 8.dp),
-            )
         }
 
         Box(
@@ -121,7 +120,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
                     "chest" -> "◆ 보물상자 — 아래에서 ‘열기’ 또는 상자를 탭"
                     "chest_open" -> "이미 열어 본 보물상자"
-                    else -> vm.dungeonMoveHint()
+                    else -> "상부 계단에서만 탈출 가능 · ${vm.dungeonMoveHint()}"
                 },
                 color = Palette.Parchment,
                 fontSize = 11.sp
@@ -237,9 +236,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     if (vm.currentPlace == com.medieval.village.model.PlaceId.GRAY_CASTLE) {
-                        "v0.4.28 Gray Castle"
+                        "v0.4.29 Gray Castle"
                     } else {
-                        "v0.4.28 Undead nest"
+                        "v0.4.29 Undead nest"
                     },
                     14f,
                     28f,
@@ -248,6 +247,12 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 )
             }
 
+            PartySwitchBar(
+                vm = vm,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 8.dp, end = 8.dp),
+            )
             DungeonSpecialSkillOverlay(
                 skillSlots = vm.frontSkillSlotsUi(),
                 onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
@@ -261,11 +266,15 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
                 onPadRelease = { vm.clearDungeonPad() },
                 onAttack = { vm.dungeonAttack() },
+                logContent = {
+                    MessageLog(vm.log, Modifier.fillMaxWidth().height(88.dp))
+                },
             )
-            Spacer(modifier.height(6.dp))
-            MessageLog(vm.log, Modifier.height(72.dp))
-            Spacer(Modifier.height(7.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 when (vm.dungeonHint) {
                     "stairs_up" -> WoodButton("탈출", Modifier.weight(1f), highlight = true) {
                         vm.escapeDungeon()
@@ -279,11 +288,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     "chest" -> WoodButton("열기", Modifier.weight(1f), highlight = true) {
                         vm.openDungeonChest()
                     }
-                    else -> WoodButton(
-                        "탈출 (상부 계단)",
-                        Modifier.weight(1f),
-                        enabled = false,
-                    ) {}
+                    else -> WoodButton("탈출", Modifier.weight(1f), enabled = false) {}
                 }
                 val portalStone = vm.inventory.toList().firstOrNull {
                     it.item.id == ItemCatalog.portalStone.id && it.count > 0
