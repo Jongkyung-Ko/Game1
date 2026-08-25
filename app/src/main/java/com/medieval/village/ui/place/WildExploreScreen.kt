@@ -41,7 +41,6 @@ import com.medieval.village.model.DungeonFloor
 import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.ItemCatalog
-import com.medieval.village.ui.Chip
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
@@ -89,7 +88,7 @@ private data class WildThemeUi(
 private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): WildThemeUi = when (theme) {
     WildTheme.FOREST -> WildThemeUi(
         title = "동쪽 숲 · ${zone}지대",
-        subtitle = "깊을수록 강한 짐승 — 패드 이동 · 공격",
+        subtitle = "",
         recordLabel = { "기록 ${it}지대" },
         foeLabel = "짐승 $foeCount",
         foeChip = Color(0xFF4A7A38),
@@ -97,15 +96,15 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.29 Eastern forest",
-        exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
-        deepHint = "↓ 더 깊은 숲 — 아래에서 ‘들어가기’",
+        watermark = "v0.4.30 Eastern forest",
+        exitHint = "↑ 탈출",
+        deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
         deepButton = "들어가기",
     )
     WildTheme.DESERT -> WildThemeUi(
         title = "남쪽 사막 · ${zone}지대",
-        subtitle = "모래바람 너머 괴물들 — 패드 이동 · 공격",
+        subtitle = "",
         recordLabel = { "기록 ${it}지대" },
         foeLabel = "괴물 $foeCount",
         foeChip = Color(0xFFC07828),
@@ -113,15 +112,15 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.29 Southern desert",
-        exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
-        deepHint = "↓ 더 깊은 사막 — 아래에서 ‘들어가기’",
+        watermark = "v0.4.30 Southern desert",
+        exitHint = "↑ 탈출",
+        deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
         deepButton = "들어가기",
     )
     WildTheme.GLACIER -> WildThemeUi(
         title = "북쪽 빙하 · ${zone}지대",
-        subtitle = "얼음 너머 극지 짐승 — 패드 이동 · 공격",
+        subtitle = "",
         recordLabel = { "기록 ${it}지대" },
         foeLabel = "극지 $foeCount",
         foeChip = Color(0xFF4A7A9A),
@@ -129,9 +128,9 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.29 Northern glacier",
-        exitHint = "↑ 마을 출구 — 아래에서 ‘탈출’",
-        deepHint = "↓ 더 깊은 빙하 — 아래에서 ‘들어가기’",
+        watermark = "v0.4.30 Northern glacier",
+        exitHint = "↑ 탈출",
+        deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
         deepButton = "들어가기",
     )
@@ -151,47 +150,36 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
     val foeCount = floor?.monsters?.count { it.alive } ?: 0
     val ui = themeUi(theme, vm.dungeonFloorNumber, record, foeCount)
     val mod = Modifier
+    val contextHint = when (vm.dungeonHint) {
+        "stairs_up" -> ui.exitHint
+        "stairs_down" -> ui.deepHint
+        "portal" -> "◎ 집으로"
+        "chest" -> "◆ 상자 열기"
+        else -> null
+    }
 
     Column(modifier = modifier.fillMaxSize().background(ui.chromeBg)) {
-        Row(
+        // 맨 윗줄: 이름·지대만
+        Text(
+            text = ui.title,
+            color = Palette.Gold,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(ui.title, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Text(ui.subtitle, color = Palette.ParchmentDim, fontSize = 10.sp)
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Chip(ui.recordLabel(record), Palette.WoodLight)
-                Chip(ui.foeLabel, ui.foeChip)
-            }
-        }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        )
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 2.dp)
-                .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
-                .padding(horizontal = 10.dp, vertical = 5.dp)
-        ) {
-            Text(
-                when (vm.dungeonHint) {
-                    "stairs_up" -> ui.exitHint
-                    "stairs_down" -> ui.deepHint
-                    "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
-                    "chest" -> "◆ 은닉 상자 — 아래에서 ‘열기’ 또는 상자를 탭"
-                    "chest_open" -> "이미 열어 본 상자"
-                    else -> "상부 출구에서만 탈출 가능 · ${ui.moveHint}"
-                },
-                color = Palette.Parchment,
-                fontSize = 11.sp
-            )
+        if (contextHint != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 2.dp)
+                    .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(contextHint, color = Palette.Parchment, fontSize = 11.sp)
+            }
         }
 
         BoxWithConstraints(
@@ -297,19 +285,17 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 wildLabel(ui.watermark, 14f, 28f, 18f, ui.border)
             }
 
-            PartySwitchBar(
-                vm = vm,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 8.dp),
-            )
-            DungeonSpecialSkillOverlay(
-                skillSlots = vm.frontSkillSlotsUi(),
-                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
-            )
+            DungeonMapStatusOverlay(vm)
         }
 
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+        PartySwitchBar(
+            vm = vm,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
             DungeonCombatControls(
                 attackLabel = vm.attackLabel(),
                 attackEnabled = vm.attackReady && vm.dungeonFloor != null && vm.levelUpSkillOffer == null,
@@ -317,8 +303,10 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 onPadRelease = { vm.clearDungeonPad() },
                 onAttack = { vm.dungeonAttack() },
                 logContent = {
-                    MessageLog(vm.log, mod.fillMaxWidth().height(88.dp))
+                    MessageLog(vm.log, mod.fillMaxWidth().height(72.dp))
                 },
+                skillSlots = vm.frontSkillSlotsUi(),
+                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
             )
             Spacer(mod.height(6.dp))
             Row(
@@ -350,6 +338,7 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
         }
     }
 }
+
 
 @Composable
 fun ForestScreen(vm: GameViewModel, modifier: Modifier = Modifier) =

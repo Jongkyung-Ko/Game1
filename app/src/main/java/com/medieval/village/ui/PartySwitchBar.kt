@@ -14,7 +14,7 @@ import com.medieval.village.game.GameViewModel
 import com.medieval.village.ui.theme.Palette
 
 /**
- * 맵 위 선두 교대 UI — 헤더에 가려지지 않도록 오버레이로 둔다.
+ * 선두 정보·교대 — 던전/탐험 맵 밖 크롬에 둔다.
  */
 @Composable
 fun PartySwitchBar(

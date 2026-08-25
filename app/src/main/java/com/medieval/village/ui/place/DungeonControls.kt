@@ -22,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -160,32 +159,71 @@ fun AttackButton(
 }
 
 /**
- * 맵 위에는 반투명 특별스킬만 남기고,
- * 이동 패드·공격 버튼은 맵 바깥(하단 컨트롤 바)에 둔다.
+ * 맵 위에 항상 보이는 HP/MP·선두 상태.
+ */
+@Composable
+fun BoxScope.DungeonMapStatusOverlay(
+    vm: com.medieval.village.game.GameViewModel,
+    modifier: Modifier = Modifier,
+) {
+    @Suppress("UNUSED_EXPRESSION")
+    vm.dungeonCombatFrame
+    Column(
+        modifier = modifier
+            .align(Alignment.TopStart)
+            .padding(8.dp)
+            .background(Color(0xCC1B120A), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .fillMaxWidth(0.72f),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            "Lv.${vm.player.level} · ${vm.frontActorName()}",
+            color = Palette.Gold,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        com.medieval.village.ui.StatBar(
+            label = "HP",
+            value = "${vm.player.hp}/${vm.player.maxHp}",
+            ratio = vm.player.hpRatio,
+            color = Palette.Health,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        com.medieval.village.ui.StatBar(
+            label = "MP",
+            value = "${vm.player.mp}/${vm.player.maxMp}",
+            ratio = vm.player.mpRatio,
+            color = Palette.Mana,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        val merc = vm.frontMercenary()
+        if (merc != null) {
+            val hp = vm.mercCurrentHp(merc)
+            com.medieval.village.ui.StatBar(
+                label = merc.name,
+                value = "$hp/${merc.maxHp}",
+                ratio = if (merc.maxHp <= 0) 0f else hp.toFloat() / merc.maxHp,
+                color = Palette.Gold,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
+ * @deprecated 특별스킬은 공격 버튼 옆(맵 밖)으로 이동함.
  */
 @Composable
 fun BoxScope.DungeonSpecialSkillOverlay(
     skillSlots: List<SkillSlotUi>,
     onSpecial: (Int) -> Unit,
 ) {
+    // 하위 호환 — 빈 구현 (맵 위 배치 제거)
     if (skillSlots.isEmpty()) return
-    Row(
-        modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(end = 10.dp, bottom = 10.dp)
-            .alpha(0.58f),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        skillSlots.forEach { slot ->
-            SpecialSkillButton(
-                slot = slot,
-                onClick = { onSpecial(slot.slotIndex) },
-            )
-        }
-    }
 }
 
-/** 맵 바깥용 — 이동 패드 + (선택) 로그 + 공격 버튼 */
+/** 맵 바깥용 — 이동 패드 + (선택) 로그 + 특별스킬·공격 */
 @Composable
 fun DungeonCombatControls(
     attackLabel: String,
@@ -195,6 +233,8 @@ fun DungeonCombatControls(
     onAttack: () -> Unit,
     modifier: Modifier = Modifier,
     logContent: (@Composable () -> Unit)? = null,
+    skillSlots: List<SkillSlotUi> = emptyList(),
+    onSpecial: (Int) -> Unit = {},
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -214,11 +254,27 @@ fun DungeonCombatControls(
                 logContent()
             }
         }
-        AttackButton(
-            label = attackLabel,
-            enabled = attackEnabled,
-            onAttack = onAttack,
-        )
+        // 휘두르기(공격) 쪽으로 특별스킬 배치
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (skillSlots.isNotEmpty()) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    skillSlots.forEach { slot ->
+                        SpecialSkillButton(
+                            slot = slot,
+                            onClick = { onSpecial(slot.slotIndex) },
+                        )
+                    }
+                }
+            }
+            AttackButton(
+                label = attackLabel,
+                enabled = attackEnabled,
+                onAttack = onAttack,
+            )
+        }
     }
 }
 
@@ -246,11 +302,11 @@ private fun SpecialSkillButton(
     val art = rememberCustomArtOrNull()
     Box(
         modifier = Modifier
-            .size(56.dp)
+            .size(48.dp)
             .background(
                 when {
                     !filled -> Color(0x332A1C12)
-                    slot.enabled -> Color(0x885A3A18)
+                    slot.enabled -> Color(0xCC5A3A18)
                     else -> Color(0x55443322)
                 },
                 CircleShape,
@@ -264,7 +320,7 @@ private fun SpecialSkillButton(
         if (filled) {
             SkillIcon(
                 skillId = slot.skillId,
-                size = 52.dp,
+                size = 44.dp,
                 art = art,
                 enabled = slot.enabled,
                 showBorder = true,

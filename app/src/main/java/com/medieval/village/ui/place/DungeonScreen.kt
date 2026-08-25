@@ -44,7 +44,7 @@ import com.medieval.village.model.DungeonFloor
 import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.ItemCatalog
-import com.medieval.village.ui.Chip
+import com.medieval.village.model.PlaceId
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
@@ -63,68 +63,45 @@ import com.medieval.village.ui.village.drawKenneySprite
 import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
-import kotlin.math.max
-import kotlin.math.min
-
-@Composable
+impor@Composable
 fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     val atlas = rememberKenneyAtlasOrNull()
     val art = rememberCustomArtOrNull()
     LaunchedEffect(Unit) { vm.ensureDungeonLoaded() }
     val floor = vm.dungeonFloor
+    val title = when (vm.currentPlace) {
+        PlaceId.GRAY_CASTLE -> "Gray Castle · ${vm.dungeonFloorNumber}층"
+        else -> "잊혀진 지하 · ${vm.dungeonFloorNumber}층"
+    }
+    val contextHint = when (vm.dungeonHint) {
+        "stairs_up" -> "↑ 탈출"
+        "stairs_down" -> "↓ 내려가기"
+        "portal" -> "◎ 집으로"
+        "chest" -> "◆ 상자 열기"
+        else -> null
+    }
     Column(modifier = modifier.fillMaxSize().background(Color(0xFF14100C))) {
-        Row(
+        // 맨 윗줄: 던전 이름·층만
+        Text(
+            text = title,
+            color = Palette.Gold,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "잊혀진 지하 · ${vm.dungeonFloorNumber}층",
-                    color = Palette.Gold,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "왼쪽 패드 이동 · 오른쪽 공격",
-                    color = Palette.ParchmentDim,
-                    fontSize = 10.sp
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Chip("기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
-                Chip("좀비 ${floor?.monsters?.count { it.alive } ?: 0}", Palette.Blood)
-                val bossAlive = floor?.monsters?.any { it.isBoss && it.alive } == true
-                if (bossAlive) {
-                    Chip("보스!", Palette.Blood)
-                }
-            }
-        }
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        )
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 2.dp)
-                .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
-                .padding(horizontal = 10.dp, vertical = 5.dp)
-        ) {
-            Text(
-                when (vm.dungeonHint) {
-                    "stairs_up" -> "↑ 지상 출구 — 아래에서 ‘탈출’"
-                    "stairs_down" -> "↓ 더 깊은 층 — 아래에서 ‘내려가기’"
-                    "portal" -> "◎ 집 포털 — 아래에서 ‘집으로’"
-                    "chest" -> "◆ 보물상자 — 아래에서 ‘열기’ 또는 상자를 탭"
-                    "chest_open" -> "이미 열어 본 보물상자"
-                    else -> "상부 계단에서만 탈출 가능 · ${vm.dungeonMoveHint()}"
-                },
-                color = Palette.Parchment,
-                fontSize = 11.sp
-            )
+        if (contextHint != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 2.dp)
+                    .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(contextHint, color = Palette.Parchment, fontSize = 11.sp)
+            }
         }
 
         BoxWithConstraints(
@@ -164,7 +141,6 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             val worldY = content.y + cam.second
                             val col = (worldX / map.tileSize).toInt()
                             val row = (worldY / map.tileSize).toInt()
-                            // 터치 이동은 끄고, 보물상자 탭만 허용
                             if (map.tileAt(col, row) == DungeonTile.VAULT) {
                                 vm.openDungeonChest(col, row)
                             }
@@ -172,7 +148,6 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     }
                     .mapZoomGestures(mapZoom)
             ) {
-                // combatFrame 구독 — 탄환/참격 갱신
                 @Suppress("UNUSED_EXPRESSION")
                 combatFrame
 
@@ -228,17 +203,16 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                                 drawLevelUpBurst(slot.x, slot.y, progress, vm.animTime)
                             }
                         }
-                        // 캐릭터 위에 반달 참격·특별 FX가 보이도록 나중에 그림
                         slashFx?.let { drawMeleeSlashFx(it) }
                         specialFx.forEach { drawSpecialSkillFx(it, art) }
                     }
                 }
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
-                    if (vm.currentPlace == com.medieval.village.model.PlaceId.GRAY_CASTLE) {
-                        "v0.4.29 Gray Castle"
+                    if (vm.currentPlace == PlaceId.GRAY_CASTLE) {
+                        "v0.4.30 Gray Castle"
                     } else {
-                        "v0.4.29 Undead nest"
+                        "v0.4.30 Undead nest"
                     },
                     14f,
                     28f,
@@ -247,19 +221,19 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 )
             }
 
-            PartySwitchBar(
-                vm = vm,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 8.dp),
-            )
-            DungeonSpecialSkillOverlay(
-                skillSlots = vm.frontSkillSlotsUi(),
-                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
-            )
+            // HP/MP 등은 맵 위 상시 표시
+            DungeonMapStatusOverlay(vm)
         }
 
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+        // 선두·교대: 맵 밖
+        PartySwitchBar(
+            vm = vm,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
             DungeonCombatControls(
                 attackLabel = vm.attackLabel(),
                 attackEnabled = vm.attackReady && vm.dungeonFloor != null && vm.levelUpSkillOffer == null,
@@ -267,8 +241,10 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 onPadRelease = { vm.clearDungeonPad() },
                 onAttack = { vm.dungeonAttack() },
                 logContent = {
-                    MessageLog(vm.log, Modifier.fillMaxWidth().height(88.dp))
+                    MessageLog(vm.log, Modifier.fillMaxWidth().height(72.dp))
                 },
+                skillSlots = vm.frontSkillSlotsUi(),
+                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
             )
             Spacer(Modifier.height(6.dp))
             Row(
@@ -306,6 +282,11 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 ) {
                     potion?.let { vm.useItem(it.item) }
                 }
+            }
+        }
+    }
+}
+        }
             }
         }
     }
