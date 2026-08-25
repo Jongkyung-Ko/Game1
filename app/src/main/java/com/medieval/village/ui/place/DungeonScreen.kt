@@ -210,9 +210,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     if (vm.currentPlace == PlaceId.GRAY_CASTLE) {
-                        "v0.4.30 Gray Castle"
+                        "v0.4.31 Gray Castle"
                     } else {
-                        "v0.4.30 Undead nest"
+                        "v0.4.31 Undead nest"
                     },
                     14f,
                     28f,
