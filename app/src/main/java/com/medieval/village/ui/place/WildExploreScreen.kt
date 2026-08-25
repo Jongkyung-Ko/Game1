@@ -16,10 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -34,9 +32,7 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.DungeonFloor
 import com.medieval.village.model.DungeonMonster
@@ -47,7 +43,6 @@ import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.mapZoomGestures
 import com.medieval.village.ui.rememberMapZoomState
-import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.withMapZoom
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
@@ -97,7 +92,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.33 Eastern forest",
+        watermark = "v0.4.34 Eastern forest",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -113,7 +108,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.33 Southern desert",
+        watermark = "v0.4.34 Southern desert",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -129,7 +124,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.33 Northern glacier",
+        watermark = "v0.4.34 Northern glacier",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -151,43 +146,13 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
     val foeCount = floor?.monsters?.count { it.alive } ?: 0
     val ui = themeUi(theme, vm.dungeonFloorNumber, record, foeCount)
     val mod = Modifier
-    val contextHint = when (vm.dungeonHint) {
-        "stairs_up" -> ui.exitHint
-        "stairs_down" -> ui.deepHint
-        "portal" -> "◎ 집으로"
-        "chest" -> "◆ 상자 열기"
-        else -> null
-    }
-
+    // 이름·층·잔여 몬스터는 TopMenuBar, 상자 상단 안내 문구는 표시하지 않음
     Column(modifier = modifier.fillMaxSize().background(ui.chromeBg)) {
-        // 맨 윗줄: 이름·지대만
-        Text(
-            text = ui.title,
-            color = Palette.Gold,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        )
-
-        if (contextHint != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 2.dp)
-                    .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Text(contextHint, color = Palette.Parchment, fontSize = 11.sp)
-            }
-        }
-
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(ui.mapFrameBg, RoundedCornerShape(12.dp))
         ) {

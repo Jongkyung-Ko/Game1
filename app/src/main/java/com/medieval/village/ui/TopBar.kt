@@ -25,6 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
+import com.medieval.village.game.Scene
+import com.medieval.village.game.isExplorePlace
+import com.medieval.village.model.PlaceId
 import com.medieval.village.ui.theme.Palette
 
 private val tabs = listOf(
@@ -37,6 +40,12 @@ private val tabs = listOf(
 
 @Composable
 fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
+    // 몬스터 처치 시 잔여 수 갱신
+    @Suppress("UNUSED_EXPRESSION")
+    vm.dungeonCombatFrame
+
+    val exploring = vm.scene == Scene.INTERIOR && vm.currentPlace.isExplorePlace()
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -45,6 +54,7 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
             )
             .padding(horizontal = 6.dp, vertical = 5.dp)
     ) {
+        // 1) 게임 메뉴
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -80,6 +90,7 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
 
         Spacer(Modifier.height(5.dp))
 
+        // 2) HP · MP · EXP
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -90,7 +101,7 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
             )
-            Spacer(Modifier.width(7.dp))
+            Spacer(Modifier.width(6.dp))
             StatBar(
                 label = "HP",
                 value = "${vm.player.hp}/${vm.player.maxHp}",
@@ -98,7 +109,7 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
                 color = Palette.Health,
                 modifier = Modifier.weight(1f)
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(5.dp))
             StatBar(
                 label = "MP",
                 value = "${vm.player.mp}/${vm.player.maxMp}",
@@ -106,26 +117,61 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
                 color = Palette.Mana,
                 modifier = Modifier.weight(1f)
             )
-            Spacer(Modifier.width(7.dp))
-            Text(
-                "${vm.player.gold}G",
-                color = Palette.Gold,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
+            Spacer(Modifier.width(5.dp))
+            StatBar(
+                label = "EXP",
+                value = "${vm.player.exp}/${vm.player.expToNext}",
+                ratio = vm.player.expRatio,
+                color = Palette.Exp,
+                modifier = Modifier.weight(1f)
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                "${vm.player.day}일",
-                color = Palette.ParchmentDim,
-                fontSize = 11.sp
-            )
-            Spacer(modifier.width(6.dp))
-            Text(
-                "B·v7",
-                color = Color(0xFFFFE29A),
+                "${vm.player.gold}G",
+                color = Palette.Gold,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
             )
+        }
+
+        // 3) 던전/탐험 정보 — 맵과 분리된 고정 줄
+        if (exploring) {
+            Spacer(Modifier.height(5.dp))
+            val place = vm.currentPlace
+            val floor = vm.dungeonFloorNumber
+            val remaining = vm.dungeonFloor?.monsters?.count { it.alive } ?: 0
+            val (name, floorLabel) = when (place) {
+                PlaceId.GRAY_CASTLE -> "Gray Castle" to "${floor}층"
+                PlaceId.EAST_FOREST -> "동쪽 숲" to "${floor}지대"
+                PlaceId.SOUTH_DESERT -> "남쪽 사막" to "${floor}지대"
+                PlaceId.NORTH_GLACIER -> "북쪽 빙하" to "${floor}지대"
+                else -> "잊혀진 지하" to "${floor}층"
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xCC1B120A))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "$name · $floorLabel",
+                    color = Palette.Gold,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Text(
+                    text = "잔여 몬스터 $remaining",
+                    color = Palette.Parchment,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+            }
         }
     }
 }

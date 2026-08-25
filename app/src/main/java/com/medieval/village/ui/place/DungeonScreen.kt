@@ -16,10 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -36,11 +34,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
-import com.medieval.village.model.DungeonFactory
 import com.medieval.village.model.DungeonFloor
 import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
@@ -52,7 +47,6 @@ import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.mapZoomGestures
 import com.medieval.village.ui.rememberMapZoomState
 import com.medieval.village.ui.withMapZoom
-import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
@@ -73,46 +67,13 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     val art = rememberCustomArtOrNull()
     LaunchedEffect(Unit) { vm.ensureDungeonLoaded() }
     val floor = vm.dungeonFloor
-    val title = when (vm.currentPlace) {
-        PlaceId.GRAY_CASTLE -> "Gray Castle · ${vm.dungeonFloorNumber}층"
-        else -> "잊혀진 지하 · ${vm.dungeonFloorNumber}층"
-    }
-    val contextHint = when (vm.dungeonHint) {
-        "stairs_up" -> "↑ 탈출"
-        "stairs_down" -> "↓ 내려가기"
-        "portal" -> "◎ 집으로"
-        "chest" -> "◆ 상자 열기"
-        else -> null
-    }
+    // 던전 이름·층·잔여 몬스터는 TopMenuBar 고정 영역에 표시 (맵과 분리)
     Column(modifier = modifier.fillMaxSize().background(Color(0xFF14100C))) {
-        // 맨 윗줄: 던전 이름·층만
-        Text(
-            text = title,
-            color = Palette.Gold,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        )
-
-        if (contextHint != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 2.dp)
-                    .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Text(contextHint, color = Palette.Parchment, fontSize = 11.sp)
-            }
-        }
-
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFFD9C8A4), RoundedCornerShape(12.dp))
         ) {
@@ -215,9 +176,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     if (vm.currentPlace == PlaceId.GRAY_CASTLE) {
-                        "v0.4.33 Gray Castle"
+                        "v0.4.34 Gray Castle"
                     } else {
-                        "v0.4.33 Undead nest"
+                        "v0.4.34 Undead nest"
                     },
                     14f,
                     28f,
