@@ -63,7 +63,10 @@ import com.medieval.village.ui.village.drawKenneySprite
 import com.medieval.village.ui.village.drawKenneyTile
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
-impor@Composable
+import kotlin.math.max
+import kotlin.math.min
+
+@Composable
 fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     val atlas = rememberKenneyAtlasOrNull()
     val art = rememberCustomArtOrNull()
@@ -210,9 +213,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     if (vm.currentPlace == PlaceId.GRAY_CASTLE) {
-                        "v0.4.31 Gray Castle"
+                        "v0.4.32 Gray Castle"
                     } else {
-                        "v0.4.31 Undead nest"
+                        "v0.4.32 Undead nest"
                     },
                     14f,
                     28f,
@@ -282,11 +285,6 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 ) {
                     potion?.let { vm.useItem(it.item) }
                 }
-            }
-        }
-    }
-}
-        }
             }
         }
     }
