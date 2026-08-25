@@ -12,7 +12,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -124,8 +126,15 @@ fun GameRoot(modifier: Modifier = Modifier) {
     }
 
     Column(modifier = modifier.background(Palette.WoodDark)) {
-        TopMenuBar(vm)
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+        // 메뉴·HP/MP는 씬 밖 고정 영역 — 던전 카메라 스크롤과 겹치지 않음
+        TopMenuBar(vm, Modifier.zIndex(2f))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .clipToBounds()
+                .zIndex(1f)
+        ) {
             when (vm.scene) {
                 Scene.VILLAGE -> VillageScene(vm, Modifier.fillMaxSize())
                 Scene.INTERIOR -> PlaceScreen(

@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -96,7 +97,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.32 Eastern forest",
+        watermark = "v0.4.33 Eastern forest",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -112,7 +113,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.32 Southern desert",
+        watermark = "v0.4.33 Southern desert",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -128,7 +129,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.32 Northern glacier",
+        watermark = "v0.4.33 Northern glacier",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -187,6 +188,7 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(ui.mapFrameBg, RoundedCornerShape(12.dp))
         ) {
             val density = LocalDensity.current
@@ -284,8 +286,6 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 drawWildMinimap(map, theme, heroX, heroY, viewW, viewH)
                 wildLabel(ui.watermark, 14f, 28f, 18f, ui.border)
             }
-
-            DungeonMapStatusOverlay(vm)
         }
 
         PartySwitchBar(

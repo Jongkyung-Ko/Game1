@@ -160,59 +160,6 @@ fun AttackButton(
 }
 
 /**
- * 맵 위에 항상 보이는 HP/MP·선두 상태.
- */
-@Composable
-fun BoxScope.DungeonMapStatusOverlay(
-    vm: com.medieval.village.game.GameViewModel,
-    modifier: Modifier = Modifier,
-) {
-    @Suppress("UNUSED_EXPRESSION")
-    vm.dungeonCombatFrame
-    Column(
-        modifier = modifier
-            .align(Alignment.TopStart)
-            .padding(8.dp)
-            .background(Color(0xCC1B120A), RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp)
-            .fillMaxWidth(0.72f),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            "Lv.${vm.player.level} · ${vm.frontActorName()}",
-            color = Palette.Gold,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        com.medieval.village.ui.StatBar(
-            label = "HP",
-            value = "${vm.player.hp}/${vm.player.maxHp}",
-            ratio = vm.player.hpRatio,
-            color = Palette.Health,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        com.medieval.village.ui.StatBar(
-            label = "MP",
-            value = "${vm.player.mp}/${vm.player.maxMp}",
-            ratio = vm.player.mpRatio,
-            color = Palette.Mana,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        val merc = vm.frontMercenary()
-        if (merc != null) {
-            val hp = vm.mercCurrentHp(merc)
-            com.medieval.village.ui.StatBar(
-                label = merc.name,
-                value = "$hp/${merc.maxHp}",
-                ratio = if (merc.maxHp <= 0) 0f else hp.toFloat() / merc.maxHp,
-                color = Palette.Gold,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-/**
  * @deprecated 특별스킬은 공격 버튼 옆(맵 밖)으로 이동함.
  */
 @Composable

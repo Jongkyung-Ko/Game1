@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -45,7 +46,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
     val mapZoom = rememberMapZoomState()
     val settlement = vm.settlement
     val places = settlement.places
-    BoxWithConstraints(modifier.background(Color(0xFF1A140E))) {
+    BoxWithConstraints(modifier.clipToBounds().background(Color(0xFF1A140E))) {
         val density = LocalDensity.current
         val wPx = with(density) { maxWidth.toPx() }
         val hPx = with(density) { maxHeight.toPx() }
@@ -151,9 +152,9 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
 
         Text(
             text = if (art != null) {
-                "${settlement.nameEn} · v0.4.32"
+                "${settlement.nameEn} · v0.4.33"
             } else {
-                "${settlement.nameEn} · v0.4.32 (맵 로딩 실패)"
+                "${settlement.nameEn} · v0.4.33 (맵 로딩 실패)"
             },
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,

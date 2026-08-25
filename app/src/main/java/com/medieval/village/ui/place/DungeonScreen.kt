@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -112,6 +113,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFFD9C8A4), RoundedCornerShape(12.dp))
         ) {
             val density = LocalDensity.current
@@ -213,9 +215,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     if (vm.currentPlace == PlaceId.GRAY_CASTLE) {
-                        "v0.4.32 Gray Castle"
+                        "v0.4.33 Gray Castle"
                     } else {
-                        "v0.4.32 Undead nest"
+                        "v0.4.33 Undead nest"
                     },
                     14f,
                     28f,
@@ -223,9 +225,6 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     Color(0xFF5A4231),
                 )
             }
-
-            // HP/MP 등은 맵 위 상시 표시
-            DungeonMapStatusOverlay(vm)
         }
 
         // 선두·교대: 맵 밖
