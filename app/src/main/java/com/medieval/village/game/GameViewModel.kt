@@ -258,6 +258,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var attackAnimPlaying = false
     private var attackAnimDuration = 0.42f
 
+    /**
+     * 마법 방벽 잔여 시간(초).
+     * init → newGame() → clearDungeonState() 가 이 값을 쓰므로 init 앞에서 선언해야 한다.
+     */
+    var spellShieldTime by mutableFloatStateOf(0f)
+        private set
+
+    /** 피격 진동 신호 — UI가 관찰해 실제 진동을 울린다. */
+    var hapticSignal by mutableIntStateOf(0)
+        private set
+    var hapticStrong by mutableStateOf(false)
+        private set
+
     private val path = ArrayDeque<Waypoint>()
     private var pendingEnter: PlaceId? = null
     private var pubTarget: Waypoint? = null
@@ -1114,12 +1127,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         lastSfx = name
         sfxSignal++
     }
-
-    /** 피격 진동 신호 — UI가 관찰해 실제 진동을 울린다. */
-    var hapticSignal by mutableIntStateOf(0)
-        private set
-    var hapticStrong by mutableStateOf(false)
-        private set
 
     private fun emitHitHaptic(strong: Boolean) {
         hapticStrong = strong
@@ -2009,10 +2016,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ---------------------------------------------------------------- 배운 마법(Grimoire)
-
-    /** 마법 방벽 잔여 시간(초) */
-    var spellShieldTime by mutableFloatStateOf(0f)
-        private set
 
     /** 하단 Magic 버튼에서 펼칠 마법 목록 */
     fun learnedSpellEntries(): List<SpellCastOption> {
