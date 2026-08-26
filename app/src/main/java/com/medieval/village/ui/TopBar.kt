@@ -28,7 +28,9 @@ import com.medieval.village.game.MenuTab
 import com.medieval.village.game.Scene
 import com.medieval.village.game.isExplorePlace
 import com.medieval.village.model.PlaceId
+import com.medieval.village.ui.theme.ClassicType
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.theme.romanNumeral
 
 private val tabs = listOf(
     MenuTab.STATUS to "Status",
@@ -141,18 +143,20 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
             val place = vm.currentPlace
             val floor = vm.dungeonFloorNumber
             val remaining = vm.dungeonFloor?.monsters?.count { it.alive } ?: 0
+            val roman = romanNumeral(floor)
             val (name, floorLabel) = when (place) {
-                PlaceId.GRAY_CASTLE -> "Gray Castle" to "${floor}층"
-                PlaceId.EAST_FOREST -> "동쪽 숲" to "${floor}지대"
-                PlaceId.SOUTH_DESERT -> "남쪽 사막" to "${floor}지대"
-                PlaceId.NORTH_GLACIER -> "북쪽 빙하" to "${floor}지대"
-                else -> "잊혀진 지하" to "${floor}층"
+                PlaceId.GRAY_CASTLE -> "Gray Castle" to "Floor $roman"
+                PlaceId.EAST_FOREST -> "Eastern Wood" to "Reach $roman"
+                PlaceId.SOUTH_DESERT -> "Southern Waste" to "Reach $roman"
+                PlaceId.NORTH_GLACIER -> "Northern Glacier" to "Reach $roman"
+                else -> "Forgotten Crypt" to "Floor $roman"
             }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color(0xCC1B120A))
+                    .border(1.dp, Palette.Gold.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -160,15 +164,13 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
                 Text(
                     text = "$name · $floorLabel",
                     color = Palette.Gold,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
+                    style = ClassicType.Title,
                     maxLines = 1
                 )
                 Text(
-                    text = "잔여 몬스터 $remaining",
+                    text = "Foes Remaining · $remaining",
                     color = Palette.Parchment,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
+                    style = ClassicType.Label,
                     maxLines = 1
                 )
             }

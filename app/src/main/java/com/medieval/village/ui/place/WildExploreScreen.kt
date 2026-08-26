@@ -5,12 +5,10 @@ import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,10 +35,7 @@ import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.DungeonFloor
 import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
-import com.medieval.village.model.ItemCatalog
 import com.medieval.village.ui.MessageLog
-import com.medieval.village.ui.PartySwitchBar
-import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.mapZoomGestures
 import com.medieval.village.ui.rememberMapZoomState
 import com.medieval.village.ui.withMapZoom
@@ -92,7 +87,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.34 Eastern forest",
+        watermark = "v0.4.35 Eastern forest",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -108,7 +103,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.34 Southern desert",
+        watermark = "v0.4.35 Southern desert",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -124,7 +119,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.34 Northern glacier",
+        watermark = "v0.4.35 Northern glacier",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -253,54 +248,12 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
             }
         }
 
-        PartySwitchBar(
+        DungeonBottomChrome(
             vm = vm,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+            logContent = {
+                MessageLog(vm.log, mod.fillMaxWidth().height(72.dp))
+            },
         )
-
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) {
-            DungeonCombatControls(
-                attackLabel = vm.attackLabel(),
-                attackEnabled = vm.attackReady && vm.dungeonFloor != null && vm.levelUpSkillOffer == null,
-                onPad = { dx, dy -> vm.setDungeonPad(dx, dy) },
-                onPadRelease = { vm.clearDungeonPad() },
-                onAttack = { vm.dungeonAttack() },
-                logContent = {
-                    MessageLog(vm.log, mod.fillMaxWidth().height(72.dp))
-                },
-                skillSlots = vm.frontSkillSlotsUi(),
-                onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
-            )
-            Spacer(mod.height(6.dp))
-            Row(
-                modifier = mod.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                when (vm.dungeonHint) {
-                    "stairs_up" -> WoodButton("탈출", mod.weight(1f), highlight = true) { vm.escapeDungeon() }
-                    "stairs_down" -> WoodButton(ui.deepButton, mod.weight(1f), highlight = true) { vm.descendDungeon() }
-                    "portal" -> WoodButton("집으로", mod.weight(1f), highlight = true) { vm.enterHomePortal() }
-                    "chest" -> WoodButton("열기", mod.weight(1f), highlight = true) { vm.openDungeonChest() }
-                    else -> WoodButton("탈출", mod.weight(1f), enabled = false) {}
-                }
-                val portalStone = vm.inventory.toList().firstOrNull {
-                    it.item.id == ItemCatalog.portalStone.id && it.count > 0
-                }
-                val potion = vm.inventory.toList().firstOrNull { it.item.healHp > 0 }
-                if (portalStone != null) {
-                    WoodButton("포털스톤", mod.weight(1f), highlight = true) {
-                        vm.useItem(ItemCatalog.portalStone)
-                    }
-                }
-                WoodButton(
-                    text = if (potion != null) "물약" else "물약 없음",
-                    modifier = mod.weight(1f),
-                    enabled = potion != null
-                ) { potion?.let { vm.useItem(it.item) } }
-            }
-        }
     }
 }
 

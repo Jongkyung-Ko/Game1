@@ -45,6 +45,15 @@ data class SkillSlotUi(
     val rank: Int = 0,
 )
 
+/** 던전 하단 Magic 버튼에서 펼치는 습득 마법 항목 */
+data class SpellCastOption(
+    val id: String,
+    val name: String,
+    val englishName: String,
+    val mpCost: Int,
+    val castable: Boolean,
+)
+
 /** 레벨업·메뉴에서 여는 스킬맵 세션 */
 data class SkillMapOffer(
     val actorKey: String,

@@ -44,6 +44,7 @@ import com.medieval.village.model.Skill
 import com.medieval.village.model.SkillCatalog
 import com.medieval.village.model.SkillSlotUi
 import com.medieval.village.model.SpecialSkillCatalog
+import com.medieval.village.model.SpellCastOption
 import com.medieval.village.model.SpecialSkillDef
 import com.medieval.village.model.SpecialVfxSpec
 import com.medieval.village.model.Village
@@ -1561,6 +1562,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         dungeonProjectiles.clear()
         attackCooldown = 0f
         specialCooldown = 0f
+        spellShieldTime = 0f
         dungeonCombatFrame = 0
         attackReady = true
         specialReady = true
@@ -1995,6 +1997,81 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         refreshAttackReady()
     }
 
+    // ---------------------------------------------------------------- 배운 마법(Grimoire)
+
+    /** 마법 방벽 잔여 시간(초) */
+    var spellShieldTime by mutableFloatStateOf(0f)
+        private set
+
+    /** 하단 Magic 버튼에서 펼칠 마법 목록 */
+    fun learnedSpellEntries(): List<SpellCastOption> {
+        @Suppress("UNUSED_EXPRESSION")
+        dungeonCombatFrame
+        return skills.map { skill ->
+            SpellCastOption(
+                id = skill.id,
+                name = skill.name,
+                englishName = spellEnglishName(skill.id),
+                mpCost = skill.mpCost,
+                castable = player.mp >= skill.mpCost && dungeonFloor != null,
+            )
+        }
+    }
+
+    /** 배운 마법을 던전에서 시전한다. */
+    fun castLearnedSpell(skillId: String) {
+        if (dungeonFloor == null) return
+        if (dungeonCombatLock || levelUpSkillOffer != null) return
+        val skill = skills.firstOrNull { it.id == skillId } ?: return
+        if (player.mp < skill.mpCost) {
+            say("마나가 부족하다. (MP ${skill.mpCost})")
+            return
+        }
+        player = player.copy(mp = player.mp - skill.mpCost)
+        attackCooldown = ATTACK_COOLDOWN
+        refreshAttackReady()
+        dungeonCombatFrame++
+
+        when (skill.id) {
+            "heal" -> {
+                val amount = 26 + player.intel * 3 + player.level * 2
+                val before = player.hp
+                player = player.copy(hp = (player.hp + amount).coerceAtMost(player.maxHp))
+                emitSfx("skill_holy")
+                startAttackAnim(HeroAnimKind.MAGIC, 0.5f)
+                say("『${skill.name}』 — 상처가 아문다. (HP +${player.hp - before})")
+            }
+            "barrier" -> {
+                spellShieldTime = 18f
+                emitSfx("skill_orb")
+                startAttackAnim(HeroAnimKind.MAGIC, 0.5f)
+                say("『${skill.name}』 — 마력 방벽이 몸을 감싼다. (18초간 피해 감소)")
+            }
+            else -> {
+                val base = totalAtk / 2 + skill.power + player.intel * 2 + blessBonus() / 2
+                val dmg = (base + Random.nextInt(0, 6)).coerceAtLeast(6)
+                emitSfx(if (skill.id == "thunder") "skill_lightning" else "skill_fire")
+                startAttackAnim(HeroAnimKind.MAGIC, 0.52f)
+                say("『${skill.name}』 시전! (피해 $dmg)")
+                spawnProjectile(
+                    style = WeaponStyle.MAGIC,
+                    damage = dmg,
+                    life = 1.35f,
+                    radius = 22f,
+                )
+            }
+        }
+        refreshAttackReady()
+    }
+
+    private fun spellEnglishName(id: String): String = when (id) {
+        "fireball" -> "Fireball"
+        "heal" -> "Mend Wounds"
+        "thunder" -> "Thunder Lance"
+        "barrier" -> "Warding Veil"
+        else -> "Arcane Rite"
+    }
+
     private fun startAttackAnim(
         kind: HeroAnimKind,
         duration: Float = 0.42f,
@@ -2317,6 +2394,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         attackAnimDuration = 0.42f
         dungeonProjectiles.clear()
         attackCooldown = 0f
+        spellShieldTime = 0f
         resetPartyTrail(dungeonHeroX, dungeonHeroY)
         attackReady = true
         heroAnimKind = HeroAnimKind.IDLE
@@ -2553,6 +2631,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 specialReady = true
                 specialSkillRevision++
             }
+        }
+        if (spellShieldTime > 0f) {
+            spellShieldTime = (spellShieldTime - dt).coerceAtLeast(0f)
+            if (spellShieldTime <= 0f) say("마법 방벽이 흩어졌다.")
         }
 
         // 1) 가상 패드 우선 이동
@@ -2961,7 +3043,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun blessBonus(): Int = if (player.blessing > 0) 9 else 0
 
     /** @return 기절 여부 */
-    private fun applyDamage(dmg: Int): Boolean {
+    private fun applyDamage(rawDmg: Int): Boolean {
+        val dmg = if (spellShieldTime > 0f) {
+            (rawDmg * 0.6f).roundToInt().coerceAtLeast(1)
+        } else {
+            rawDmg
+        }
         val hp = player.hp - dmg
         if (hp <= 0) {
             val lost = (player.gold * 0.2f).toInt()
