@@ -139,6 +139,7 @@ object CastleFactory {
                 y = y,
                 power = 16 + f * 11 + kindBonus + rng.nextInt(0, 10),
                 armor = 2 + f / 3,
+                ranged = DungeonFactory.isRangedKind(kind),
             )
         }
 

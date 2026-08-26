@@ -171,9 +171,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     if (vm.currentPlace == PlaceId.GRAY_CASTLE) {
-                        "v0.4.35 Gray Castle"
+                        "v0.4.36 Gray Castle"
                     } else {
-                        "v0.4.35 Undead nest"
+                        "v0.4.36 Undead nest"
                     },
                     14f,
                     28f,
@@ -500,11 +500,11 @@ private fun DrawScope.drawDungeonMonster(atlas: KenneyAtlas?, art: CustomArt?, m
         )
     } else {
         val kenneyId = when (monster.kind) {
-            "shambler", "bloater", "boss_abomination" -> DungeonTiles.SLIME
+            "shambler", "bloater", "boss_abomination", "spitter" -> DungeonTiles.SLIME
             "runner" -> DungeonTiles.BAT
             "armored", "blacksmith", "boss_warden" -> DungeonTiles.ORC
             "farmer" -> DungeonTiles.SPIDER
-            "golem", "boss_lich",
+            "golem", "boss_lich", "plague_archer",
             "skel_soldier", "skel_archer", "ghost_cavalry", "boss_skel_king" -> DungeonTiles.SKELETON
             else -> DungeonTiles.SLIME
         }

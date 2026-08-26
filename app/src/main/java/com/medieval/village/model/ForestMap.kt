@@ -18,6 +18,7 @@ object ForestFactory {
         "boar" to "멧돼지",
         "snake" to "독사",
         "owl" to "부엉이",
+        "hawk" to "사냥매",
     )
 
     private val deepAnimals = listOf(
@@ -26,6 +27,7 @@ object ForestFactory {
         "giant_boar" to "거대 멧돼지",
         "forest_spider" to "거미줄 독거미",
         "stag" to "뿔사슴",
+        "quill_boar" to "가시멧돼지",
     )
 
     fun generate(floor: Int, seed: Int = floor * 5303 + 91): DungeonFloor =
@@ -38,9 +40,9 @@ object ForestFactory {
             kindBonus = { kind ->
                 when (kind) {
                     "bear", "giant_boar", "dire_wolf" -> 8
-                    "boar", "forest_spider", "stag" -> 5
+                    "boar", "forest_spider", "stag", "quill_boar" -> 5
                     "wolf", "snake" -> 3
-                    "fox", "owl" -> 1
+                    "fox", "owl", "hawk" -> 1
                     else -> 0
                 }
             },

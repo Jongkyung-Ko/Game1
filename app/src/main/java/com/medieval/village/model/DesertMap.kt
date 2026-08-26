@@ -13,6 +13,7 @@ object DesertFactory {
         "vulture" to "독수리",
         "sidewinder" to "뿔살무사",
         "dung_beetle" to "사막풍뎅이",
+        "spitting_cobra" to "독침 코브라",
     )
 
     private val deep = listOf(
@@ -21,6 +22,7 @@ object DesertFactory {
         "dune_worm" to "모래벌레",
         "sand_golem" to "모래골렘",
         "desert_drake" to "사막 드레이크",
+        "sand_slinger" to "모래 투석꾼",
     )
 
     fun generate(floor: Int, seed: Int = floor * 6113 + 17): DungeonFloor =
@@ -33,8 +35,8 @@ object DesertFactory {
             kindBonus = { kind ->
                 when (kind) {
                     "giant_scorpion", "desert_drake", "sand_golem" -> 9
-                    "deathstalker", "dune_worm" -> 6
-                    "scorpion", "camel_spider", "sidewinder" -> 4
+                    "deathstalker", "dune_worm", "sand_slinger" -> 6
+                    "scorpion", "camel_spider", "sidewinder", "spitting_cobra" -> 4
                     "desert_fox", "vulture" -> 2
                     else -> 0
                 }

@@ -13,6 +13,7 @@ object GlacierFactory {
         "ice_wolf" to "빙하늑대",
         "frost_owl" to "서리부엉이",
         "ice_penguin" to "얼음 펭귄",
+        "icicle_penguin" to "고드름 펭귄",
     )
 
     private val deep = listOf(
@@ -21,6 +22,7 @@ object GlacierFactory {
         "ice_elemental" to "얼음정령",
         "frost_penguin" to "서리 거대펭귄",
         "ice_spider" to "빙하독거미",
+        "frost_shaman" to "서리 주술사",
     )
 
     fun generate(floor: Int, seed: Int = floor * 4729 + 33): DungeonFloor =
@@ -33,8 +35,8 @@ object GlacierFactory {
             kindBonus = { kind ->
                 when (kind) {
                     "polar_bear", "yeti", "ice_elemental" -> 9
-                    "frost_penguin", "ice_spider" -> 6
-                    "ice_wolf", "ice_penguin" -> 4
+                    "frost_penguin", "ice_spider", "frost_shaman" -> 6
+                    "ice_wolf", "ice_penguin", "icicle_penguin" -> 4
                     "penguin", "seal", "ice_fox" -> 1
                     else -> 0
                 }

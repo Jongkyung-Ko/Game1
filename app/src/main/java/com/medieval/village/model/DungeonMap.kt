@@ -32,6 +32,8 @@ data class DungeonMonster(
     val maxHp: Int = (power * 4).coerceAtLeast(24),
     /** 받는 피해 감소 (방어 역할) */
     val armor: Int = 0,
+    /** 화살·투척 등 원거리 공격을 하는 개체 */
+    val ranged: Boolean = false,
     /** 연출·AI 상태 (탐험 중 갱신) */
     var facingLeft: Boolean = false,
     var moving: Boolean = false,
@@ -40,6 +42,10 @@ data class DungeonMonster(
     var animTime: Float = 0f,
     var attackCooldown: Float = 0f,
     var attackHitApplied: Boolean = false,
+    /** 한 번이라도 피해를 입으면 사거리와 무관하게 끝까지 추격한다. */
+    var enraged: Boolean = false,
+    /** 이번 공격이 원거리 투척인지 */
+    var rangedShot: Boolean = false,
 )
 
 data class DungeonFloor(
@@ -107,6 +113,8 @@ object DungeonFactory {
         "blacksmith" to "빙의된 대장장이",
         "farmer" to "감염된 농부",
         "golem" to "저주받은 선생님",
+        "plague_archer" to "역병 궁수",
+        "spitter" to "역병 투척꾼",
     )
 
     /** 10 / 20 / 30층… 순환 보스 */
@@ -229,6 +237,8 @@ object DungeonFactory {
                 "bloater", "armored", "blacksmith" -> 8
                 "runner" -> 4
                 "golem" -> 5
+                "plague_archer" -> 3
+                "spitter" -> 2
                 else -> 1
             }
             monsters += DungeonMonster(
@@ -239,6 +249,7 @@ object DungeonFactory {
                 y = y,
                 power = 14 + floor * 10 + kindBonus + rng.nextInt(0, 10),
                 armor = 1 + floor / 4,
+                ranged = isRangedKind(kind),
             )
         }
 
@@ -305,6 +316,22 @@ object DungeonFactory {
             monsters = monsters
         )
     }
+
+    /** 화살·독침·고드름 등을 던지는 원거리 개체 판별 (모든 지역 공통) */
+    fun isRangedKind(kind: String): Boolean = kind in RANGED_KINDS
+
+    private val RANGED_KINDS = setOf(
+        // 지하 묘지
+        "plague_archer", "spitter",
+        // Gray Castle
+        "skel_archer",
+        // 동쪽 숲
+        "quill_boar", "hawk",
+        // 남쪽 사막
+        "spitting_cobra", "sand_slinger",
+        // 북쪽 빙하
+        "icicle_penguin", "frost_shaman",
+    )
 
     private fun isWalkableTile(tiles: Array<DungeonTile>, x: Float, y: Float): Boolean {
         val c = (x / TILE).toInt()

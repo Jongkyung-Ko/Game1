@@ -38,6 +38,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
     val vm: GameViewModel = viewModel()
     val context = LocalContext.current
     val audio = remember(context) { GameAudioEngine(context) }
+    val haptics = remember(context) { GameHaptics(context) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -67,6 +68,11 @@ fun GameRoot(modifier: Modifier = Modifier) {
 
     LaunchedEffect(vm.walking, vm.pubWalking, vm.dungeonWalking) {
         audio.setWalking(vm.walking || vm.pubWalking || vm.dungeonWalking)
+    }
+
+    LaunchedEffect(vm.hapticSignal) {
+        if (vm.hapticSignal == 0) return@LaunchedEffect
+        haptics.hit(vm.hapticStrong)
     }
 
     LaunchedEffect(vm.sfxSignal) {

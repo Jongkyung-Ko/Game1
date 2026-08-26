@@ -25,6 +25,8 @@ data class DungeonProjectile(
     val fxSpriteKey: String? = null,
     /** 명중 시 추가 버스트 FX (예: adv_fx_fireburst) */
     val impactSpriteKey: String? = null,
+    /** 몬스터가 쏜 탄환 — 주인공을 노린다. */
+    val hostile: Boolean = false,
 )
 
 /** 근접 초승달 참격 연출 */

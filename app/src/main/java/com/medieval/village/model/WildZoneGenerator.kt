@@ -129,6 +129,7 @@ object WildZoneGenerator {
                 y = y,
                 power = basePower + floor * powerPerFloor + kindBonus(kind) + rng.nextInt(0, 9),
                 armor = 1 + floor / 5,
+                ranged = DungeonFactory.isRangedKind(kind),
             )
         }
 

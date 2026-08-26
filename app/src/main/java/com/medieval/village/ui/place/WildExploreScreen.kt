@@ -87,7 +87,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.35 Eastern forest",
+        watermark = "v0.4.36 Eastern forest",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -103,7 +103,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.35 Southern desert",
+        watermark = "v0.4.36 Southern desert",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -119,7 +119,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.35 Northern glacier",
+        watermark = "v0.4.36 Northern glacier",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -498,13 +498,13 @@ private fun DrawScope.drawWildBeast(
 private fun DrawScope.drawForestBeast(atlas: KenneyAtlas?, monster: DungeonMonster, x: Float, y: Float) {
     val critter = when (monster.kind) {
         "rabbit" -> "critter_a"
-        "fox", "owl" -> "critter_b"
+        "fox", "owl", "hawk" -> "critter_b"
         "deer", "stag" -> "critter_c"
         else -> null
     }
     val kenney = when (monster.kind) {
         "wolf", "dire_wolf" -> DungeonTiles.BAT
-        "boar", "giant_boar", "bear" -> DungeonTiles.ORC
+        "boar", "giant_boar", "bear", "quill_boar" -> DungeonTiles.ORC
         "snake" -> DungeonTiles.SLIME
         "forest_spider" -> DungeonTiles.SPIDER
         else -> null
@@ -522,8 +522,8 @@ private fun DrawScope.drawDesertBeast(atlas: KenneyAtlas?, monster: DungeonMonst
     }
     val kenney = when (monster.kind) {
         "scorpion", "giant_scorpion", "deathstalker", "camel_spider" -> DungeonTiles.SPIDER
-        "sand_snake", "sidewinder", "dune_worm" -> DungeonTiles.SLIME
-        "sand_golem", "desert_drake" -> DungeonTiles.ORC
+        "sand_snake", "sidewinder", "dune_worm", "spitting_cobra" -> DungeonTiles.SLIME
+        "sand_golem", "desert_drake", "sand_slinger" -> DungeonTiles.ORC
         else -> null
     }
     if (drawCritterOrKenney(atlas, critter, kenney, x, y)) {
@@ -551,7 +551,7 @@ private fun DrawScope.drawDesertBeast(atlas: KenneyAtlas?, monster: DungeonMonst
 
 private fun DrawScope.drawGlacierBeast(atlas: KenneyAtlas?, monster: DungeonMonster, x: Float, y: Float) {
     val critter = when (monster.kind) {
-        "penguin", "ice_penguin", "frost_penguin" -> "critter_a"
+        "penguin", "ice_penguin", "frost_penguin", "icicle_penguin" -> "critter_a"
         "ice_fox", "snow_hare" -> "critter_b"
         "seal", "frost_owl" -> "critter_c"
         else -> null
@@ -560,6 +560,7 @@ private fun DrawScope.drawGlacierBeast(atlas: KenneyAtlas?, monster: DungeonMons
         "ice_wolf" -> DungeonTiles.BAT
         "polar_bear", "yeti", "ice_elemental" -> DungeonTiles.ORC
         "ice_spider" -> DungeonTiles.SPIDER
+        "frost_shaman" -> DungeonTiles.SKELETON
         else -> null
     }
     if (drawCritterOrKenney(atlas, critter, kenney, x, y)) {

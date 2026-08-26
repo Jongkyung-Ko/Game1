@@ -1115,6 +1115,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         sfxSignal++
     }
 
+    /** 피격 진동 신호 — UI가 관찰해 실제 진동을 울린다. */
+    var hapticSignal by mutableIntStateOf(0)
+        private set
+    var hapticStrong by mutableStateOf(false)
+        private set
+
+    private fun emitHitHaptic(strong: Boolean) {
+        hapticStrong = strong
+        hapticSignal++
+    }
+
     fun say(msg: String) {
         log.add(msg)
         if (log.size > 40) log.removeAt(0)
@@ -2230,6 +2241,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         if (!monster.alive) return
         if (hitSfx != null) emitSfx(hitSfx)
+        // 한 번 맞은 적은 끝까지 추격한다
+        monster.enraged = true
         applyKnockback(monster, knockDx, knockDy)
         val mitigated = (damage - monster.armor).coerceAtLeast(1)
         monster.hp -= mitigated
@@ -2759,6 +2772,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
             p.x = nx
             p.y = ny
+            if (p.hostile) {
+                if (hypot(dungeonHeroX - p.x, dungeonHeroY - 22f - p.y) < p.radius + 24f) {
+                    resolveHostileProjectileHit(p)
+                    doomed += p
+                }
+                return@forEach
+            }
             val hit = map.monsters.firstOrNull {
                 it.alive && hypot(it.x - p.x, it.y - p.y) < p.radius + 30f
             }
@@ -2834,19 +2854,43 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             "skel_soldier" -> 64f
             "boss_skel_king" -> 82f
             "bear", "polar_bear", "giant_scorpion" -> 68f
+            "plague_archer" -> 66f
+            "spitter" -> 54f
+            "hawk" -> 96f
+            "quill_boar" -> 60f
+            "spitting_cobra" -> 62f
+            "sand_slinger" -> 58f
+            "icicle_penguin" -> 56f
+            "frost_shaman" -> 60f
             else -> 58f
         }
         return if (monster.isBoss) base * 1.28f + 14f else base
     }
 
-    private fun monsterAggroRange(monster: DungeonMonster): Float =
-        if (monster.isBoss) MONSTER_AGGRO_RANGE + 55f else MONSTER_AGGRO_RANGE
+    private fun monsterAggroRange(monster: DungeonMonster): Float = when {
+        // 한 번 맞은 적은 사거리와 무관하게 끝까지 쫓아온다
+        monster.enraged -> Float.MAX_VALUE
+        monster.isBoss -> MONSTER_AGGRO_RANGE + 55f
+        monster.ranged -> MONSTER_AGGRO_RANGE + 90f
+        else -> MONSTER_AGGRO_RANGE
+    }
 
     private fun monsterAttackRange(monster: DungeonMonster): Float =
         if (monster.isBoss) MONSTER_ATTACK_RANGE + 30f else MONSTER_ATTACK_RANGE
 
-    private fun monsterAttackCooldown(monster: DungeonMonster): Float =
-        if (monster.isBoss) MONSTER_ATTACK_COOLDOWN + 0.35f else MONSTER_ATTACK_COOLDOWN
+    /** 원거리 개체가 화살·독침을 날리기 시작하는 거리 */
+    private fun monsterShootRange(monster: DungeonMonster): Float =
+        if (monster.isBoss) 340f else 300f
+
+    /** 이 거리보다 가까우면 원거리 개체도 뒤로 물러선다 */
+    private fun monsterKiteRange(monster: DungeonMonster): Float =
+        monsterAttackRange(monster) + 34f
+
+    private fun monsterAttackCooldown(monster: DungeonMonster): Float = when {
+        monster.isBoss -> MONSTER_ATTACK_COOLDOWN + 0.35f
+        monster.ranged -> MONSTER_ATTACK_COOLDOWN + 0.55f
+        else -> MONSTER_ATTACK_COOLDOWN
+    }
 
     /** 가방·장비·스킬맵 등 UI가 열려 있으면 몬스터 AI를 멈춘다. */
     private fun dungeonMenusPauseMonsters(): Boolean =
@@ -2876,12 +2920,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 if (!monster.attackHitApplied && monster.animTime >= MONSTER_ATTACK_DURATION * 0.42f) {
                     monster.attackHitApplied = true
                     val dist = hypot(dungeonHeroX - monster.x, dungeonHeroY - monster.y)
-                    if (dist <= monsterAttackRange(monster) + 14f) {
+                    if (monster.rangedShot) {
+                        spawnMonsterProjectile(monster)
+                    } else if (dist <= monsterAttackRange(monster) + 14f) {
                         resolveMonsterAttackHit(monster)
                     }
                 }
                 if (monster.animTime >= MONSTER_ATTACK_DURATION) {
                     monster.attacking = false
+                    monster.rangedShot = false
                     monster.animTime = 0f
                     monster.animFrame = 0
                     monster.moving = false
@@ -2896,10 +2943,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val aggro = monsterAggroRange(monster)
             val atkRange = monsterAttackRange(monster)
 
-            if (dist <= aggro && dist > 0.5f) {
+            val shootRange = if (monster.ranged) monsterShootRange(monster) else 0f
+            val canSee = dist <= aggro || (monster.ranged && dist <= shootRange)
+
+            if (canSee && dist > 0.5f) {
                 monster.facingLeft = dx < 0f
-                if (dist <= atkRange && monster.attackCooldown <= 0f) {
+                val inMelee = dist <= atkRange
+                val canShoot = monster.ranged && !inMelee && dist <= shootRange
+                if ((inMelee || canShoot) && monster.attackCooldown <= 0f) {
                     monster.attacking = true
+                    monster.rangedShot = canShoot
                     monster.attackHitApplied = false
                     monster.animTime = 0f
                     monster.animFrame = 0
@@ -2907,9 +2960,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     monster.attackCooldown = monsterAttackCooldown(monster)
                     dirty = true
                 } else {
+                    // 원거리 개체는 너무 붙으면 거리를 벌린다
+                    val retreat = monster.ranged && dist < monsterKiteRange(monster)
+                    val dirSign = if (retreat) -1f else 1f
                     val speed = monsterChaseSpeed(monster)
-                    val nx = monster.x + dx / dist * speed * dt
-                    val ny = monster.y + dy / dist * speed * dt
+                    val nx = monster.x + dirSign * dx / dist * speed * dt
+                    val ny = monster.y + dirSign * dy / dist * speed * dt
                     if (tryMoveMonster(map, monster, nx, ny)) {
                         monster.moving = true
                         monster.animTime += dt
@@ -2964,6 +3020,56 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return true
     }
 
+    /** 원거리 몬스터가 주인공을 향해 탄환을 날린다. */
+    private fun spawnMonsterProjectile(monster: DungeonMonster) {
+        val dx = dungeonHeroX - monster.x
+        val dy = dungeonHeroY - monster.y - 22f
+        val len = hypot(dx, dy).coerceAtLeast(0.01f)
+        val nx = dx / len
+        val ny = dy / len
+        val speed = PROJECTILE_SPEED * 0.72f
+        val style = if (monsterUsesMagicShot(monster)) WeaponStyle.MAGIC else WeaponStyle.BOW
+        val base = (monster.power - totalDef / 2).coerceAtLeast(3)
+        dungeonProjectiles += DungeonProjectile(
+            x = monster.x + nx * 20f,
+            y = monster.y - 26f + ny * 12f,
+            vx = nx * speed,
+            vy = ny * speed,
+            style = style,
+            damage = (base * 0.8f).roundToInt().coerceAtLeast(3),
+            life = 2.1f,
+            radius = 16f,
+            hostile = true,
+        )
+        emitSfx(if (style == WeaponStyle.MAGIC) "magic_hit" else "arrow_hit")
+        say("${monster.name}이(가) ${monsterShotNoun(monster)}을(를) 날린다!")
+    }
+
+    private fun monsterUsesMagicShot(monster: DungeonMonster): Boolean = when (monster.kind) {
+        "spitter", "spitting_cobra", "frost_shaman", "icicle_penguin" -> true
+        else -> false
+    }
+
+    private fun monsterShotNoun(monster: DungeonMonster): String = when (monster.kind) {
+        "spitter" -> "역병 침"
+        "spitting_cobra" -> "독침"
+        "frost_shaman" -> "서리 파편"
+        "icicle_penguin" -> "고드름"
+        "quill_boar" -> "가시"
+        "sand_slinger" -> "돌팔매"
+        "hawk" -> "날카로운 깃털"
+        else -> "화살"
+    }
+
+    /** 적 탄환이 주인공에게 명중 */
+    private fun resolveHostileProjectileHit(projectile: DungeonProjectile) {
+        val dmg = projectile.damage.coerceAtLeast(1)
+        say("날아든 탄환에 맞았다! (HP -$dmg)")
+        emitSfx(if (projectile.style == WeaponStyle.MAGIC) "magic_hit" else "arrow_hit")
+        emitHitHaptic(strong = false)
+        applyFrontDamage(dmg)
+    }
+
     private fun resolveMonsterAttackHit(monster: DungeonMonster) {
         val base = (monster.power - totalDef).coerceAtLeast(3) + Random.nextInt(0, 4)
         val dmg = if (monster.isBoss) {
@@ -2983,6 +3089,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
         )
         emitSfx("hit")
+        emitHitHaptic(strong = monster.isBoss)
         applyFrontDamage(dmg)
         val push = 34f
         val dx = dungeonHeroX - monster.x
