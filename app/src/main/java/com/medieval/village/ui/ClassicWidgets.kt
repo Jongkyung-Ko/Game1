@@ -99,8 +99,8 @@ fun ClassicScroll(
     val body = if (texture != null) {
         modifier
             .nineSliceBackground(texture, SkinInsets.Scroll)
-            .heightIn(min = 78.dp)
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 18.dp)
+            .heightIn(min = 92.dp)
+            .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 22.dp)
     } else {
         modifier
             .clip(RoundedCornerShape(8.dp))

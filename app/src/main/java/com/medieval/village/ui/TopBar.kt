@@ -211,15 +211,24 @@ fun StatBar(
         // 채워지는 양은 액자 안쪽 홈에만 그리고, 금테는 텍스처 그대로 위에 얹는다
         Box(modifier = modifier.height(19.dp), contentAlignment = Alignment.Center) {
             Canvas(Modifier.matchParentSize()) {
-                val inset = size.height * 0.30f
+                val inset = size.height * 0.26f
                 val capW = size.height * 0.62f
                 val channel = (size.width - capW * 2f).coerceAtLeast(1f)
+                val trough = Size(channel, size.height - inset * 2f)
+                drawRect(Color(0xFF17100A), topLeft = Offset(capW, inset), size = trough)
                 drawRect(
                     color = color,
                     topLeft = Offset(capW, inset),
-                    size = Size(channel * ratio.coerceIn(0f, 1f), size.height - inset * 2f),
+                    size = Size(channel * ratio.coerceIn(0f, 1f), trough.height),
                 )
-                drawNineSlice(frame, SkinInsets.BarFrame, size.width, size.height)
+                // 가운데는 비워 두어야 채워진 양이 금테 안쪽으로 비쳐 보인다
+                drawNineSlice(
+                    image = frame,
+                    insets = SkinInsets.BarFrame,
+                    width = size.width,
+                    height = size.height,
+                    drawCenter = false,
+                )
             }
             Text(
                 text = value,
