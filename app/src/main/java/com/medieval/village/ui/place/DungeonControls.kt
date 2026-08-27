@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -35,8 +36,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.medieval.village.ui.skin.rememberUiSkin
+import com.medieval.village.ui.theme.ClassicType
 import com.medieval.village.game.DungeonProjectile
 import com.medieval.village.game.Facing
 import com.medieval.village.game.MeleeSlashFx
@@ -112,19 +116,40 @@ fun VirtualMovePad(
             },
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(124.dp)) {
-            val dim = this.size.minDimension
-            drawCircle(Color(0x44FFE29A), radius = dim * 0.48f, style = Stroke(3f))
-            drawCircle(Color(0x33FFFFFF), radius = dim * 0.18f)
-        }
-        Box(
-            modifier = Modifier
-                .offset { IntOffset(knobX.roundToInt(), knobY.roundToInt()) }
-                .size(46.dp)
-                .background(Color(0xDDFFE29A), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("이동", color = Color(0xFF2A1C12), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        val dpad = rememberUiSkin()?.dpad
+        if (dpad != null) {
+            Canvas(modifier = Modifier.size(124.dp)) {
+                drawImage(
+                    image = dpad,
+                    srcOffset = IntOffset.Zero,
+                    srcSize = IntSize(dpad.width, dpad.height),
+                    dstOffset = IntOffset.Zero,
+                    dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                    filterQuality = FilterQuality.Medium,
+                )
+            }
+            // 손가락 위치를 알려주는 은은한 광점
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(knobX.roundToInt(), knobY.roundToInt()) }
+                    .size(38.dp)
+                    .background(Color(0x55FFE29A), CircleShape)
+            )
+        } else {
+            Canvas(modifier = Modifier.size(124.dp)) {
+                val dim = this.size.minDimension
+                drawCircle(Color(0x44FFE29A), radius = dim * 0.48f, style = Stroke(3f))
+                drawCircle(Color(0x33FFFFFF), radius = dim * 0.18f)
+            }
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(knobX.roundToInt(), knobY.roundToInt()) }
+                    .size(46.dp)
+                    .background(Color(0xDDFFE29A), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("이동", color = Color(0xFF2A1C12), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -137,12 +162,19 @@ fun AttackButton(
     onAttack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val face = rememberUiSkin()?.roundButton
     Box(
         modifier = modifier
             .size(86.dp)
-            .background(
-                if (enabled) Color(0xCC8B2E2E) else Color(0x66443333),
-                CircleShape
+            .then(
+                if (face == null) {
+                    Modifier.background(
+                        if (enabled) Color(0xCC8B2E2E) else Color(0x66443333),
+                        CircleShape,
+                    )
+                } else {
+                    Modifier
+                }
             )
             .pointerInput(enabled) {
                 if (!enabled) return@pointerInput
@@ -150,11 +182,24 @@ fun AttackButton(
             },
         contentAlignment = Alignment.Center
     ) {
+        if (face != null) {
+            Canvas(modifier = Modifier.size(86.dp)) {
+                drawImage(
+                    image = face,
+                    srcOffset = IntOffset.Zero,
+                    srcSize = IntSize(face.width, face.height),
+                    dstOffset = IntOffset.Zero,
+                    dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+                    filterQuality = FilterQuality.Medium,
+                    alpha = if (enabled) 1f else 0.5f,
+                )
+            }
+        }
         Text(
             text = label,
-            color = if (enabled) Palette.Parchment else Color(0x88C8B8A0),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold
+            color = if (enabled) Color(0xFFF3E2B8) else Color(0x88C8B8A0),
+            style = ClassicType.Button,
+            modifier = Modifier.offset(y = 22.dp),
         )
     }
 }

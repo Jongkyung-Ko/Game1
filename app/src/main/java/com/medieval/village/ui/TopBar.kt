@@ -1,5 +1,6 @@
 package com.medieval.village.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +31,10 @@ import com.medieval.village.game.MenuTab
 import com.medieval.village.game.Scene
 import com.medieval.village.game.isExplorePlace
 import com.medieval.village.model.PlaceId
+import com.medieval.village.ui.skin.SkinInsets
+import com.medieval.village.ui.skin.drawNineSlice
+import com.medieval.village.ui.skin.nineSliceBackground
+import com.medieval.village.ui.skin.rememberUiSkin
 import com.medieval.village.ui.theme.ClassicType
 import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.theme.romanNumeral
@@ -56,34 +63,41 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
             )
             .padding(horizontal = 6.dp, vertical = 5.dp)
     ) {
-        // 1) 게임 메뉴
+        // 1) 게임 메뉴 — 도안의 각인 목판
+        val skin = rememberUiSkin()
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             tabs.forEach { (tab, label) ->
                 val selected = vm.menuTab == tab
+                val plate = skin?.buttonWood
+                val tile = Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clickable { vm.menuTab = if (selected) MenuTab.NONE else tab }
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(36.dp)
-                        .clip(RoundedCornerShape(7.dp))
-                        .background(if (selected) Palette.Gold else Palette.WoodDark)
-                        .border(
-                            width = 1.5.dp,
-                            color = if (selected) Palette.Parchment else Palette.Gold.copy(alpha = 0.65f),
-                            shape = RoundedCornerShape(7.dp)
-                        )
-                        .clickable {
-                            vm.menuTab = if (selected) MenuTab.NONE else tab
-                        },
+                    modifier = if (plate != null) {
+                        tile.nineSliceBackground(plate, SkinInsets.Button)
+                    } else {
+                        tile.clip(RoundedCornerShape(7.dp))
+                            .background(if (selected) Palette.Gold else Palette.WoodDark)
+                            .border(
+                                width = 1.5.dp,
+                                color = if (selected) Palette.Parchment else Palette.Gold.copy(alpha = 0.65f),
+                                shape = RoundedCornerShape(7.dp)
+                            )
+                    },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = label,
-                        color = if (selected) Palette.Ink else Palette.Parchment,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
+                        color = when {
+                            plate == null && selected -> Palette.Ink
+                            selected -> Color(0xFFFFE9A8)
+                            else -> Color(0xFFCDB68A)
+                        },
+                        style = ClassicType.Tab,
                         maxLines = 1
                     )
                 }
@@ -97,42 +111,40 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                "Lv.${vm.player.level}",
-                color = Palette.Gold,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.width(6.dp))
+            Text("HP", color = Color(0xFFD9B972), style = ClassicType.Bar)
+            Spacer(Modifier.width(3.dp))
             StatBar(
                 label = "HP",
                 value = "${vm.player.hp}/${vm.player.maxHp}",
                 ratio = vm.player.hpRatio,
-                color = Palette.Health,
+                color = Color(0xFFA82C22),
                 modifier = Modifier.weight(1f)
             )
-            Spacer(Modifier.width(5.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("MP", color = Color(0xFFD9B972), style = ClassicType.Bar)
+            Spacer(Modifier.width(3.dp))
             StatBar(
                 label = "MP",
                 value = "${vm.player.mp}/${vm.player.maxMp}",
                 ratio = vm.player.mpRatio,
-                color = Palette.Mana,
+                color = Color(0xFF2E6FB5),
                 modifier = Modifier.weight(1f)
             )
-            Spacer(Modifier.width(5.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("EXP", color = Color(0xFFD9B972), style = ClassicType.Bar)
+            Spacer(Modifier.width(3.dp))
             StatBar(
                 label = "EXP",
                 value = "${vm.player.exp}/${vm.player.expToNext}",
                 ratio = vm.player.expRatio,
-                color = Palette.Exp,
+                color = Color(0xFFB98D1E),
                 modifier = Modifier.weight(1f)
             )
             Spacer(Modifier.width(6.dp))
             Text(
                 "${vm.player.gold}G",
                 color = Palette.Gold,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+                style = ClassicType.Bar,
                 maxLines = 1
             )
         }
@@ -151,13 +163,21 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
                 PlaceId.NORTH_GLACIER -> "Northern Glacier" to "Reach $roman"
                 else -> "Forgotten Crypt" to "Floor $roman"
             }
+            val strip = skin?.infoStrip
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xCC1B120A))
-                    .border(1.dp, Palette.Gold.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .then(
+                        if (strip != null) {
+                            Modifier.nineSliceBackground(strip, SkinInsets.InfoStrip)
+                        } else {
+                            Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xCC1B120A))
+                                .border(1.dp, Palette.Gold.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+                        }
+                    )
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -186,6 +206,30 @@ fun StatBar(
     color: Color,
     modifier: Modifier = Modifier
 ) {
+    val frame = rememberUiSkin()?.barFrame
+    if (frame != null) {
+        // 채워지는 양은 액자 안쪽 홈에만 그리고, 금테는 텍스처 그대로 위에 얹는다
+        Box(modifier = modifier.height(19.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.matchParentSize()) {
+                val inset = size.height * 0.30f
+                val capW = size.height * 0.62f
+                val channel = (size.width - capW * 2f).coerceAtLeast(1f)
+                drawRect(
+                    color = color,
+                    topLeft = Offset(capW, inset),
+                    size = Size(channel * ratio.coerceIn(0f, 1f), size.height - inset * 2f),
+                )
+                drawNineSlice(frame, SkinInsets.BarFrame, size.width, size.height)
+            }
+            Text(
+                text = value,
+                color = Color(0xFFF6EAD0),
+                style = ClassicType.Bar,
+                maxLines = 1,
+            )
+        }
+        return
+    }
     Box(
         modifier = modifier
             .height(16.dp)

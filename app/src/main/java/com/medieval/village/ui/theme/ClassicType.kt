@@ -1,16 +1,18 @@
 package com.medieval.village.ui.theme
 
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.medieval.village.R
 
 /**
  * 고전 영문(비문/필사본) 느낌의 서체 세트.
- * 별도 폰트 에셋 없이 세리프 + 넓은 자간으로 각인된 느낌을 낸다.
+ * 로마 비문풍 Cinzel(OFL) 을 쓰고, 한글 등 없는 글자는 시스템 폰트로 대체된다.
  */
 object ClassicType {
-    val Family = FontFamily.Serif
+    val Family = FontFamily(Font(R.font.cinzel))
 
     /** 버튼 각인용 — 넓은 자간의 세리프 대문자 */
     val Button = TextStyle(
@@ -44,6 +46,22 @@ object ClassicType {
         fontSize = 10.sp,
         lineHeight = 13.sp,
         letterSpacing = 0.8.sp,
+    )
+
+    /** 상단 메뉴 탭 */
+    val Tab = TextStyle(
+        fontFamily = Family,
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.sp,
+        letterSpacing = 0.6.sp,
+    )
+
+    /** HP/MP/EXP 수치 */
+    val Bar = TextStyle(
+        fontFamily = Family,
+        fontWeight = FontWeight.Bold,
+        fontSize = 9.sp,
+        letterSpacing = 0.4.sp,
     )
 
     /** 칩·라벨 */
