@@ -2,8 +2,10 @@ package com.medieval.village.ui.place
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -12,37 +14,46 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.EQUIP_SLOTS
+import com.medieval.village.model.InteriorNpcCatalog
+import com.medieval.village.model.InteriorRoom
 import com.medieval.village.model.Item
 import com.medieval.village.model.ItemCatalog
 import com.medieval.village.model.MercenaryCatalog
 import com.medieval.village.model.PlaceId
 import com.medieval.village.model.SkillCatalog
-import com.medieval.village.model.Village
 import com.medieval.village.ui.Chip
+import com.medieval.village.ui.ItemIcon
 import com.medieval.village.ui.ListRow
+import com.medieval.village.ui.MercPortrait
 import com.medieval.village.ui.MessageLog
+import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.SectionTitle
 import com.medieval.village.ui.ThinDivider
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
+import com.medieval.village.ui.village.rememberCustomArtOrNull
+import com.medieval.village.ui.village.rememberKenneyAtlas
+import kotlin.math.hypot
+import kotlin.math.min
 
 @Composable
 fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
@@ -50,144 +61,298 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         PubScreen(vm = vm, modifier = modifier)
         return
     }
-    val place = Village.of(id)
+    if (id == PlaceId.DUNGEON || id == PlaceId.GRAY_CASTLE) {
+        DungeonScreen(vm = vm, modifier = modifier)
+        return
+    }
+    if (id == PlaceId.EAST_FOREST) {
+        ForestScreen(vm = vm, modifier = modifier)
+        return
+    }
+    if (id == PlaceId.SOUTH_DESERT) {
+        DesertScreen(vm = vm, modifier = modifier)
+        return
+    }
+    if (id == PlaceId.NORTH_GLACIER) {
+        GlacierScreen(vm = vm, modifier = modifier)
+        return
+    }
+    WalkableInteriorScreen(vm = vm, id = id, rootModifier = modifier)
+}
 
-    Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
+@Composable
+private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier: Modifier = Modifier) {
+    val modifier = Modifier
+    val place = vm.placeOf(id)
+    val atlas = rememberKenneyAtlas()
+    val art = rememberCustomArtOrNull()
+    val npcs = remember(id, vm.currentSettlement, vm.player.castleCleared) {
+        InteriorNpcCatalog.forPlace(id, vm.currentSettlement, vm.player.castleCleared)
+    }
+    val panelOpen = vm.interiorPanelOpen
 
-        // 배경 일러스트
-        Box(
+    Column(modifier = rootModifier.fillMaxSize().background(Palette.WoodDark)) {
+        Text(
+            text = "${place.name} · ${place.subtitle}",
+            color = Palette.Gold,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+        )
+
+        BoxWithConstraints(
             modifier = Modifier
+                .weight(if (panelOpen) 0.38f else 1f)
                 .fillMaxWidth()
-                .height(168.dp)
-                .padding(8.dp)
-                .clip(RoundedCornerShape(12.dp))
+                .padding(horizontal = 8.dp)
+                .background(Color(0xFF21150E), RoundedCornerShape(12.dp))
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawInterior(id, size.width, size.height, vm.activeParty)
+            val density = LocalDensity.current
+            val widthPx = with(density) { maxWidth.toPx() }
+            val heightPx = with(density) { maxHeight.toPx() }
+            val scale = min(widthPx / InteriorRoom.WORLD_W, heightPx / InteriorRoom.WORLD_H)
+            val offsetX = (widthPx - InteriorRoom.WORLD_W * scale) / 2f
+            val offsetY = (heightPx - InteriorRoom.WORLD_H * scale) / 2f
+
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(id, scale, offsetX, offsetY, panelOpen) {
+                        detectTapGestures { tap ->
+                            if (vm.interiorPanelOpen) return@detectTapGestures
+                            val x = (tap.x - offsetX) / scale
+                            val y = (tap.y - offsetY) / scale
+                            val npc = npcs.minByOrNull {
+                                hypot(x - it.worldX, y - it.worldY)
+                            }?.takeIf { hypot(x - it.worldX, y - it.worldY) < 100f }
+                            if (npc != null) vm.approachInteriorNpc(npc) else vm.walkInInterior(x, y)
+                        }
+                    }
+            ) {
+                withTransform({
+                    translate(offsetX, offsetY)
+                    scale(scale, scale, Offset.Zero)
+                }) {
+                    drawWalkableInterior(
+                        atlas = atlas,
+                        art = art,
+                        id = id,
+                        heroX = vm.pubHeroX,
+                        heroY = vm.pubHeroY,
+                        facing = vm.facing,
+                        walking = vm.pubWalking,
+                        walkPhase = vm.walkPhase,
+                        companions = vm.activeParty,
+                        animTime = vm.animTime,
+                        speechNpcId = vm.interiorSpeakerId,
+                        speechText = vm.interiorSpeech,
+                        frontIndex = vm.frontIndex,
+                        partySlots = vm.partyDrawSlots(vm.pubHeroX, vm.pubHeroY),
+                        settlementId = vm.currentSettlement,
+                        castleCleared = vm.player.castleCleared,
+                        levelUpFxActorKey = vm.levelUpFxActorKey,
+                        levelUpFxUntil = vm.levelUpFxUntil,
+                    )
+                }
             }
+
+            PartySwitchBar(
+                vm = vm,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+            )
+
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopStart)
+                    .align(Alignment.BottomCenter)
                     .padding(8.dp)
-                    .background(Color(0xCC1B120A), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .background(Color(0xAA1B120A), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
             ) {
-                Column {
-                    Text(place.name, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                    Text(place.subtitle, color = Palette.ParchmentDim, fontSize = 10.sp)
+                Text(
+                    if (panelOpen) "거래 창이 열려 있다"
+                    else "탭으로 이동 · 손님과 대화 · 주인에게 다가가면 구매 메뉴",
+                    color = Palette.Parchment,
+                    fontSize = 11.sp
+                )
+            }
+        }
+
+        if (panelOpen) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .background(Palette.Wood, RoundedCornerShape(12.dp))
+                    .padding(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SectionTitle(panelTitle(id), Modifier.weight(1f))
+                    Chip("${vm.player.gold}G", Palette.WoodLight)
+                    WoodButton("닫기") { vm.closeInteriorPanel() }
+                }
+                ThinDivider()
+                Spacer(modifier.height(4.dp))
+                when (id) {
+                    PlaceId.SHOP -> ShopSplitPanel(vm, ItemCatalog.generalGoods, "잡화 진열대")
+                    PlaceId.WEAPON_SHOP -> ShopSplitPanel(vm, ItemCatalog.weaponGoods, "무기와 방어구")
+                    PlaceId.MAGIC_SCHOOL -> MagicSplitPanel(vm)
+                    else -> {
+                        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                            PlaceServiceBody(vm, id)
+                        }
+                        Spacer(modifier.height(6.dp))
+                        InventoryBottomPanel(vm, sellable = false)
+                    }
                 }
             }
-        }
-
-        // 행동
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            when (id) {
-                PlaceId.HOME -> HomeActions(vm)
-                PlaceId.SHOP -> ShopActions(vm, ItemCatalog.generalGoods, "잡화 진열대")
-                PlaceId.WEAPON_SHOP -> ShopActions(vm, ItemCatalog.weaponGoods, "무기와 방어구")
-                PlaceId.HOSPITAL -> HospitalActions(vm)
-                PlaceId.CHURCH -> ChurchActions(vm)
-                PlaceId.INN -> InnActions(vm)
-                PlaceId.PUB -> Unit
-                PlaceId.ARENA -> ArenaActions(vm)
-                PlaceId.DUNGEON -> DungeonActions(vm)
-                PlaceId.BLACKSMITH -> BlacksmithActions(vm)
-                PlaceId.MAGIC_SCHOOL -> MagicSchoolActions(vm)
-                PlaceId.MERCENARY -> MercenaryActions(vm)
+        } else {
+            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                Text(
+                    "여행객·손님을 탭하면 대화, 주인을 탭하면 거래. 아래 버튼으로도 메뉴를 연다.",
+                    color = Palette.ParchmentDim,
+                    fontSize = 11.sp
+                )
+                Spacer(modifier.height(5.dp))
+                MessageLog(vm.log, Modifier.height(72.dp))
+                Spacer(modifier.height(7.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    WoodButton("메뉴 열기", Modifier.weight(1f), highlight = true) {
+                        vm.openInteriorPanel()
+                    }
+                    WoodButton("마을로 나가기", Modifier.weight(1f)) { vm.leavePlace() }
+                }
             }
-            Spacer(Modifier.height(10.dp))
-        }
-
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            MessageLog(vm.log)
-            Spacer(Modifier.height(8.dp))
-            WoodButton(
-                text = "마을로 나가기",
-                highlight = true,
-                modifier = Modifier.fillMaxWidth()
-            ) { vm.leavePlace() }
         }
     }
 }
 
-// ---------------------------------------------------------------- 각 장소
+private fun panelTitle(id: PlaceId): String = when (id) {
+    PlaceId.SHOP -> "잡화 상점"
+    PlaceId.WEAPON_SHOP -> "무기점"
+    PlaceId.MAGIC_SCHOOL -> "마법 수업"
+    PlaceId.HOME -> "오두막"
+    PlaceId.HOSPITAL -> "치료"
+    PlaceId.CHURCH -> "신전"
+    PlaceId.INN -> "여관"
+    PlaceId.ARENA -> "대련소"
+    PlaceId.BLACKSMITH -> "대장간"
+    PlaceId.MERCENARY -> "용병고용소"
+    else -> "서비스"
+}
 
+/** 상단: 구매 목록 / 하단: 내 가방 */
 @Composable
-private fun ColumnScope.HomeActions(vm: GameViewModel) {
-    SectionTitle("나의 오두막")
-    Text(
-        "침대와 벽난로뿐인 작은 집. 여기서 하루를 마무리할 수 있다.",
-        color = Palette.ParchmentDim, fontSize = 12.sp
-    )
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        WoodButton("잠자기 (무료 · 완전 회복)", highlight = true) { vm.sleepAtHome() }
+private fun ColumnScope.ShopSplitPanel(vm: GameViewModel, goods: List<Item>, title: String) {
+    val modifier = Modifier
+    Column(modifier = Modifier.weight(1f)) {
+        Text(title, color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text("구매할 물건을 고르세요", color = Palette.ParchmentDim, fontSize = 11.sp)
+        Spacer(modifier.height(4.dp))
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            goods.forEach { item ->
+                ListRow(
+                    title = item.name,
+                    subtitle = buildString {
+                        append(item.type.label)
+                        if (item.atk != 0) append(" · 공격 ${item.atk}")
+                        if (item.def != 0) append(" · 방어 ${item.def}")
+                        if (item.desc.isNotEmpty()) append("\n${item.desc}")
+                    },
+                    leading = { ItemIcon(item) },
+                    trailing = {
+                        WoodButton(
+                            text = "${item.price}G",
+                            enabled = vm.player.gold >= item.price,
+                            highlight = vm.player.gold >= item.price
+                        ) { vm.buy(item) }
+                    }
+                )
+                ThinDivider()
+            }
+        }
     }
-    Spacer(Modifier.height(10.dp))
+    Spacer(modifier.height(6.dp))
     ThinDivider()
-    Spacer(Modifier.height(8.dp))
-    SectionTitle("가방 정리")
-    val potions = vm.inventory.toList().filter { it.item.healHp > 0 || it.item.healMp > 0 }
-    if (potions.isEmpty()) {
-        Text("쓸 만한 회복 아이템이 없다.", color = Palette.ParchmentDim, fontSize = 12.sp)
-    } else {
-        potions.forEach { e ->
-            ListRow("${e.item.name} x${e.count}", e.item.desc) {
-                WoodButton("사용") { vm.useItem(e.item) }
-            }
-        }
-    }
+    Spacer(modifier.height(4.dp))
+    InventoryBottomPanel(vm, sellable = true)
 }
 
 @Composable
-private fun ColumnScope.ShopActions(vm: GameViewModel, goods: List<Item>, title: String) {
-    var selling by remember { mutableStateOf(false) }
-
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        SectionTitle(if (selling) "물건 팔기" else title, Modifier.weight(1f))
-        Chip("${vm.player.gold}G", Palette.WoodLight)
-    }
-    Spacer(Modifier.height(4.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        WoodButton("사기", highlight = !selling) { selling = false }
-        WoodButton("팔기", highlight = selling) { selling = true }
-    }
-    Spacer(Modifier.height(8.dp))
-
-    if (!selling) {
-        goods.forEach { item ->
-            ListRow(
-                title = item.name,
-                subtitle = buildString {
-                    append(item.type.label)
-                    if (item.atk != 0) append(" · 공격 ${item.atk}")
-                    if (item.def != 0) append(" · 방어 ${item.def}")
-                    if (item.desc.isNotEmpty()) append("\n${item.desc}")
-                }
-            ) {
-                WoodButton(
-                    text = "${item.price}G",
-                    enabled = vm.player.gold >= item.price,
-                    highlight = vm.player.gold >= item.price
-                ) { vm.buy(item) }
-            }
+private fun ColumnScope.MagicSplitPanel(vm: GameViewModel) {
+    val modifier = Modifier
+    Column(modifier = Modifier.weight(1f)) {
+        Text("정화 마법 · 연구", color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier.height(4.dp))
+        Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            val studyCost = 60 + vm.player.intel * 12
+            ListRow("해독 고서 연구", "지능 +1 · ${studyCost}G", trailing = {
+                WoodButton("연구", enabled = vm.player.gold >= studyCost) { vm.study() }
+            })
             ThinDivider()
+            SkillCatalog.all.forEach { skill ->
+                val owned = vm.skills.any { it.id == skill.id }
+                ListRow(
+                    title = skill.name + if (owned) " (습득함)" else "",
+                    subtitle = "${skill.desc}\nMP ${skill.mpCost} · 수업료 ${skill.cost}G",
+                    trailing = {
+                        WoodButton(
+                            text = if (owned) "완료" else "${skill.cost}G",
+                            enabled = !owned && vm.player.gold >= skill.cost,
+                            highlight = !owned
+                        ) { vm.learn(skill) }
+                    }
+                )
+                ThinDivider()
+            }
         }
-    } else {
+    }
+    Spacer(modifier.height(6.dp))
+    ThinDivider()
+    Spacer(modifier.height(4.dp))
+    InventoryBottomPanel(vm, sellable = false)
+}
+
+@Composable
+private fun ColumnScope.InventoryBottomPanel(vm: GameViewModel, sellable: Boolean) {
+    val modifier = Modifier
+    Text("내 가방", color = Palette.Gold, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    Text(
+        if (sellable) "아래에서 아이템을 팔 수 있다" else "소지 중인 아이템",
+        color = Palette.ParchmentDim,
+        fontSize = 11.sp
+    )
+    Spacer(modifier.height(4.dp))
+    Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
         val bag = vm.inventory.toList()
         if (bag.isEmpty()) {
-            Text("팔 물건이 없다.", color = Palette.ParchmentDim, fontSize = 12.sp)
+            Text("가방이 비어 있다.", color = Palette.ParchmentDim, fontSize = 12.sp)
         } else {
             bag.forEach { e ->
-                ListRow("${e.item.name} x${e.count}", e.item.type.label) {
-                    WoodButton("${e.item.sellPrice}G에 팔기") { vm.sell(e) }
-                }
+                ListRow(
+                    title = "${e.item.name} x${e.count}",
+                    subtitle = buildString {
+                        append(e.item.type.label)
+                        if (e.item.atk != 0) append(" · 공격 ${e.item.atk}")
+                        if (e.item.def != 0) append(" · 방어 ${e.item.def}")
+                    },
+                    leading = { ItemIcon(e.item) },
+                    trailing = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            if (e.item.healHp > 0 || e.item.healMp > 0) {
+                                WoodButton("사용") { vm.useItem(e.item) }
+                            }
+                            if (sellable) {
+                                WoodButton("${e.item.sellPrice}G") { vm.sell(e) }
+                            }
+                        }
+                    }
+                )
                 ThinDivider()
             }
         }
@@ -195,31 +360,70 @@ private fun ColumnScope.ShopActions(vm: GameViewModel, goods: List<Item>, title:
 }
 
 @Composable
+private fun ColumnScope.PlaceServiceBody(vm: GameViewModel, id: PlaceId) {
+    val modifier = Modifier
+    when (id) {
+        PlaceId.HOME -> HomeActions(vm)
+        PlaceId.HOSPITAL -> HospitalActions(vm)
+        PlaceId.CHURCH -> ChurchActions(vm)
+        PlaceId.INN -> InnActions(vm)
+        PlaceId.ARENA -> ArenaActions(vm)
+        PlaceId.BLACKSMITH -> BlacksmithActions(vm)
+        PlaceId.MERCENARY -> MercenaryActions(vm)
+        else -> Text("이용할 서비스가 없다.", color = Palette.ParchmentDim, fontSize = 12.sp)
+    }
+}
+
+// ---------------------------------------------------------------- 각 장소 서비스 본문
+
+@Composable
+private fun ColumnScope.HomeActions(vm: GameViewModel) {
+    val modifier = Modifier
+    SectionTitle("풍요의 마을 오두막")
+    Text(
+        "신성한 포도주의 향기가 희미한 작은 집. 저주가 스며든 밤에도 여기서 하루를 마무리할 수 있다.",
+        color = Palette.ParchmentDim, fontSize = 12.sp
+    )
+    Spacer(modifier.height(8.dp))
+    WoodButton("잠자기 (무료 · 완전 회복)", highlight = true) { vm.sleepAtHome() }
+}
+
+@Composable
 private fun ColumnScope.HospitalActions(vm: GameViewModel) {
-    SectionTitle("치유의 집")
+    val modifier = Modifier
+    SectionTitle("오염 상처를 돌보는 집")
     val cost = vm.hospitalHealCost()
-    ListRow("상처 치료", if (cost == 0) "지금은 건강하다." else "HP를 모두 회복한다. 비용 ${cost}G") {
-        WoodButton("치료", enabled = cost > 0 && vm.player.gold >= cost, highlight = cost > 0) {
-            vm.hospitalHeal()
+    ListRow(
+        "상처 치료",
+        if (cost == 0) "지금은 건강하다." else "좀비의 생채기와 타박을 치료한다. 비용 ${cost}G",
+        trailing = {
+            WoodButton("치료", enabled = cost > 0 && vm.player.gold >= cost, highlight = cost > 0) {
+                vm.hospitalHeal()
+            }
         }
-    }
+    )
     ThinDivider()
-    ListRow("영양제 처방", "최대 HP가 6 늘어난다. 비용 150G") {
-        WoodButton("복용", enabled = vm.player.gold >= 150) { vm.hospitalTonic() }
-    }
+    ListRow(
+        "해독 영양제",
+        "최대 HP가 6 늘어난다. 좀비석 잔향에 버티는 몸을 만든다. 150G",
+        trailing = {
+            WoodButton("복용", enabled = vm.player.gold >= 150) { vm.hospitalTonic() }
+        }
+    )
 }
 
 @Composable
 private fun ColumnScope.ChurchActions(vm: GameViewModel) {
-    SectionTitle("빛의 신전")
-    ListRow("기도하기", "무료. MP를 회복하고 드물게 행운이 오른다.") {
+    val modifier = Modifier
+    SectionTitle("저주를 씻는 신전")
+    ListRow("기도하기", "무료. 좀비석 기운을 밀어내며 MP를 회복한다.", trailing = {
         WoodButton("기도", highlight = true) { vm.pray() }
-    }
+    })
     ThinDivider()
-    ListRow("헌금하기", "100G. 3일간 축복을 받아 전투에서 유리해진다.") {
+    ListRow("헌금하기", "100G. 3일간 축복을 받아 좀비와의 싸움에서 유리해진다.", trailing = {
         WoodButton("100G 헌금", enabled = vm.player.gold >= 100) { vm.donate(100) }
-    }
-    Spacer(Modifier.height(8.dp))
+    })
+    Spacer(modifier.height(8.dp))
     if (vm.player.blessing > 0) {
         Chip("현재 축복 ${vm.player.blessing}일 남음", Palette.Moss)
     }
@@ -227,141 +431,101 @@ private fun ColumnScope.ChurchActions(vm: GameViewModel) {
 
 @Composable
 private fun ColumnScope.InnActions(vm: GameViewModel) {
-    SectionTitle("여관 · 잠든 곰")
-    ListRow("숙박하기", "60G. HP·MP를 모두 회복하고 하루가 지난다.") {
+    val modifier = Modifier
+    SectionTitle("여관 · 잠든 포도송이")
+    ListRow("숙박하기", "60G. HP·MP를 모두 회복하고 하루가 지난다.", trailing = {
         WoodButton("60G 숙박", enabled = vm.player.gold >= 60, highlight = true) { vm.stayAtInn() }
-    }
+    })
     ThinDivider()
-    ListRow("소문 듣기", "무료. 마을 사람들의 이야기를 들어본다.") {
+    ListRow("소문 듣기", "무료. 좀비석과 영주, 지하 비극에 대한 이야기를 듣는다.", trailing = {
         WoodButton("듣기") { vm.listenRumor() }
-    }
+    })
 }
 
 @Composable
 private fun ColumnScope.ArenaActions(vm: GameViewModel) {
-    SectionTitle("무인들의 터")
+    val modifier = Modifier
+    SectionTitle("지상의 칼날 연마터")
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         Chip("${vm.arenaWins}승 ${vm.arenaLosses}패", Palette.WoodLight)
         Chip("공격 ${vm.totalAtk}", Palette.Blood)
         Chip("방어 ${vm.totalDef}", Palette.Sky)
     }
-    Spacer(Modifier.height(8.dp))
-    ListRow("대련 신청", "실력이 비슷한 상대와 겨룬다. 이기면 경험치와 상금.") {
+    Spacer(modifier.height(8.dp))
+    ListRow("대련 신청", "지하에 들어가기 전, 비슷한 상대와 겨룬다.", trailing = {
         WoodButton("대련", highlight = true) { vm.spar() }
-    }
-}
-
-@Composable
-private fun ColumnScope.DungeonActions(vm: GameViewModel) {
-    SectionTitle("잊혀진 지하")
-    Text(
-        "축축한 계단이 어둠 속으로 이어진다. 깊이 내려갈수록 위험하지만 보상도 커진다.",
-        color = Palette.ParchmentDim, fontSize = 12.sp
-    )
-    Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip("최고 기록 ${vm.player.dungeonDepth}층", Palette.WoodLight)
-        Chip("활성 동료 ${vm.activeParty.size}명", Palette.Moss)
-    }
-    Spacer(Modifier.height(10.dp))
-    ListRow(
-        "지하 ${vm.player.dungeonDepth + 1}층 탐험",
-        "몬스터와 싸우고 전리품을 얻는다."
-    ) {
-        WoodButton("내려가기", highlight = true) { vm.exploreDungeon() }
-    }
-    ThinDivider()
-    val potion = vm.inventory.toList().firstOrNull { it.item.healHp > 0 }
-    if (potion != null) {
-        ListRow("${potion.item.name} x${potion.count}", "지금 마셔 체력을 회복한다.") {
-            WoodButton("마시기") { vm.useItem(potion.item) }
-        }
-    }
+    })
 }
 
 @Composable
 private fun ColumnScope.BlacksmithActions(vm: GameViewModel) {
-    SectionTitle("불꽃의 모루")
+    val modifier = Modifier
+    SectionTitle("좀비 이빨을 부수는 모루")
     Text(
-        "착용 중인 장비를 강화한다. 단계가 오를수록 비용이 늘고 실패할 수도 있다.",
+        "착용 장비를 강화한다. 좀비 둥지에서는 무딘 칼이 곧 죽음이다.",
         color = Palette.ParchmentDim, fontSize = 12.sp
     )
-    Spacer(Modifier.height(8.dp))
+    Spacer(modifier.height(8.dp))
     EQUIP_SLOTS.forEach { slot ->
         val eq = vm.equipment[slot]
         ListRow(
             title = "[${slot.label}] ${eq?.displayName ?: "―"}",
             subtitle = if (eq == null) "착용한 장비가 없다." else
-                "공격 ${eq.atk} · 방어 ${eq.def} · 강화비 ${eq.upgradeCost}G"
-        ) {
-            if (eq != null) {
-                WoodButton(
-                    text = "강화",
-                    enabled = vm.player.gold >= eq.upgradeCost && eq.plus < 9,
-                    highlight = true
-                ) { vm.upgrade(slot) }
+                "공격 ${eq.atk} · 방어 ${eq.def} · 강화비 ${eq.upgradeCost}G",
+            leading = { ItemIcon(eq?.item) },
+            trailing = {
+                if (eq != null) {
+                    WoodButton(
+                        text = "강화",
+                        enabled = vm.player.gold >= eq.upgradeCost && eq.plus < 9,
+                        highlight = true
+                    ) { vm.upgrade(slot) }
+                }
             }
-        }
-        ThinDivider()
-    }
-}
-
-@Composable
-private fun ColumnScope.MagicSchoolActions(vm: GameViewModel) {
-    SectionTitle("아르카나 학당")
-    ListRow("고서 연구", "지능을 1 올린다. 비용 ${60 + vm.player.intel * 12}G") {
-        WoodButton("연구", enabled = vm.player.gold >= 60 + vm.player.intel * 12) { vm.study() }
-    }
-    Spacer(Modifier.height(10.dp))
-    ThinDivider()
-    SectionTitle("마법 수업")
-    SkillCatalog.all.forEach { skill ->
-        val owned = vm.skills.any { it.id == skill.id }
-        ListRow(
-            title = skill.name + if (owned) " (습득함)" else "",
-            subtitle = "${skill.desc}\nMP ${skill.mpCost} · 수업료 ${skill.cost}G"
-        ) {
-            WoodButton(
-                text = if (owned) "완료" else "${skill.cost}G",
-                enabled = !owned && vm.player.gold >= skill.cost,
-                highlight = !owned
-            ) { vm.learn(skill) }
-        }
+        )
         ThinDivider()
     }
 }
 
 @Composable
 private fun ColumnScope.MercenaryActions(vm: GameViewModel) {
-    SectionTitle("떠돌이 칼잡이")
-    Text("용병은 여러 명 고용할 수 있고, Status에서 최대 2명을 원정대로 선택한다.", color = Palette.ParchmentDim, fontSize = 12.sp)
-    Spacer(Modifier.height(8.dp))
-
+    val modifier = Modifier
+    SectionTitle("좀비 사냥 용병")
+    Text(
+        "용병은 Status에서 최대 2명을 원정대로 선택한다. 장비·레벨업도 Status에서.",
+        color = Palette.ParchmentDim,
+        fontSize = 12.sp
+    )
+    Spacer(modifier.height(8.dp))
     if (vm.party.isNotEmpty()) {
         SectionTitle("현재 동료")
         vm.party.toList().forEach { m ->
             val active = m.id in vm.activeMercenaryIds
-            ListRow("${m.name} (${m.role})", "전투 기여 +${m.power} · ${if (active) "원정대" else "대기 중"}") {
-                WoodButton("해고") { vm.dismiss(m) }
-            }
+            ListRow(
+                title = "${m.name} (${m.role}) · Lv.${m.level}",
+                subtitle = "기여 +${m.power} · ${if (active) "원정대" else "대기"}",
+                leading = { MercPortrait(m, size = 48.dp) },
+                trailing = { WoodButton("해고") { vm.dismiss(m) } }
+            )
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(modifier.height(8.dp))
         ThinDivider()
     }
-
     SectionTitle("고용 가능")
     MercenaryCatalog.all.forEach { m ->
         val hired = vm.party.any { it.id == m.id }
         ListRow(
             title = "${m.name} · ${m.role}",
-            subtitle = "${m.desc}\n전투 기여 +${m.power}"
-        ) {
-            WoodButton(
-                text = if (hired) "고용함" else "${m.cost}G",
-                enabled = !hired && vm.player.gold >= m.cost,
-                highlight = !hired
-            ) { vm.hire(m) }
-        }
+            subtitle = "${m.desc}\n기본 기여 +${m.basePower}",
+            leading = { MercPortrait(m, size = 52.dp) },
+            trailing = {
+                WoodButton(
+                    text = if (hired) "고용함" else "${m.cost}G",
+                    enabled = !hired && vm.player.gold >= m.cost,
+                    highlight = !hired
+                ) { vm.hire(m) }
+            }
+        )
         ThinDivider()
     }
 }

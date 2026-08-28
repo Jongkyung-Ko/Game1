@@ -1,7 +1,7 @@
 # 중세마을 이야기 (Medieval Village)
 
 Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니다.
-마을 지도와 캐릭터를 이미지 리소스 없이 **Canvas 로 직접 그려서**, 별도 에셋 없이 바로 실행됩니다.
+마을은 **오크헤이븐 일러스트 맵**, 던전은 걸어 다니는 **만화풍 탑다운 층 지도**로 플레이합니다.
 
 ## 화면 구성
 
@@ -51,6 +51,16 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 - 용병은 여러 명 고용할 수 있지만 Status에서 최대 2명만 원정대로 선택합니다.
 - 선택한 용병만 마을과 각 장소 상단 그림에 등장하고 던전 전투력에 반영됩니다.
 
+## APK 다운로드
+
+최신 설치 파일은 [Releases](https://github.com/Jongkyung-Ko/Game1/releases) 에서 받을 수 있습니다.
+
+1. Assets 의 `MedievalVillage-vX.Y.Z-debug.apk` 다운로드
+2. 폰 **설정 > 보안** 에서 알 수 없는 앱 설치 허용
+3. APK 를 열어 설치 → 앱 이름 **중세마을 이야기**
+
+`v*` 태그를 푸시하면 GitHub Actions 가 자동으로 APK 를 빌드해 Release Assets 에 올립니다.
+
 ## 실행 방법
 
 1. [Android Studio](https://developer.android.com/studio) (Ladybug 이상 권장) 설치
@@ -89,6 +99,8 @@ app/src/main/java/com/medieval/village/
     ├── menu/MenuOverlay.kt      Status/Inventory/Equipment/System
     └── place/
         ├── PlaceScreen.kt       장소별 행동 UI
+        ├── PubScreen.kt         PUB 실내 탐험
+        ├── DungeonScreen.kt     만화풍 탑다운 던전 맵
         └── Interior.kt          장소별 실내 배경
 ```
 
@@ -104,6 +116,6 @@ app/src/main/java/com/medieval/village/
 
 - 저장/불러오기 (DataStore)
 - 턴제 전투 화면 (지금은 결과 요약 방식)
-- 던전 층별 맵과 보스
+- 던전 층별 보스전 (맵 UI는 만화풍 탑다운으로 구현됨)
 - 효과음 / BGM
 - 퀘스트와 NPC 대화

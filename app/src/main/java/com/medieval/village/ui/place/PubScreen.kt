@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -29,6 +32,8 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.Facing
@@ -36,19 +41,34 @@ import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.NpcKind
 import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
+import com.medieval.village.model.SettlementId
 import com.medieval.village.ui.MessageLog
+import com.medieval.village.ui.PartySwitchBar
 import com.medieval.village.ui.WoodButton
 import com.medieval.village.ui.theme.Palette
-import com.medieval.village.ui.village.drawHero
-import com.medieval.village.ui.village.drawMercenary
+import com.medieval.village.ui.village.CustomArt
+import com.medieval.village.ui.village.drawCustomSprite
+import com.medieval.village.ui.village.drawLevelUpBurst
+import com.medieval.village.ui.village.drawVillageFollowParty
+import com.medieval.village.ui.village.rememberCustomArtOrNull
 import kotlin.math.hypot
 import kotlin.math.min
-
+import kotlin.math.roundToInt
 @Composable
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
+    val art = rememberCustomArtOrNull()
+    val pubNpcs = remember(vm.currentSettlement, vm.player.castleCleared) {
+        PubNpcCatalog.forSettlement(vm.currentSettlement, vm.player.castleCleared)
+    }
+    val pubTitle = when (vm.currentSettlement) {
+        SettlementId.ASHBROOK -> "PUB · 강변의 재 선술집"
+        SettlementId.GRAY_CASTLE ->
+            if (vm.player.castleCleared) "PUB · 해방 연회장" else "PUB · 저주의 잔향"
+        else -> "PUB · 신성한 잔 선술집"
+    }
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
         Text(
-            text = "PUB · 황금 수사슴",
+            text = pubTitle,
             color = Palette.Gold,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
@@ -68,15 +88,19 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val scale = min(widthPx / PubNpcCatalog.WORLD_W, heightPx / PubNpcCatalog.WORLD_H)
             val offsetX = (widthPx - PubNpcCatalog.WORLD_W * scale) / 2f
             val offsetY = (heightPx - PubNpcCatalog.WORLD_H * scale) / 2f
+            val facing = vm.facing
+            val walking = vm.pubWalking
+            val walkPhase = vm.walkPhase
+            val partySlots = vm.partyDrawSlots(vm.pubHeroX, vm.pubHeroY)
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(scale, offsetX, offsetY) {
+                    .pointerInput(scale, offsetX, offsetY, pubNpcs) {
                         detectTapGestures { tap ->
                             val x = (tap.x - offsetX) / scale
                             val y = (tap.y - offsetY) / scale
-                            val npc = PubNpcCatalog.all.minByOrNull {
+                            val npc = pubNpcs.minByOrNull {
                                 hypot(x - it.x, y - it.y)
                             }?.takeIf { hypot(x - it.x, y - it.y) < 95f }
                             if (npc != null) vm.approachPubNpc(npc) else vm.walkInPub(x, y)
@@ -87,23 +111,42 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     translate(offsetX, offsetY)
                     scale(scale, scale, Offset.Zero)
                 }) {
-                    drawPubBackground()
-                    PubNpcCatalog.all.forEach { npc ->
-                        drawPubNpc(npc, vm.pubSpeakerId == npc.id, vm.pubDialogue)
+                    drawPubBackground(art)
+                    pubNpcs.forEach { npc ->
+                        drawPubNpc(npc, vm.pubSpeakerId == npc.id, vm.pubDialogue, art)
                     }
-                    vm.activeParty.forEachIndexed { index, mercenary ->
-                        drawMercenary(
-                            mercenary,
-                            vm.pubHeroX + if (index == 0) -58f else 58f,
-                            vm.pubHeroY + 45f + index * 8f,
-                            vm.facing,
-                            vm.pubWalking,
-                            vm.walkPhase + index
-                        )
+                    drawVillageFollowParty(
+                        heroX = vm.pubHeroX,
+                        heroY = vm.pubHeroY,
+                        facing = facing,
+                        walking = walking,
+                        walkPhase = walkPhase,
+                        mercs = vm.activeParty,
+                        art = art,
+                        heroScale = 1.08f,
+                        mercScale = 0.76f,
+                        frontIndex = vm.frontIndex,
+                        slots = partySlots,
+                    )
+                    val fxKey = vm.levelUpFxActorKey
+                    if (fxKey != null) {
+                        val slot = partySlots.firstOrNull { it.actorKey == fxKey }
+                            ?: partySlots.firstOrNull()
+                        if (slot != null) {
+                            val rem = (vm.levelUpFxUntil - vm.animTime).coerceAtLeast(0f)
+                            val progress = (1f - rem / 2f).coerceIn(0f, 1f)
+                            drawLevelUpBurst(slot.x, slot.y, progress, vm.animTime)
+                        }
                     }
-                    drawHero(vm.pubHeroX, vm.pubHeroY, vm.facing, vm.pubWalking, vm.walkPhase)
                 }
             }
+
+            PartySwitchBar(
+                vm = vm,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+            )
         }
 
         Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
@@ -122,11 +165,25 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-private fun DrawScope.drawPubBackground() {
+private fun DrawScope.drawPubBackground(art: CustomArt?) {
     val w = PubNpcCatalog.WORLD_W
     val h = PubNpcCatalog.WORLD_H
+    val roomArt = art?.interiorOrNull("pub")
+    if (roomArt != null) {
+        drawImage(
+            image = roomArt,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(roomArt.width, roomArt.height),
+            dstOffset = IntOffset.Zero,
+            dstSize = IntSize(w.roundToInt(), h.roundToInt()),
+            filterQuality = FilterQuality.Medium,
+        )
+        drawRect(Color(0x22000000), Offset.Zero, Size(w, h * 0.08f))
+        drawRect(Color(0x33000000), Offset(0f, h * 0.92f), Size(w, h * 0.08f))
+        return
+    }
 
-    // 따뜻한 목조 벽과 석재 하단
+    // 따뜻한 목조 벽과 석재 하단 (폴백)
     drawRect(Color(0xFF5A2F21), size = Size(w, h))
     for (x in 0..10) {
         drawRect(
@@ -231,43 +288,58 @@ private fun DrawScope.drawStairs() {
     }
 }
 
-private fun DrawScope.drawPubNpc(npc: PubNpc, speaking: Boolean, dialogue: String?) {
-    val outfit = when (npc.kind) {
-        NpcKind.OWNER -> Color(0xFF9A3F35)
-        NpcKind.TRAVELER -> Color(0xFF456B8E)
-        NpcKind.GUILD_MEMBER -> Color(0xFF4E7843)
-        NpcKind.DRUNK -> Color(0xFF775489)
+private fun DrawScope.drawPubNpc(
+    npc: PubNpc,
+    speaking: Boolean,
+    dialogue: String?,
+    art: CustomArt?,
+) {
+    val sprite = art?.npcSpriteOrNull(npc.spriteKey)
+    if (sprite != null) {
+        drawCustomSprite(
+            image = sprite,
+            cx = npc.x,
+            footY = npc.y,
+            worldHeight = 118f,
+        )
+    } else {
+        val outfit = when (npc.kind) {
+            NpcKind.OWNER -> Color(0xFF9A3F35)
+            NpcKind.TRAVELER -> Color(0xFF456B8E)
+            NpcKind.GUILD_MEMBER -> Color(0xFF4E7843)
+            NpcKind.DRUNK -> Color(0xFF775489)
+        }
+        drawOval(Color(0x33000000), Offset(npc.x - 27f, npc.y - 7f), Size(54f, 18f))
+        drawRect(Color(0xFF453326), Offset(npc.x - 17f, npc.y - 34f), Size(12f, 34f))
+        drawRect(Color(0xFF453326), Offset(npc.x + 5f, npc.y - 34f), Size(12f, 34f))
+        val body = Path().apply {
+            moveTo(npc.x - 25f, npc.y - 92f)
+            lineTo(npc.x + 25f, npc.y - 92f)
+            lineTo(npc.x + 31f, npc.y - 31f)
+            lineTo(npc.x - 31f, npc.y - 31f)
+            close()
+        }
+        drawPath(body, outfit)
+        drawCircle(Color(0xFFE2B087), 21f, Offset(npc.x, npc.y - 113f))
+        drawArc(
+            if (npc.kind == NpcKind.DRUNK) Color(0xFF8B6A42) else Color(0xFF4D3325),
+            180f,
+            180f,
+            true,
+            Offset(npc.x - 22f, npc.y - 136f),
+            Size(44f, 35f)
+        )
+        if (npc.kind == NpcKind.OWNER) {
+            drawRect(Color(0xFFE7D9C2), Offset(npc.x - 19f, npc.y - 82f), Size(38f, 44f))
+        }
     }
-    drawOval(Color(0x33000000), Offset(npc.x - 27f, npc.y - 7f), Size(54f, 18f))
-    drawRect(Color(0xFF453326), Offset(npc.x - 17f, npc.y - 34f), Size(12f, 34f))
-    drawRect(Color(0xFF453326), Offset(npc.x + 5f, npc.y - 34f), Size(12f, 34f))
-    val body = Path().apply {
-        moveTo(npc.x - 25f, npc.y - 92f)
-        lineTo(npc.x + 25f, npc.y - 92f)
-        lineTo(npc.x + 31f, npc.y - 31f)
-        lineTo(npc.x - 31f, npc.y - 31f)
-        close()
-    }
-    drawPath(body, outfit)
-    drawCircle(Color(0xFFE2B087), 21f, Offset(npc.x, npc.y - 113f))
-    drawArc(
-        if (npc.kind == NpcKind.DRUNK) Color(0xFF8B6A42) else Color(0xFF4D3325),
-        180f,
-        180f,
-        true,
-        Offset(npc.x - 22f, npc.y - 136f),
-        Size(44f, 35f)
-    )
-    if (npc.kind == NpcKind.OWNER) {
-        drawRect(Color(0xFFE7D9C2), Offset(npc.x - 19f, npc.y - 82f), Size(38f, 44f))
-    }
-    drawLabel("${npc.name} · ${npc.role}", npc.x - 58f, npc.y + 25f, 18f, Color(0xFFF3E4C5))
+    drawLabel("${npc.name} · ${npc.role}", npc.x - 58f, npc.y + 22f, 18f, Color(0xFFF3E4C5))
 
     if (speaking && dialogue != null) {
-        drawSpeechBubble(npc.x, npc.y - 160f, dialogue)
+        drawSpeechBubble(npc.x, npc.y - 150f, dialogue)
     } else {
-        drawCircle(Color(0xFFE8D9B8), 17f, Offset(npc.x + 26f, npc.y - 145f))
-        drawLabel("…", npc.x + 18f, npc.y - 139f, 20f, Color(0xFF342017))
+        drawCircle(Color(0xFFE8D9B8), 17f, Offset(npc.x + 28f, npc.y - 130f))
+        drawLabel("…", npc.x + 20f, npc.y - 124f, 20f, Color(0xFF342017))
     }
 }
 

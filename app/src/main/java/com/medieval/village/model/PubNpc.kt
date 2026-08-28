@@ -14,14 +14,16 @@ data class PubNpc(
     val kind: NpcKind,
     val x: Float,
     val y: Float,
-    val lines: List<String>
+    val lines: List<String>,
+    val spriteKey: String,
 )
 
 object PubNpcCatalog {
     const val WORLD_W = 1000f
     const val WORLD_H = 700f
 
-    val all = listOf(
+    /** 오크헤이븐 기본 선술집 NPC (하위 호환용 all 별칭) */
+    val oakhavenBase = listOf(
         PubNpc(
             id = "owner",
             name = "보릭",
@@ -29,10 +31,11 @@ object PubNpcCatalog {
             kind = NpcKind.OWNER,
             x = 805f,
             y = 390f,
+            spriteKey = "merchant",
             lines = listOf(
-                "황금 수사슴에 잘 왔네! 따뜻한 자리는 항상 남아 있지.",
-                "던전에 갈 생각이면 물약과 횃불부터 챙기게.",
-                "여행은 배가 든든해야 하는 법이야."
+                "신성한 잔에 잘 왔네. 예전엔 포도주만으로도 마을이 웃었지…",
+                "지하에서 캐낸 좀비석 얘기는 손님들 사이에서 끊이질 않아.",
+                "던전에 갈 거면 횃불이랑 물약부터 챙기게. 저 아래는 더 이상 보관소가 아니야."
             )
         ),
         PubNpc(
@@ -42,10 +45,11 @@ object PubNpcCatalog {
             kind = NpcKind.TRAVELER,
             x = 335f,
             y = 245f,
+            spriteKey = "rogue",
             lines = listOf(
-                "북쪽 교회에서는 기도만 해도 마나를 회복할 수 있대요.",
-                "이 마을은 건물을 누르면 길을 따라 자동으로 걸어가요.",
-                "멀리서 왔는데, 이곳 벽난로가 제일 따뜻하네요."
+                "풍요의 마을이라니… 표지판과 달리 공기가 무겁네요.",
+                "영주가 병을 고치겠다고 좀비석을 만졌다는 소문을 들으러 왔어요.",
+                "하수도 쪽에서 기척이 올라온대요. 밤에 문단속은 필수래요."
             )
         ),
         PubNpc(
@@ -55,10 +59,11 @@ object PubNpcCatalog {
             kind = NpcKind.GUILD_MEMBER,
             x = 565f,
             y = 345f,
+            spriteKey = "warrior",
             lines = listOf(
-                "Status에서 고용한 용병 중 두 명을 원정대로 선택할 수 있어.",
-                "대장간 강화는 단계가 높을수록 실패하기 쉬우니 골드를 모아 둬.",
-                "던전 기록은 다음 탐험 난이도를 결정하지. 준비를 단단히 해."
+                "좀비 둥지는 라그나로크 던전처럼 직접 걸어 다니며 싸워야 해.",
+                "오염된 사람들은 죽지도 못하고 뇌가 썩어, 생살 허기만 남았지.",
+                "Status에서 용병 둘을 원정대로 뽑아. 심층일수록 혼자선 버겁다."
             )
         ),
         PubNpc(
@@ -68,11 +73,17 @@ object PubNpcCatalog {
             kind = NpcKind.DRUNK,
             x = 210f,
             y = 505f,
+            spriteKey = "farmer",
             lines = listOf(
-                "히끅... 우물 밑에 보물이 있다던데... 아마 꿈이었나?",
-                "용병은 둘이면 충분해! 셋이면 술값이 너무 많이 나와!",
-                "대련소의 산적 두목은 왼쪽 공격에 약하다더군... 히끅."
+                "히끅… 신성한 포도주가… 검붉은 돌에 먹혀버렸어…",
+                "연금술사 놈들… 목숨 늘리겠다고 하다가 마을을 좀비 우리로 만들었지!",
+                "최하층에 좀비석이 아직 있다던데… 만지면… 히끅… 끝장이야…"
             )
         )
     )
+
+    val all: List<PubNpc> get() = oakhavenBase
+
+    fun forSettlement(settlementId: SettlementId, castleCleared: Boolean = false): List<PubNpc> =
+        RegionDialogue.pubNpcs(settlementId, castleCleared)
 }

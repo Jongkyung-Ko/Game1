@@ -25,6 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.medieval.village.ui.skin.SkinInsets
+import com.medieval.village.ui.skin.nineSliceBackground
+import com.medieval.village.ui.skin.rememberUiSkin
 import com.medieval.village.ui.theme.Palette
 
 @Composable
@@ -82,27 +85,37 @@ fun WoodButton(
 fun MessageLog(lines: List<String>, modifier: Modifier = Modifier) {
     val scroll = rememberScrollState()
     LaunchedEffect(lines.size) { scroll.animateScrollTo(scroll.maxValue) }
-    Column(
-        modifier = modifier
+    val parchment = rememberUiSkin()?.logScroll
+    val body = if (parchment != null) {
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 84.dp, max = 140.dp)
+            .nineSliceBackground(parchment, SkinInsets.LogScroll)
+            .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 16.dp)
+            .verticalScroll(scroll)
+    } else {
+        modifier
             .fillMaxWidth()
             .heightIn(min = 74.dp, max = 132.dp)
             .background(Palette.Ink, RoundedCornerShape(10.dp))
             .border(1.5.dp, Palette.WoodLight, RoundedCornerShape(10.dp))
             .padding(10.dp)
-            .verticalScroll(scroll),
-        verticalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
+            .verticalScroll(scroll)
+    }
+    val ink = if (parchment != null) Color(0xFF3E2C16) else Palette.Parchment
+    Column(modifier = body, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         lines.forEach { line ->
-            Text(line, color = Palette.Parchment, fontSize = 12.sp, lineHeight = 16.sp)
+            Text(line, color = ink, fontSize = 11.sp, lineHeight = 14.sp)
         }
     }
 }
 
-/** 좌: 이름/설명, 우: 버튼 형태의 목록 한 줄 */
+/** 좌: (선택)아이콘 + 이름/설명, 우: 버튼 형태의 목록 한 줄 */
 @Composable
 fun ListRow(
     title: String,
     subtitle: String? = null,
+    leading: @Composable (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null
 ) {
     Row(
@@ -111,6 +124,9 @@ fun ListRow(
             .padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (leading != null) {
+            Box(modifier = Modifier.padding(end = 8.dp)) { leading() }
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = Palette.Parchment, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             if (subtitle != null) {
