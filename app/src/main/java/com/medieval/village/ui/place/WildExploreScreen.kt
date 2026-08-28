@@ -21,7 +21,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -30,6 +33,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.DungeonFloor
@@ -38,6 +43,10 @@ import com.medieval.village.model.DungeonTile
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.mapZoomGestures
 import com.medieval.village.ui.rememberMapZoomState
+import com.medieval.village.ui.skin.DungeonArt
+import com.medieval.village.ui.skin.WildArt
+import com.medieval.village.ui.skin.rememberDungeonArt
+import com.medieval.village.ui.skin.rememberWildArt
 import com.medieval.village.ui.withMapZoom
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
@@ -54,6 +63,7 @@ import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 enum class WildTheme {
     FOREST, DESERT, GLACIER
@@ -74,6 +84,10 @@ private data class WildThemeUi(
     val deepHint: String,
     val moveHint: String,
     val deepButton: String,
+    /** 도안 타일 위에 덮는 지대별 분위기 보정 */
+    val shade: Color,
+    /** assets 하위 타일 폴더 */
+    val artDir: String,
 )
 
 private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): WildThemeUi = when (theme) {
@@ -87,11 +101,13 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.40 Eastern forest",
+        watermark = "v0.4.41 Eastern forest",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
         deepButton = "들어가기",
+        shade = Color(0x2A0A1A06),
+        artDir = "forest",
     )
     WildTheme.DESERT -> WildThemeUi(
         title = "남쪽 사막 · ${zone}지대",
@@ -103,11 +119,13 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.40 Southern desert",
+        watermark = "v0.4.41 Southern desert",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
         deepButton = "들어가기",
+        shade = Color(0x1E3A1E04),
+        artDir = "desert",
     )
     WildTheme.GLACIER -> WildThemeUi(
         title = "북쪽 빙하 · ${zone}지대",
@@ -119,11 +137,13 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.40 Northern glacier",
+        watermark = "v0.4.41 Northern glacier",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
         deepButton = "들어가기",
+        shade = Color(0x1C0A1A30),
+        artDir = "glacier",
     )
 }
 
@@ -140,6 +160,8 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
     }
     val foeCount = floor?.monsters?.count { it.alive } ?: 0
     val ui = themeUi(theme, vm.dungeonFloorNumber, record, foeCount)
+    val wildArt = rememberWildArt(ui.artDir)
+    val dungeonArt = rememberDungeonArt()
     val mod = Modifier
     // 이름·층·잔여 몬스터는 TopMenuBar, 상자 상단 안내 문구는 표시하지 않음
     Column(modifier = modifier.fillMaxSize().background(ui.chromeBg)) {
@@ -209,10 +231,24 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                 val (camX, camY) = wildCamera(map, heroX, heroY, viewW, viewH)
                 withMapZoom(mapZoom) {
                     withTransform({ translate(-camX, -camY) }) {
-                        when (theme) {
-                            WildTheme.FOREST -> drawForestFloor(atlas, map)
-                            WildTheme.DESERT -> drawDesertFloor(atlas, map)
-                            WildTheme.GLACIER -> drawGlacierFloor(atlas, map)
+                        if (wildArt != null) {
+                            drawArtWildFloor(
+                                wild = wildArt,
+                                dungeon = dungeonArt,
+                                map = map,
+                                camX = camX,
+                                camY = camY,
+                                viewW = viewW,
+                                viewH = viewH,
+                                backdrop = ui.chromeBg,
+                                shade = ui.shade,
+                            )
+                        } else {
+                            when (theme) {
+                                WildTheme.FOREST -> drawForestFloor(atlas, map)
+                                WildTheme.DESERT -> drawDesertFloor(atlas, map)
+                                WildTheme.GLACIER -> drawGlacierFloor(atlas, map)
+                            }
                         }
                         map.monsters.filter { it.alive }.forEach { monster ->
                             drawWildBeast(atlas, art, theme, monster)
@@ -283,6 +319,120 @@ private fun wildCamera(
 }
 
 // ----- Forest floor (from previous ForestScreen) -----
+
+/**
+ * 도안 타일로 그리는 야외 지대. 화면에 걸치는 칸만 그린다.
+ * 상자·포털은 던전과 같은 물건이라 [DungeonArt] 쪽 그림을 함께 쓴다.
+ */
+private fun DrawScope.drawArtWildFloor(
+    wild: WildArt,
+    dungeon: DungeonArt?,
+    map: DungeonFloor,
+    camX: Float,
+    camY: Float,
+    viewW: Float,
+    viewH: Float,
+    backdrop: Color,
+    shade: Color,
+) {
+    val ts = map.tileSize
+    drawRect(backdrop, size = Size(map.worldW, map.worldH))
+
+    val c0 = ((camX / ts).toInt() - 2).coerceAtLeast(0)
+    val r0 = ((camY / ts).toInt() - 2).coerceAtLeast(0)
+    val c1 = (((camX + viewW) / ts).toInt() + 2).coerceAtMost(map.cols - 1)
+    val r1 = (((camY + viewH) / ts).toInt() + 2).coerceAtMost(map.rows - 1)
+
+    fun tile(image: ImageBitmap, x: Float, y: Float) {
+        drawImage(
+            image = image,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(image.width, image.height),
+            dstOffset = IntOffset(x.roundToInt(), y.roundToInt()),
+            dstSize = IntSize(ts.roundToInt() + 1, ts.roundToInt() + 1),
+            filterQuality = FilterQuality.Medium,
+        )
+    }
+
+    fun prop(image: ImageBitmap, x: Float, y: Float, fill: Float) {
+        val budget = ts * fill
+        val scale = min(budget / image.width, budget / image.height)
+        val w = (image.width * scale).roundToInt().coerceAtLeast(1)
+        val h = (image.height * scale).roundToInt().coerceAtLeast(1)
+        drawImage(
+            image = image,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(image.width, image.height),
+            dstOffset = IntOffset(
+                (x + (ts - w) / 2f).roundToInt(),
+                (y + (ts - h) / 2f).roundToInt(),
+            ),
+            dstSize = IntSize(w, h),
+            filterQuality = FilterQuality.Medium,
+        )
+    }
+
+    // 1) 지면 — 장애물 칸 아래에도 깔아 나무·바위가 땅 위에 선 것처럼 보이게 한다
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            tile(wild.groundFor(c, r), c * ts, r * ts)
+        }
+    }
+
+    // 2) 수풀·모래언덕 등 지형 소품
+    val scenery = wild.scenery
+    if (scenery != null) {
+        for (r in r0..r1) {
+            for (c in c0..c1) {
+                if (map.tileAt(c, r) == DungeonTile.SEWER) tile(scenery, c * ts, r * ts)
+            }
+        }
+    }
+
+    // 3) 장애물 — 나무·바위·얼음 기둥. 숲이 비어 보이지 않도록 안쪽 칸까지 채운다
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            if (map.tileAt(c, r) != DungeonTile.WALL) continue
+            wild.obstacleFor(c, r)?.let { prop(it, c * ts, r * ts, 1.08f) }
+        }
+    }
+
+    // 4) 출입 표식과 상자·포털
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            val x = c * ts
+            val y = r * ts
+            when (map.tileAt(c, r)) {
+                DungeonTile.STAIRS_UP -> wild.exit?.let { tile(it, x, y) }
+                DungeonTile.STAIRS_DOWN -> wild.deeper?.let { tile(it, x, y) }
+                DungeonTile.VAULT -> dungeon?.chestClosed?.let { prop(it, x, y, 0.86f) }
+                DungeonTile.CHEST_OPEN -> dungeon?.chestOpen?.let { prop(it, x, y, 0.86f) }
+                DungeonTile.PORTAL -> dungeon?.portal?.let { prop(it, x, y, 1.15f) }
+                else -> Unit
+            }
+        }
+    }
+
+    // 5) 지대 분위기 보정
+    drawRect(shade, size = Size(map.worldW, map.worldH))
+
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            if (map.tileAt(c, r) != DungeonTile.PORTAL) continue
+            val center = Offset(c * ts + ts * 0.5f, r * ts + ts * 0.5f)
+            val pr = ts * 2.4f
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0x8855C8E8), Color(0x4455A0E8), Color(0x0055A0E8)),
+                    center = center,
+                    radius = pr,
+                ),
+                radius = pr,
+                center = center,
+            )
+        }
+    }
+}
 
 private fun DrawScope.drawForestFloor(atlas: KenneyAtlas?, map: DungeonFloor) {
     drawRect(Color(0xFF1E2E18), size = Size(map.worldW, map.worldH))
