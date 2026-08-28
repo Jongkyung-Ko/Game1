@@ -11,15 +11,21 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.medieval.village.model.Item
 import com.medieval.village.model.ItemType
+import com.medieval.village.ui.skin.rememberItemArt
 import com.medieval.village.ui.theme.Palette
+import kotlin.math.roundToInt
 
 /** 인벤토리·상점 목록용 아이템 아이콘. */
 @Composable
@@ -29,6 +35,18 @@ fun ItemIcon(
     size: Dp = 36.dp,
     framed: Boolean = true,
 ) {
+    val art = rememberItemArt()
+    val painted = art?.iconOrNull(item?.id)
+    if (art != null && (painted != null || item == null)) {
+        PaintedItemIcon(
+            icon = painted,
+            slot = art.emptySlot.takeIf { framed },
+            modifier = modifier,
+            size = size,
+        )
+        return
+    }
+
     val bg = when (item?.type) {
         ItemType.WEAPON -> Color(0xFF3A2418)
         ItemType.SHIELD -> Color(0xFF2A3040)
@@ -53,6 +71,44 @@ fun ItemIcon(
         } else {
             drawItemGlyph(item.id, item.type)
         }
+    }
+}
+
+/** 도안 슬롯 위에 아이템 그림을 비율 그대로 얹는다. */
+@Composable
+private fun PaintedItemIcon(
+    icon: ImageBitmap?,
+    slot: ImageBitmap?,
+    modifier: Modifier,
+    size: Dp,
+) {
+    Canvas(modifier = modifier.size(size)) {
+        slot?.let {
+            drawImage(
+                image = it,
+                srcOffset = IntOffset.Zero,
+                srcSize = IntSize(it.width, it.height),
+                dstOffset = IntOffset.Zero,
+                dstSize = IntSize(this.size.width.roundToInt(), this.size.height.roundToInt()),
+                filterQuality = FilterQuality.Medium,
+            )
+        }
+        if (icon == null) return@Canvas
+        val budget = this.size.minDimension * (if (slot != null) 0.74f else 0.94f)
+        val scale = minOf(budget / icon.width, budget / icon.height)
+        val w = (icon.width * scale).roundToInt().coerceAtLeast(1)
+        val h = (icon.height * scale).roundToInt().coerceAtLeast(1)
+        drawImage(
+            image = icon,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(icon.width, icon.height),
+            dstOffset = IntOffset(
+                ((this.size.width - w) / 2f).roundToInt(),
+                ((this.size.height - h) / 2f).roundToInt(),
+            ),
+            dstSize = IntSize(w, h),
+            filterQuality = FilterQuality.Medium,
+        )
     }
 }
 
