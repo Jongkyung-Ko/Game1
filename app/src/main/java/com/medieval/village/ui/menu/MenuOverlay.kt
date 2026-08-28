@@ -449,7 +449,7 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
     Spacer(Modifier.height(12.dp))
     SectionTitle("게임 정보")
     Text(
-        "중세마을 이야기 v0.4.39\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
+        "중세마을 이야기 v0.4.40\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
         color = Palette.ParchmentDim,
         fontSize = 12.sp,
         lineHeight = 17.sp

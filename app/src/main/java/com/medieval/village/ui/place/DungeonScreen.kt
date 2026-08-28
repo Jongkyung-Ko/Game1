@@ -24,6 +24,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -32,6 +34,8 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.model.DungeonFloor
@@ -41,6 +45,8 @@ import com.medieval.village.model.PlaceId
 import com.medieval.village.ui.MessageLog
 import com.medieval.village.ui.mapZoomGestures
 import com.medieval.village.ui.rememberMapZoomState
+import com.medieval.village.ui.skin.DungeonArt
+import com.medieval.village.ui.skin.rememberDungeonArt
 import com.medieval.village.ui.withMapZoom
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
@@ -55,11 +61,13 @@ import com.medieval.village.ui.village.rememberCustomArtOrNull
 import com.medieval.village.ui.village.rememberKenneyAtlasOrNull
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 @Composable
 fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     val atlas = rememberKenneyAtlasOrNull()
     val art = rememberCustomArtOrNull()
+    val dungeonArt = rememberDungeonArt()
     LaunchedEffect(Unit) { vm.ensureDungeonLoaded() }
     val floor = vm.dungeonFloor
     // 던전 이름·층·잔여 몬스터는 TopMenuBar 고정 영역에 표시 (맵과 분리)
@@ -134,7 +142,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     withTransform({
                         translate(-camX, -camY)
                     }) {
-                        if (atlas != null) {
+                        if (dungeonArt != null) {
+                            drawArtDungeonFloor(dungeonArt, map, camX, camY, viewW, viewH)
+                        } else if (atlas != null) {
                             drawHybridDungeonFloor(atlas, map)
                         } else {
                             drawDungeonFloorFallback(map)
@@ -171,9 +181,9 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     if (vm.currentPlace == PlaceId.GRAY_CASTLE) {
-                        "v0.4.39 Gray Castle"
+                        "v0.4.40 Gray Castle"
                     } else {
-                        "v0.4.39 Undead nest"
+                        "v0.4.40 Undead nest"
                     },
                     14f,
                     28f,
@@ -204,6 +214,187 @@ private fun cameraOffset(
     val camX = (heroX - viewW / 2f).coerceIn(0f, maxX)
     val camY = (heroY - viewH / 2f).coerceIn(0f, maxY)
     return camX to camY
+}
+
+/**
+ * 도안에서 잘라낸 석조 타일로 그리는 던전.
+ * 화면 밖 칸은 건너뛰고, 횃불 불빛과 비네트는 기존 연출을 유지한다.
+ */
+private fun DrawScope.drawArtDungeonFloor(
+    art: DungeonArt,
+    map: DungeonFloor,
+    camX: Float,
+    camY: Float,
+    viewW: Float,
+    viewH: Float,
+) {
+    val ts = map.tileSize
+    drawRect(Color(0xFF0E0A08), size = Size(map.worldW, map.worldH))
+
+    fun isWalk(c: Int, r: Int): Boolean = map.tileAt(c, r) != DungeonTile.WALL
+
+    // 카메라에 걸치는 칸만 그린다 (여유 2칸)
+    val c0 = ((camX / ts).toInt() - 2).coerceAtLeast(0)
+    val r0 = ((camY / ts).toInt() - 2).coerceAtLeast(0)
+    val c1 = (((camX + viewW) / ts).toInt() + 2).coerceAtMost(map.cols - 1)
+    val r1 = (((camY + viewH) / ts).toInt() + 2).coerceAtMost(map.rows - 1)
+
+    fun tile(image: ImageBitmap, x: Float, y: Float) {
+        drawImage(
+            image = image,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(image.width, image.height),
+            dstOffset = IntOffset(x.roundToInt(), y.roundToInt()),
+            // 칸 사이 이음새가 보이지 않도록 1px 겹쳐 깐다
+            dstSize = IntSize(ts.roundToInt() + 1, ts.roundToInt() + 1),
+            filterQuality = FilterQuality.Medium,
+        )
+    }
+
+    fun prop(image: ImageBitmap, x: Float, y: Float, fill: Float) {
+        val budget = ts * fill
+        val scale = min(budget / image.width, budget / image.height)
+        val w = (image.width * scale).roundToInt().coerceAtLeast(1)
+        val h = (image.height * scale).roundToInt().coerceAtLeast(1)
+        drawImage(
+            image = image,
+            srcOffset = IntOffset.Zero,
+            srcSize = IntSize(image.width, image.height),
+            dstOffset = IntOffset(
+                (x + (ts - w) / 2f).roundToInt(),
+                (y + (ts - h) / 2f).roundToInt(),
+            ),
+            dstSize = IntSize(w, h),
+            filterQuality = FilterQuality.Medium,
+        )
+    }
+
+    // 1) 바닥
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            if (map.tileAt(c, r) == DungeonTile.WALL) continue
+            tile(art.floorFor(c, r), c * ts, r * ts)
+        }
+    }
+
+    // 2) 벽 — 바닥과 맞닿은 면만
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            if (map.tileAt(c, r) != DungeonTile.WALL) continue
+            if (!(isWalk(c, r - 1) || isWalk(c, r + 1) || isWalk(c - 1, r) || isWalk(c + 1, r))) continue
+            tile(art.wall, c * ts, r * ts)
+        }
+    }
+
+    // 3) 벽 밑동 그림자 — 바닥에 닿는 곳을 어둡게
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            if (!isWalk(c, r)) continue
+            val x = c * ts
+            val y = r * ts
+            if (!isWalk(c, r - 1)) {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color(0x73000000), Color(0x00000000)),
+                        startY = y,
+                        endY = y + ts * 0.5f,
+                    ),
+                    topLeft = Offset(x, y),
+                    size = Size(ts, ts * 0.5f),
+                )
+            }
+            if (!isWalk(c - 1, r)) {
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color(0x59000000), Color(0x00000000)),
+                        startX = x,
+                        endX = x + ts * 0.3f,
+                    ),
+                    topLeft = Offset(x, y),
+                    size = Size(ts * 0.3f, ts),
+                )
+            }
+            if (!isWalk(c + 1, r)) {
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color(0x00000000), Color(0x59000000)),
+                        startX = x + ts * 0.7f,
+                        endX = x + ts,
+                    ),
+                    topLeft = Offset(x + ts * 0.7f, y),
+                    size = Size(ts * 0.3f, ts),
+                )
+            }
+        }
+    }
+
+    // 4) 소품
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            val x = c * ts
+            val y = r * ts
+            when (map.tileAt(c, r)) {
+                DungeonTile.STAIRS_UP -> art.stairsUp?.let { prop(it, x, y, 1.02f) }
+                DungeonTile.STAIRS_DOWN -> art.stairsDown?.let { prop(it, x, y, 1.02f) }
+                DungeonTile.VAULT -> art.chestClosed?.let { prop(it, x, y, 0.86f) }
+                DungeonTile.CHEST_OPEN -> art.chestOpen?.let { prop(it, x, y, 0.86f) }
+                DungeonTile.PORTAL -> art.portal?.let { prop(it, x, y, 1.15f) }
+                DungeonTile.SEWER -> art.sewerGrate?.let { prop(it, x, y, 0.78f) }
+                else -> Unit
+            }
+        }
+    }
+
+    // 5) 벽에 걸린 횃불
+    val torchSpots = ArrayList<Offset>(24)
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            if (!isWalk(c, r)) continue
+            val nearWall = !isWalk(c, r - 1) || !isWalk(c, r + 1) || !isWalk(c - 1, r) || !isWalk(c + 1, r)
+            if (!nearWall || (c * 17 + r * 9) % 16 != 0) continue
+            val cx = c * ts + ts * 0.5f
+            val cy = r * ts + ts * 0.32f
+            torchSpots += Offset(cx, cy)
+            drawRect(Color(0xFF5A3A22), Offset(cx - 2.5f, cy), Size(5f, ts * 0.28f))
+            drawOval(Color(0xFFE8843A), Offset(cx - 7f, cy - 12f), Size(14f, 14f))
+            drawOval(Color(0xFFF9DE85), Offset(cx - 4f, cy - 14f), Size(8f, 10f))
+            if (torchSpots.size >= 18) break
+        }
+        if (torchSpots.size >= 18) break
+    }
+
+    // 6) 전체 감광 + 횃불 방사광
+    drawRect(Color(0x30080402), size = Size(map.worldW, map.worldH))
+    val glowR = ts * 3.2f
+    for (spot in torchSpots) {
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0x66E8843A), Color(0x33E8843A), Color(0x00E8843A)),
+                center = spot,
+                radius = glowR,
+            ),
+            radius = glowR,
+            center = spot,
+            blendMode = BlendMode.Screen,
+        )
+    }
+    for (r in r0..r1) {
+        for (c in c0..c1) {
+            if (map.tileAt(c, r) != DungeonTile.PORTAL) continue
+            val center = Offset(c * ts + ts * 0.5f, r * ts + ts * 0.5f)
+            val pr = ts * 2.4f
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0x8855C8E8), Color(0x4455A0E8), Color(0x0055A0E8)),
+                    center = center,
+                    radius = pr,
+                ),
+                radius = pr,
+                center = center,
+                blendMode = BlendMode.Screen,
+            )
+        }
+    }
 }
 
 /**

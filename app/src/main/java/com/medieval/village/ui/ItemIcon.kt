@@ -93,7 +93,10 @@ private fun PaintedItemIcon(
                 filterQuality = FilterQuality.Medium,
             )
         }
-        if (icon == null) return@Canvas
+        if (icon == null) {
+            if (slot == null) drawEmptySlotMark()
+            return@Canvas
+        }
         val budget = this.size.minDimension * (if (slot != null) 0.74f else 0.94f)
         val scale = minOf(budget / icon.width, budget / icon.height)
         val w = (icon.width * scale).roundToInt().coerceAtLeast(1)
