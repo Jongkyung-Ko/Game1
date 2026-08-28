@@ -51,13 +51,16 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 - 용병은 여러 명 고용할 수 있지만 Status에서 최대 2명만 원정대로 선택합니다.
 - 선택한 용병만 마을과 각 장소 상단 그림에 등장하고 던전 전투력에 반영됩니다.
 
-## APK 다운로드
+## APK 다운로드 (최신: v0.4.41)
 
-최신 설치 파일은 [Releases](https://github.com/Jongkyung-Ko/Game1/releases) 에서 받을 수 있습니다.
+바로 설치할 파일: [MedievalVillage-v0.4.41-debug.apk](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.41/MedievalVillage-v0.4.41-debug.apk)
 
-1. Assets 의 `MedievalVillage-vX.Y.Z-debug.apk` 다운로드
+이전 버전은 [Releases](https://github.com/Jongkyung-Ko/Game1/releases) 에서 받을 수 있습니다.
+
+1. 위 APK 를 폰으로 다운로드
 2. 폰 **설정 > 보안** 에서 알 수 없는 앱 설치 허용
-3. APK 를 열어 설치 → 앱 이름 **중세마을 이야기**
+3. APK 를 열어 설치 → 앱 이름 **중세마을 v0.4.41**
+4. 예전 빌드와 패키지명이 다르므로 기존 앱을 지울 필요는 없습니다
 
 `v*` 태그를 푸시하면 GitHub Actions 가 자동으로 APK 를 빌드해 Release Assets 에 올립니다.
 
@@ -67,14 +70,12 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 2. `File > Open` 으로 이 폴더를 엽니다
 3. Gradle Sync가 끝나면 (SDK·Gradle 자동 다운로드) 상단 `Run ▶` 실행
 
-명령줄에서 빌드하려면 JDK 17과 Android SDK 34가 필요합니다.
+명령줄에서 빌드하려면 JDK 17과 Android SDK 34가 필요합니다. Gradle Wrapper(`./gradlew`)가 포함되어 있습니다.
 
 ```bash
 ./gradlew assembleDebug
+# APK: app/build/outputs/apk/debug/app-debug.apk
 ```
-
-> `gradle/wrapper/gradle-wrapper.jar` 는 저장소에 포함되어 있지 않습니다.
-> Android Studio가 첫 Sync 때 생성하며, 직접 만들려면 `gradle wrapper` 를 한 번 실행하세요.
 
 ## 프로젝트 구조
 
