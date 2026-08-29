@@ -37,6 +37,15 @@ if [[ -z "$PKG" ]]; then
   PKG="$(grep -oP 'applicationId\s*=\s*"\K[^"]+' "$ROOT/app/build.gradle.kts" | head -1)"
 fi
 
+"$ADB" -s "$SERIAL" shell settings put global airplane_mode_on 1 >/dev/null || true
+"$ADB" -s "$SERIAL" shell settings put system screen_off_timeout 2147483647 >/dev/null || true
+"$ADB" -s "$SERIAL" shell input keyevent KEYCODE_WAKEUP >/dev/null || true
 "$ADB" -s "$SERIAL" shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
+# Software-emulated first boots often raise a system ANR over the game.
+# Tap the lower "Wait" row a few times so MainActivity can take focus.
+for _ in 1 2 3; do
+  "$ADB" -s "$SERIAL" shell input tap 360 820 >/dev/null || true
+  sleep 1
+done
 echo "emulator-run-apk: launched $PKG from $APK on $SERIAL"
 echo "emulator-run-apk: optional mirror: scripts/emulator-show.sh"

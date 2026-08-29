@@ -23,10 +23,11 @@ if ! xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v scrcpy >/dev/null 2>&1; then
-  echo "emulator-show: installing scrcpy"
-  sudo apt-get update -qq
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq scrcpy
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if command -v scrcpy >/dev/null 2>&1; then
+  if scrcpy -s "$SERIAL" --stay-awake --window-title "Medieval Village emulator" --max-fps 15 --force-adb-forward; then
+    exit 0
+  fi
+  echo "emulator-show: scrcpy failed (software AVDs often lack a hardware encoder). Using screenshot mirror."
 fi
-
-exec scrcpy -s "$SERIAL" --stay-awake --turn-screen-on --window-title "Medieval Village emulator"
+exec python3 "$ROOT/scripts/emulator-mirror.py"
