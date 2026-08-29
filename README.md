@@ -84,7 +84,7 @@ Android SDK 34와 `medieval` AVD가 있으면 명령줄만으로 디버그 APK�
 ```bash
 scripts/emulator-install.sh          # SDK 패키지 + AVD (한 번만)
 scripts/emulator-run-apk.sh          # 부팅 → 설치 → 실행
-# 화면 미러 (VNC DISPLAY=:1)
+# 화면 미러 (VNC DISPLAY=:1). scrcpy가 안 되면 클릭 전달 스크린샷 미러로 넘어갑니다.
 scripts/emulator-show.sh
 ```
 
