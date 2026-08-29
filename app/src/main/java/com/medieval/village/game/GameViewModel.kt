@@ -81,6 +81,27 @@ fun PlaceId?.exploreBiome(): ExploreBiome? = when (this) {
 /** 도보 탐험 지역(던전·숲·사막·빙하) 여부 */
 fun PlaceId?.isExplorePlace(): Boolean = exploreBiome() != null
 
+/** 10층 단위 클리어 후 재진입 시 출발 층 선택 */
+data class ExploreFloorChoice(
+    val placeId: PlaceId,
+    val biome: ExploreBiome,
+    val checkpoint: Int,
+    val title: String,
+    val floorWord: String,
+)
+
+fun ExploreBiome.floorLabel(n: Int): String = when (this) {
+    ExploreBiome.FOREST, ExploreBiome.DESERT, ExploreBiome.GLACIER -> "${n}지대"
+    ExploreBiome.DUNGEON, ExploreBiome.CASTLE -> "${n}층"
+}
+
+/** 옛 세이브는 도달 깊이에서 10층 단위를 복원한다. */
+private fun checkpointOrDepth(stored: Int, depth: Int): Int {
+    val fromStored = (stored / 10) * 10
+    val fromDepth = (depth / 10) * 10
+    return maxOf(fromStored, fromDepth)
+}
+
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
@@ -154,6 +175,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     var currentPlace by mutableStateOf<PlaceId?>(PlaceId.HOME)
         private set
     var menuTab by mutableStateOf(MenuTab.NONE)
+
+    /** 탐험 입구에서 1층/클리어 층 선택 대기 */
+    var pendingExploreChoice by mutableStateOf<ExploreFloorChoice?>(null)
+        private set
 
     /** 현재 머무는 정착지(마을) */
     var currentSettlement by mutableStateOf(SettlementId.OAKHAVEN)
@@ -412,6 +437,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 put("glacierDepth", player.glacierDepth)
                 put("castleDepth", player.castleDepth)
                 put("castleCleared", player.castleCleared)
+                put("dungeonCleared", player.dungeonCleared)
+                put("forestCleared", player.forestCleared)
+                put("desertCleared", player.desertCleared)
+                put("glacierCleared", player.glacierCleared)
+                put("castleFloorCleared", player.castleFloorCleared)
             })
             put("inventory", JSONArray().apply {
                 inventory.forEach { entry ->
@@ -494,6 +524,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         skillMapQueue.clear()
         specialCooldown = 0f
         specialReady = true
+        pendingExploreChoice = null
         log.clear()
 
         val p = json.getJSONObject("player")
@@ -521,6 +552,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             glacierDepth = p.optInt("glacierDepth", 0),
             castleDepth = p.optInt("castleDepth", 0),
             castleCleared = p.optBoolean("castleCleared", false),
+            dungeonCleared = checkpointOrDepth(p.optInt("dungeonCleared", 0), p.optInt("dungeonDepth", 0)),
+            forestCleared = checkpointOrDepth(p.optInt("forestCleared", 0), p.optInt("forestDepth", 0)),
+            desertCleared = checkpointOrDepth(p.optInt("desertCleared", 0), p.optInt("desertDepth", 0)),
+            glacierCleared = checkpointOrDepth(p.optInt("glacierCleared", 0), p.optInt("glacierDepth", 0)),
+            castleFloorCleared = checkpointOrDepth(
+                p.optInt("castleFloorCleared", 0),
+                p.optInt("castleDepth", 0),
+            ).let { if (p.optBoolean("castleCleared", false)) it.coerceAtLeast(10) else it },
         )
 
         inventory.clear()
@@ -650,6 +689,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         specialCooldown = 0f
         specialReady = true
         specialSkillRevision = 0
+        pendingExploreChoice = null
         ensureActorSkillState(HERO_SKILL_KEY)
         log.clear()
         path.clear()
@@ -740,6 +780,72 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (frontIndex <= 0) null else activeParty.getOrNull(frontIndex - 1)
 
     fun frontActorName(): String = frontMercenary()?.name ?: player.name
+
+    fun clearedCheckpoint(biome: ExploreBiome): Int = when (biome) {
+        ExploreBiome.DUNGEON -> player.dungeonCleared
+        ExploreBiome.FOREST -> player.forestCleared
+        ExploreBiome.DESERT -> player.desertCleared
+        ExploreBiome.GLACIER -> player.glacierCleared
+        ExploreBiome.CASTLE -> player.castleFloorCleared
+    }
+
+    private fun frontWeapon(): Item? {
+        val merc = frontMercenary()
+        return if (merc != null) merc.equipment[ItemType.WEAPON]?.item
+        else equipment[ItemType.WEAPON]?.item
+    }
+
+    private fun ownsItem(id: String): Boolean =
+        inventory.any { it.item.id == id } ||
+            equipment.values.any { it.item.id == id } ||
+            party.any { merc -> merc.equipment.values.any { it.item.id == id } }
+
+    private fun applyOnHitWeaponEffects() {
+        val weapon = frontWeapon() ?: return
+        if (weapon.lifestealHp > 0) {
+            healFront(weapon.lifestealHp)
+            say("${weapon.name}이(가) 생기를 빨아들인다! HP +${weapon.lifestealHp}")
+        }
+        if (weapon.onHitMpChance > 0 && weapon.onHitMp > 0 && Random.nextInt(100) < weapon.onHitMpChance) {
+            player = player.copy(mp = (player.mp + weapon.onHitMp).coerceAtMost(player.maxMp))
+            say("${weapon.name}에서 마력이 스며든다! MP +${weapon.onHitMp}")
+        }
+    }
+
+    private fun healFront(amount: Int) {
+        val merc = frontMercenary()
+        if (merc != null) {
+            val cur = mercHp[merc.id] ?: merc.maxHp
+            mercHp[merc.id] = (cur + amount).coerceAtMost(merc.maxHp)
+        } else {
+            player = player.copy(hp = (player.hp + amount).coerceAtMost(player.maxHp))
+        }
+    }
+
+    private fun markCheckpointCleared(biome: ExploreBiome, floor: Int) {
+        val checkpoint = (floor / 10) * 10
+        if (checkpoint < 10) return
+        player = when (biome) {
+            ExploreBiome.DUNGEON -> player.copy(dungeonCleared = maxOf(player.dungeonCleared, checkpoint))
+            ExploreBiome.FOREST -> player.copy(forestCleared = maxOf(player.forestCleared, checkpoint))
+            ExploreBiome.DESERT -> player.copy(desertCleared = maxOf(player.desertCleared, checkpoint))
+            ExploreBiome.GLACIER -> player.copy(glacierCleared = maxOf(player.glacierCleared, checkpoint))
+            ExploreBiome.CASTLE -> player.copy(castleFloorCleared = maxOf(player.castleFloorCleared, checkpoint))
+        }
+    }
+
+    private fun grantMidBossRelic(monster: DungeonMonster, floor: Int) {
+        val relic = ItemCatalog.relicForBossKind(monster.kind) ?: return
+        if (ownsItem(relic.id)) {
+            val bonus = 140 + floor * 10
+            player = player.copy(gold = player.gold + bonus)
+            say("이미 ${relic.name}을(를) 가지고 있어 잔해를 금화로 바꿨다. (+${bonus}G)")
+            return
+        }
+        addItem(relic)
+        say("중간 보스의 정수에서 특수 무기 『${relic.name}』을(를) 손에 넣었다!")
+        say(relic.desc)
+    }
 
     fun mercCurrentHp(merc: Mercenary): Int = mercHp[merc.id] ?: merc.maxHp
 
@@ -1034,8 +1140,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             pubSpeakerId = null
         }
         if (id.isExplorePlace()) {
-            enterExploreFloor(1)
+            val biome = id.exploreBiome()
+            val cleared = biome?.let { clearedCheckpoint(it) } ?: 0
+            if (biome != null && cleared >= 10) {
+                pendingExploreChoice = ExploreFloorChoice(
+                    placeId = id,
+                    biome = biome,
+                    checkpoint = cleared,
+                    title = placeOf(id).name,
+                    floorWord = biome.floorLabel(cleared),
+                )
+                dungeonFloor = null
+                dungeonFloorNumber = 0
+            } else {
+                pendingExploreChoice = null
+                enterExploreFloor(1)
+            }
         } else {
+            pendingExploreChoice = null
             resetPartyTrail(pubHeroX, pubHeroY)
         }
         emitSfx("door")
@@ -1043,6 +1165,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun leavePlace() {
+        pendingExploreChoice = null
         val id = currentPlace ?: return
         val place = placeOf(id)
         heroX = place.doorX
@@ -2247,8 +2370,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         // 한 번 맞은 적은 끝까지 추격한다
         monster.enraged = true
         applyKnockback(monster, knockDx, knockDy)
-        val mitigated = (damage - monster.armor).coerceAtLeast(1)
+        val bonus = frontWeapon()?.onHitBonusDamage ?: 0
+        val mitigated = (damage + bonus - monster.armor).coerceAtLeast(1)
         monster.hp -= mitigated
+        applyOnHitWeaponEffects()
         if (monster.hp > 0) {
             val armorNote = if (monster.armor > 0) " · 방어 -${monster.armor}" else ""
             say("${monster.name}에게 ${mitigated} 피해! (HP ${monster.hp}/${monster.maxHp}$armorNote)")
@@ -2289,6 +2414,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val exp = ((if (wild) 16 else 20) + floor * (if (wild) 10 else 12)) * bossMult
         if (monster.isBoss) {
             say("보스 ${monster.name}을(를) 쓰러뜨렸다! (+${gold}G, EXP +$exp)")
+            markCheckpointCleared(biome, floor)
+            grantMidBossRelic(monster, floor)
         } else {
             say("${monster.name}을(를) 쓰러뜨렸다! (+${gold}G, EXP +$exp)")
         }
@@ -2357,6 +2484,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         player = player.copy(
             castleCleared = true,
             castleDepth = CastleFactory.MAX_FLOOR,
+            castleFloorCleared = maxOf(player.castleFloorCleared, CastleFactory.MAX_FLOOR),
         )
         clearDungeonState()
         path.clear()
@@ -2383,7 +2511,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         dungeonFloor = map.copy(monsters = map.monsters.toMutableList())
     }
 
-    private fun enterExploreFloor(floor: Int) {
+    private fun enterExploreFloor(floor: Int, skipClearedBoss: Boolean = false) {
         val biome = currentBiome()
         val map = when (biome) {
             ExploreBiome.FOREST -> ForestFactory.generate(floor)
@@ -2392,10 +2520,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             ExploreBiome.DUNGEON -> DungeonFactory.generate(floor)
             ExploreBiome.CASTLE -> CastleFactory.generate(floor)
         }
+        if (skipClearedBoss) {
+            map.monsters.removeAll { it.isBoss }
+        }
         dungeonFloor = map
         dungeonFloorNumber = floor
-        dungeonHeroX = map.spawnX
-        dungeonHeroY = map.spawnY
+        dungeonHeroX = if (skipClearedBoss) map.stairsDownX else map.spawnX
+        dungeonHeroY = if (skipClearedBoss) map.stairsDownY else map.spawnY
         dungeonWalking = false
         dungeonTarget = null
         pendingDungeonMonster = null
@@ -2450,9 +2581,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
                 say("─── 지하 ${floor}층 · 오염된 통로 ───")
                 when {
-                    DungeonFactory.isBossFloor(floor) -> {
+                    DungeonFactory.isBossFloor(floor) && !skipClearedBoss -> {
                         val bossName = DungeonFactory.bossForFloor(floor).second
                         say("이 층의 주인이 깨어 있다 — 보스 『$bossName』. 하층 계단 근처를 경계하라.")
+                    }
+                    DungeonFactory.isBossFloor(floor) && skipClearedBoss -> {
+                        say("이미 쓰러뜨린 층의 심층 계단 앞에 섰다.")
                     }
                     floor == 1 -> say("한때 포도주 보관소와 하수도였던 길이 좀비의 숨결로 가득하다.")
                     else -> say("더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다.")
@@ -2475,7 +2609,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 탐험 화면 진입 시 맵이 없으면 즉시 생성한다. */
     fun ensureDungeonLoaded() {
+        if (pendingExploreChoice != null) return
         if (dungeonFloor == null) enterExploreFloor(1)
+    }
+
+    fun chooseExploreFloor(startFromOne: Boolean) {
+        val choice = pendingExploreChoice ?: return
+        pendingExploreChoice = null
+        val dest = if (startFromOne) 1 else choice.checkpoint.coerceAtLeast(1)
+        enterExploreFloor(dest, skipClearedBoss = dest > 1)
+        if (dest > 1) {
+            say("이전에 쓰러뜨린 ${choice.floorWord}으로 바로 내려왔다. 심층 계단에서 더 들어갈 수 있다.")
+        }
+    }
+
+    fun cancelExploreFloorChoice() {
+        if (pendingExploreChoice == null) return
+        leavePlace()
     }
 
     fun walkInDungeon(x: Float, y: Float) {

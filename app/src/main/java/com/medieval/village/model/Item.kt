@@ -39,6 +39,14 @@ data class Item(
     val healMp: Int = 0,
     val desc: String = "",
     val weaponStyle: WeaponStyle = WeaponStyle.MELEE,
+    /** 적중 시 공격자가 회복하는 HP */
+    val lifestealHp: Int = 0,
+    /** 적중 시 MP 회복 확률 (0–100) */
+    val onHitMpChance: Int = 0,
+    /** 적중 시 회복하는 MP (확률 성공 시) */
+    val onHitMp: Int = 0,
+    /** 적중 시 방어 계산 전에 더하는 추가 피해 */
+    val onHitBonusDamage: Int = 0,
 ) {
     val isEquipment: Boolean get() = type != ItemType.CONSUMABLE
     /** 되팔 때 가격 */
@@ -147,8 +155,76 @@ object ItemCatalog {
     /** 북쪽 빙하 전리품 */
     val glacierLoot = listOf(potion, hiPotion, ether, portalStone, ironSword, hunterBow, chainMail, manaAmulet, luckyRing)
 
-    val all: List<Item> = (generalGoods + weaponGoods + dungeonLoot + forestLoot + desertLoot + glacierLoot)
-        .distinctBy { it.id }
+    // 중간 보스 전용 특수 무기 — 상점 판매 없음
+    val vampireBlade = Item(
+        "vampire_blade", "흡혈검", ItemType.WEAPON, 980, atk = 22,
+        desc = "지하 감시자의 검. 때릴 때마다 HP를 8 흡수한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        lifestealHp = 8,
+    )
+    val plagueGreatsword = Item(
+        "plague_greatsword", "역병의 대검", ItemType.WEAPON, 1120, atk = 26,
+        desc = "역병 흉물의 살점 검. 적중 시 추가 피해를 주고 HP를 5 흡수한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        lifestealHp = 5,
+        onHitBonusDamage = 6,
+    )
+    val magicSword = Item(
+        "magic_sword", "매직소드", ItemType.WEAPON, 1080, atk = 20,
+        desc = "리치의 마력 검. 때릴 때마다 35% 확률로 MP를 6 회복한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        onHitMpChance = 35,
+        onHitMp = 6,
+    )
+    val guardianFang = Item(
+        "guardian_fang", "수호자의 송곳니", ItemType.WEAPON, 940, atk = 21,
+        desc = "숲의 수호자가 남긴 이빨. 때릴 때마다 HP를 10 흡수한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        lifestealHp = 10,
+    )
+    val scorpionFangBlade = Item(
+        "scorpion_fang_blade", "전갈왕의 독월도", ItemType.WEAPON, 1000, atk = 23,
+        desc = "모래폭풍의 독침을 벼린 도. 적중 시 추가 피해를 주고 HP를 4 흡수한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        lifestealHp = 4,
+        onHitBonusDamage = 8,
+    )
+    val frostMagicSword = Item(
+        "frost_magic_sword", "서리 마력검", ItemType.WEAPON, 1060, atk = 19,
+        desc = "빙하의 군주가 품던 검. 때릴 때마다 40% 확률로 MP를 8 회복한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        onHitMpChance = 40,
+        onHitMp = 8,
+    )
+    val soulKingBlade = Item(
+        "soul_king_blade", "해골왕의 영혼검", ItemType.WEAPON, 1280, atk = 28,
+        desc = "해방된 왕관의 검. 때릴 때마다 HP를 6 흡수하고 25% 확률로 MP를 5 회복한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        lifestealHp = 6,
+        onHitMpChance = 25,
+        onHitMp = 5,
+    )
+
+    val bossRelics = listOf(
+        vampireBlade, plagueGreatsword, magicSword,
+        guardianFang, scorpionFangBlade, frostMagicSword, soulKingBlade,
+    )
+
+    val all: List<Item> = (
+        generalGoods + weaponGoods + dungeonLoot + forestLoot + desertLoot + glacierLoot + bossRelics
+        ).distinctBy { it.id }
 
     fun byId(id: String): Item? = all.firstOrNull { it.id == id }
+
+    /** 중간 보스 kind → 전용 특수 무기 */
+    fun relicForBossKind(kind: String): Item? = when (kind) {
+        "boss_warden" -> vampireBlade
+        "boss_abomination" -> plagueGreatsword
+        "boss_lich" -> magicSword
+        "bear" -> guardianFang
+        "giant_scorpion" -> scorpionFangBlade
+        "polar_bear" -> frostMagicSword
+        "boss_skel_king" -> soulKingBlade
+        else -> null
+    }
 }

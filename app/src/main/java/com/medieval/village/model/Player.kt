@@ -31,6 +31,12 @@ data class Player(
     val castleDepth: Int = 0,
     /** Gray Castle 10층 클리어 — White Castle로 해방 */
     val castleCleared: Boolean = false,
+    /** 중간 보스를 쓰러뜨린 최고 10층 단위 (재진입 시 바로 내려갈 수 있는 층) */
+    val dungeonCleared: Int = 0,
+    val forestCleared: Int = 0,
+    val desertCleared: Int = 0,
+    val glacierCleared: Int = 0,
+    val castleFloorCleared: Int = 0,
 ) {
     val expToNext: Int
         get() {

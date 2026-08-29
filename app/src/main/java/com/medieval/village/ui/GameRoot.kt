@@ -119,11 +119,13 @@ fun GameRoot(modifier: Modifier = Modifier) {
 
     BackHandler(
         enabled = vm.levelUpSkillOffer != null ||
+            vm.pendingExploreChoice != null ||
             vm.menuTab != MenuTab.NONE ||
             vm.scene == Scene.INTERIOR,
     ) {
         when {
             vm.levelUpSkillOffer != null -> vm.dismissLevelUpSkillOffer()
+            vm.pendingExploreChoice != null -> vm.cancelExploreFloorChoice()
             vm.menuTab != MenuTab.NONE -> vm.menuTab = MenuTab.NONE
             vm.interiorPanelOpen -> vm.closeInteriorPanel()
             vm.scene == Scene.INTERIOR && vm.currentPlace.isExplorePlace() -> vm.escapeDungeon()
@@ -152,6 +154,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
             MenuOverlay(vm)
             WorldMapOverlay(vm)
             LevelUpSkillOverlay(vm)
+            ExploreFloorChoiceOverlay(vm)
         }
     }
 }

@@ -150,10 +150,10 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     Spacer(Modifier.height(10.dp))
     SectionTitle("기록")
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip("좀비 둥지 ${p.dungeonDepth}층")
-        Chip("동쪽 숲 ${p.forestDepth}지대")
-        Chip("남쪽 사막 ${p.desertDepth}지대")
-        Chip("북쪽 빙하 ${p.glacierDepth}지대")
+        Chip("좀비 둥지 ${p.dungeonDepth}층" + if (p.dungeonCleared >= 10) " · 클리어 ${p.dungeonCleared}" else "")
+        Chip("동쪽 숲 ${p.forestDepth}지대" + if (p.forestCleared >= 10) " · 클리어 ${p.forestCleared}" else "")
+        Chip("남쪽 사막 ${p.desertDepth}지대" + if (p.desertCleared >= 10) " · 클리어 ${p.desertCleared}" else "")
+        Chip("북쪽 빙하 ${p.glacierDepth}지대" + if (p.glacierCleared >= 10) " · 클리어 ${p.glacierCleared}" else "")
         Chip(
             if (p.castleCleared) "White Castle 해방"
             else "Gray Castle ${p.castleDepth}층"
@@ -449,7 +449,7 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
     Spacer(Modifier.height(12.dp))
     SectionTitle("게임 정보")
     Text(
-        "중세마을 이야기 v0.4.41\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
+        "중세마을 이야기 v0.4.42\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
         color = Palette.ParchmentDim,
         fontSize = 12.sp,
         lineHeight = 17.sp
