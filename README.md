@@ -77,6 +77,19 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 # APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
+### 에뮬레이터에서 APK 실행
+
+Android SDK 34와 `medieval` AVD가 있으면 명령줄만으로 디버그 APK를 띄울 수 있습니다.
+
+```bash
+scripts/emulator-install.sh          # SDK 패키지 + AVD (한 번만)
+scripts/emulator-run-apk.sh          # 부팅 → 설치 → 실행
+# 화면 미러 (VNC DISPLAY=:1)
+scripts/emulator-show.sh
+```
+
+일부 Cloud Agent 호스트는 `/dev/kvm`이 있어도 중첩 KVM에서 게스트 vCPU 생성이 실패합니다. 그 경우 스크립트가 소프트웨어 가속(`-accel off`)으로 넘어갑니다. TCG 부팅은 수 분이 걸릴 수 있습니다. 로컬 PC에서 KVM이 정상이면 `EMULATOR_ACCEL=on scripts/emulator-start.sh` 로 강제할 수 있습니다.
+
 ## 프로젝트 구조
 
 ```
