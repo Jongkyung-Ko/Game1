@@ -19,6 +19,9 @@ import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.EquippedItem
 import com.medieval.village.model.ForestFactory
 import com.medieval.village.model.GlacierFactory
+import com.medieval.village.model.IglooFactory
+import com.medieval.village.model.SeaCaveFactory
+import com.medieval.village.model.WinterKeepFactory
 import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InteriorNpcKind
@@ -65,7 +68,7 @@ enum class Scene { VILLAGE, INTERIOR }
 enum class MenuTab { NONE, STATUS, INVENTORY, EQUIPMENT, SYSTEM, WORLD_MAP }
 
 /** 도보 탐험 바이옴 */
-enum class ExploreBiome { DUNGEON, FOREST, DESERT, GLACIER, CASTLE }
+enum class ExploreBiome { DUNGEON, FOREST, DESERT, GLACIER, CASTLE, IGLOO, SEA, WINTER_KEEP }
 
 private data class Waypoint(val x: Float, val y: Float)
 
@@ -75,6 +78,22 @@ fun PlaceId?.exploreBiome(): ExploreBiome? = when (this) {
     PlaceId.SOUTH_DESERT -> ExploreBiome.DESERT
     PlaceId.NORTH_GLACIER -> ExploreBiome.GLACIER
     PlaceId.GRAY_CASTLE -> ExploreBiome.CASTLE
+    PlaceId.IGLOO_GLACIER -> ExploreBiome.IGLOO
+    PlaceId.SEA_CAVE -> ExploreBiome.SEA
+    PlaceId.WINTER_KEEP -> ExploreBiome.WINTER_KEEP
+    else -> null
+}
+
+fun ExploreBiome.isWild(): Boolean = when (this) {
+    ExploreBiome.FOREST, ExploreBiome.DESERT, ExploreBiome.GLACIER, ExploreBiome.IGLOO -> true
+    else -> false
+}
+
+fun ExploreBiome.storyMaxFloor(): Int? = when (this) {
+    ExploreBiome.CASTLE -> CastleFactory.MAX_FLOOR
+    ExploreBiome.IGLOO -> IglooFactory.MAX_FLOOR
+    ExploreBiome.SEA -> SeaCaveFactory.MAX_FLOOR
+    ExploreBiome.WINTER_KEEP -> WinterKeepFactory.MAX_FLOOR
     else -> null
 }
 
@@ -91,8 +110,8 @@ data class ExploreFloorChoice(
 )
 
 fun ExploreBiome.floorLabel(n: Int): String = when (this) {
-    ExploreBiome.FOREST, ExploreBiome.DESERT, ExploreBiome.GLACIER -> "${n}지대"
-    ExploreBiome.DUNGEON, ExploreBiome.CASTLE -> "${n}층"
+    ExploreBiome.FOREST, ExploreBiome.DESERT, ExploreBiome.GLACIER, ExploreBiome.IGLOO -> "${n}지대"
+    ExploreBiome.DUNGEON, ExploreBiome.CASTLE, ExploreBiome.SEA, ExploreBiome.WINTER_KEEP -> "${n}층"
 }
 
 /** 옛 세이브는 도달 깊이에서 10층 단위를 복원한다. */
@@ -184,7 +203,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     var currentSettlement by mutableStateOf(SettlementId.OAKHAVEN)
         private set
 
-    val settlement: Settlement get() = Settlements.of(currentSettlement, player.castleCleared)
+    val settlement: Settlement get() = Settlements.of(currentSettlement, player.worldFlags)
 
     fun placeOf(id: PlaceId): Place =
         settlement.ofOrNull(id) ?: Settlements.oakhaven.of(id)
@@ -396,7 +415,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun buildSaveJson(): JSONObject {
-        val settlement = Settlements.of(currentSettlement, player.castleCleared)
+        val settlement = Settlements.of(currentSettlement, player.worldFlags)
         return JSONObject().apply {
             put("version", 1)
             put("savedAtMs", System.currentTimeMillis())
@@ -442,6 +461,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 put("desertCleared", player.desertCleared)
                 put("glacierCleared", player.glacierCleared)
                 put("castleFloorCleared", player.castleFloorCleared)
+                put("iglooCleared", player.iglooCleared)
+                put("iglooDepth", player.iglooDepth)
+                put("iglooFloorCleared", player.iglooFloorCleared)
+                put("seasideCleared", player.seasideCleared)
+                put("seasideDepth", player.seasideDepth)
+                put("seasideFloorCleared", player.seasideFloorCleared)
+                put("winterCleared", player.winterCleared)
+                put("winterDepth", player.winterDepth)
+                put("winterFloorCleared", player.winterFloorCleared)
+                put("bgmVolume", player.bgmVolume.toDouble())
+                put("sfxVolume", player.sfxVolume.toDouble())
             })
             put("inventory", JSONArray().apply {
                 inventory.forEach { entry ->
@@ -560,6 +590,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 p.optInt("castleFloorCleared", 0),
                 p.optInt("castleDepth", 0),
             ).let { if (p.optBoolean("castleCleared", false)) it.coerceAtLeast(10) else it },
+            iglooCleared = p.optBoolean("iglooCleared", false),
+            iglooDepth = p.optInt("iglooDepth", 0),
+            iglooFloorCleared = checkpointOrDepth(p.optInt("iglooFloorCleared", 0), p.optInt("iglooDepth", 0))
+                .let { if (p.optBoolean("iglooCleared", false)) it.coerceAtLeast(20) else it },
+            seasideCleared = p.optBoolean("seasideCleared", false),
+            seasideDepth = p.optInt("seasideDepth", 0),
+            seasideFloorCleared = checkpointOrDepth(p.optInt("seasideFloorCleared", 0), p.optInt("seasideDepth", 0))
+                .let { if (p.optBoolean("seasideCleared", false)) it.coerceAtLeast(20) else it },
+            winterCleared = p.optBoolean("winterCleared", false),
+            winterDepth = p.optInt("winterDepth", 0),
+            winterFloorCleared = checkpointOrDepth(p.optInt("winterFloorCleared", 0), p.optInt("winterDepth", 0))
+                .let { if (p.optBoolean("winterCleared", false)) it.coerceAtLeast(20) else it },
+            bgmVolume = p.optDouble("bgmVolume", 1.0).toFloat().coerceIn(0f, 1f),
+            sfxVolume = p.optDouble("sfxVolume", 1.0).toFloat().coerceIn(0f, 1f),
         )
 
         inventory.clear()
@@ -754,7 +798,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         menuTab = MenuTab.NONE
         resetPartyTrail(heroX, heroY)
         emitSfx("door")
-        val s = Settlements.of(id, player.castleCleared)
+        val s = Settlements.of(id, player.worldFlags)
         if (moved) {
             say("${s.nameKo}(${s.nameEn})에 도착했다. ${s.blurb}")
         } else {
@@ -763,6 +807,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ---------------------------------------------------------------- 스탯 계산
+
+    fun setBgmVolume(value: Float) {
+        player = player.copy(bgmVolume = value.coerceIn(0f, 1f))
+    }
+
+    fun setSfxVolume(value: Float) {
+        player = player.copy(sfxVolume = value.coerceIn(0f, 1f))
+    }
 
     val equipAtk: Int get() = equipment.values.sumOf { it.atk }
     val equipDef: Int get() = equipment.values.sumOf { it.def }
@@ -787,6 +839,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         ExploreBiome.DESERT -> player.desertCleared
         ExploreBiome.GLACIER -> player.glacierCleared
         ExploreBiome.CASTLE -> player.castleFloorCleared
+        ExploreBiome.IGLOO -> player.iglooFloorCleared
+        ExploreBiome.SEA -> player.seasideFloorCleared
+        ExploreBiome.WINTER_KEEP -> player.winterFloorCleared
     }
 
     private fun frontWeapon(): Item? {
@@ -831,6 +886,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             ExploreBiome.DESERT -> player.copy(desertCleared = maxOf(player.desertCleared, checkpoint))
             ExploreBiome.GLACIER -> player.copy(glacierCleared = maxOf(player.glacierCleared, checkpoint))
             ExploreBiome.CASTLE -> player.copy(castleFloorCleared = maxOf(player.castleFloorCleared, checkpoint))
+            ExploreBiome.IGLOO -> player.copy(iglooFloorCleared = maxOf(player.iglooFloorCleared, checkpoint))
+            ExploreBiome.SEA -> player.copy(seasideFloorCleared = maxOf(player.seasideFloorCleared, checkpoint))
+            ExploreBiome.WINTER_KEEP -> player.copy(winterFloorCleared = maxOf(player.winterFloorCleared, checkpoint))
         }
     }
 
@@ -1191,7 +1249,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 실내 입장 시 NPC들이 번갈아 인사한다. */
     private fun greetInteriorNpcs(id: PlaceId) {
-        val npcs = InteriorNpcCatalog.forPlace(id, currentSettlement, player.castleCleared)
+        val npcs = InteriorNpcCatalog.forPlace(id, currentSettlement, player.worldFlags)
         if (npcs.isEmpty()) {
             say(greetingOf(id))
             return
@@ -1212,7 +1270,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val npc = InteriorNpcCatalog.forPlace(
             currentPlace ?: return,
             currentSettlement,
-            player.castleCleared,
+            player.worldFlags,
         ).firstOrNull { it.id == npcId }
             ?: InteriorNpcCatalog.all.firstOrNull { it.id == npcId }
             ?: return
@@ -1225,7 +1283,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun greetingOf(id: PlaceId): String {
-        RegionDialogue.placeGreeting(currentSettlement, player.castleCleared, id)?.let { return it }
+        RegionDialogue.placeGreeting(currentSettlement, player.worldFlags, id)?.let { return it }
         return when (id) {
             PlaceId.HOME -> "창문 너머로도 하수구 냄새가 스며든다. 그래도 여기는 나의 오두막이다."
             PlaceId.SHOP -> "\"어서 오세요… 횃불이랑 붕대는 늘 비치해 둡니다. 요즘엔 필수죠.\""
@@ -1237,6 +1295,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             PlaceId.ARENA -> "\"지상에서라도 칼날을 갈아야지. 지하에선 실수가 곧 죽음이야.\""
             PlaceId.DUNGEON -> "축축한 하수도 바람이 얼굴을 스친다. 저주의 둥지가 발밑에서 숨 쉰다."
             PlaceId.GRAY_CASTLE -> "회색 돌문이 열린다. 해골과 유령의 숨결이 성채 심층에서 흘러나온다."
+            PlaceId.IGLOO_GLACIER -> "하얀 빙벽이 열린다. 지하 깊숙이 얼음북극곰의 숨결이 얼어붙어 있다."
+            PlaceId.SEA_CAVE -> "짠 바람이 동굴을 훑는다. 해일 너머에서 대왕문어가 꿈틀거린다."
+            PlaceId.WINTER_KEEP -> "성 지하로 내려가는 돌계단. 납치된 아이들의 울음이 메아리친다."
             PlaceId.EAST_FOREST -> "나뭇잎 사이로 바람이 스친다. 동쪽으로 갈수록 짐승의 울음이 가까워진다."
             PlaceId.SOUTH_DESERT -> "뜨거운 모래바람이 얼굴을 때린다. 전갈과 낙타거미가 모래 아래 숨는다."
             PlaceId.NORTH_GLACIER -> "칼바람과 함께 하얀 침묵이 내려앉는다. 북극의 짐승들이 얼음 너머에서 지켜본다."
@@ -2408,7 +2469,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun rewardMonsterKill(monster: DungeonMonster) {
         val floor = dungeonFloorNumber
         val biome = currentBiome()
-        val wild = biome != ExploreBiome.DUNGEON && biome != ExploreBiome.CASTLE
+        val wild = biome.isWild()
         val bossMult = if (monster.isBoss) 3 else 1
         val gold = ((if (wild) 14 else 18) + floor * (if (wild) 11 else 14) + Random.nextInt(0, 16)) * bossMult
         val exp = ((if (wild) 16 else 20) + floor * (if (wild) 10 else 12)) * bossMult
@@ -2426,6 +2487,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             ExploreBiome.GLACIER -> if (floor > player.glacierDepth) player = player.copy(glacierDepth = floor)
             ExploreBiome.DUNGEON -> if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
             ExploreBiome.CASTLE -> if (floor > player.castleDepth) player = player.copy(castleDepth = floor)
+            ExploreBiome.IGLOO -> if (floor > player.iglooDepth) player = player.copy(iglooDepth = floor)
+            ExploreBiome.SEA -> if (floor > player.seasideDepth) player = player.copy(seasideDepth = floor)
+            ExploreBiome.WINTER_KEEP -> if (floor > player.winterDepth) player = player.copy(winterDepth = floor)
         }
         gainExp(exp)
         gainMercExp(exp)
@@ -2437,8 +2501,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val loot = when (biome) {
                 ExploreBiome.FOREST -> ItemCatalog.forestLoot.random()
                 ExploreBiome.DESERT -> ItemCatalog.desertLoot.random()
-                ExploreBiome.GLACIER -> ItemCatalog.glacierLoot.random()
-                ExploreBiome.DUNGEON, ExploreBiome.CASTLE -> ItemCatalog.dungeonLoot.random()
+                ExploreBiome.GLACIER, ExploreBiome.IGLOO -> ItemCatalog.glacierLoot.random()
+                ExploreBiome.DUNGEON, ExploreBiome.CASTLE, ExploreBiome.SEA, ExploreBiome.WINTER_KEEP ->
+                    ItemCatalog.dungeonLoot.random()
             }
             addItem(loot)
             say(
@@ -2446,8 +2511,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     monster.isBoss -> "보스의 잔해에서 ${loot.name}을(를) 챙겼다."
                     biome == ExploreBiome.FOREST -> "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
                     biome == ExploreBiome.DESERT -> "모래 속에서 ${loot.name}을(를) 주웠다."
-                    biome == ExploreBiome.GLACIER -> "얼음 틈에서 ${loot.name}을(를) 챙겼다."
+                    biome == ExploreBiome.GLACIER || biome == ExploreBiome.IGLOO ->
+                        "얼음 틈에서 ${loot.name}을(를) 챙겼다."
                     biome == ExploreBiome.CASTLE -> "해골 더미에서 ${loot.name}을(를) 챙겼다."
+                    biome == ExploreBiome.SEA -> "바닷물 사이에서 ${loot.name}을(를) 건졌다."
+                    biome == ExploreBiome.WINTER_KEEP -> "차가운 감방에서 ${loot.name}을(를) 챙겼다."
                     else -> "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
                 }
             )
@@ -2465,32 +2533,125 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         } else {
                             "이 층의 언데드가 잠잠해졌다. 더 높은 성채로 올라가 보자."
                         }
+                    ExploreBiome.IGLOO ->
+                        if (floor >= IglooFactory.MAX_FLOOR) {
+                            "얼음북극곰이 쓰러지자 빙벽이 녹기 시작한다…"
+                        } else {
+                            "이 지대의 극지 짐승이 잠잠해졌다. 더 깊은 빙하를 찾아보자."
+                        }
+                    ExploreBiome.SEA ->
+                        if (floor >= SeaCaveFactory.MAX_FLOOR) {
+                            "대왕문어가 쓰러지자 해일이 잦아든다…"
+                        } else {
+                            "이 층의 바다 괴물이 잠잠해졌다. 더 깊은 동굴로 내려가자."
+                        }
+                    ExploreBiome.WINTER_KEEP ->
+                        if (floor >= WinterKeepFactory.MAX_FLOOR) {
+                            "납치범 두목이 쓰러지자 아이들의 목소리가 성으로 돌아온다…"
+                        } else {
+                            "이 층의 납치범이 잠잠해졌다. 더 깊은 지하로 내려가자."
+                        }
                 }
             )
-            maybeLiberateCastle()
+            maybeLiberateStory()
         }
     }
 
-    /** Gray Castle 10층을 모두 정리하면 White Castle로 해방한다. */
-    private fun maybeLiberateCastle() {
-        if (currentBiome() != ExploreBiome.CASTLE) return
-        if (dungeonFloorNumber < CastleFactory.MAX_FLOOR) return
+    /** 스토리 던전 최심층을 정리하면 해당 정착지를 해방한다. */
+    private fun maybeLiberateStory() {
         if (!mapCleared()) return
-        if (player.castleCleared) return
-        liberateCastle()
+        when (currentBiome()) {
+            ExploreBiome.CASTLE -> {
+                if (dungeonFloorNumber >= CastleFactory.MAX_FLOOR && !player.castleCleared) {
+                    finishLiberation(
+                        dest = SettlementId.GRAY_CASTLE,
+                        update = {
+                            it.copy(
+                                castleCleared = true,
+                                castleDepth = CastleFactory.MAX_FLOOR,
+                                castleFloorCleared = maxOf(it.castleFloorCleared, CastleFactory.MAX_FLOOR),
+                            )
+                        },
+                        lines = listOf(
+                            "해골 왕의 왕관이 빛과 함께 산산이 부서진다!",
+                            "저주가 풀렸다 — Gray Castle이 White Castle로 되살아난다.",
+                            "해방된 사람들이 성으로 돌아와 다시 삶을 시작한다.",
+                        ),
+                    )
+                }
+            }
+            ExploreBiome.IGLOO -> {
+                if (dungeonFloorNumber >= IglooFactory.MAX_FLOOR && !player.iglooCleared) {
+                    finishLiberation(
+                        dest = SettlementId.IGLOO,
+                        update = {
+                            it.copy(
+                                iglooCleared = true,
+                                iglooDepth = IglooFactory.MAX_FLOOR,
+                                iglooFloorCleared = maxOf(it.iglooFloorCleared, IglooFactory.MAX_FLOOR),
+                            )
+                        },
+                        lines = listOf(
+                            "얼음북극곰이 쓰러지자 북녘의 얼음 별이 빛을 잃는다!",
+                            "이글루 마을에 온기가 돌아온다. 눈밭이 녹고 풀이 돋는다.",
+                            "한때 따뜻했던 북녘이 다시 봄을 맞는다.",
+                        ),
+                    )
+                }
+            }
+            ExploreBiome.SEA -> {
+                if (dungeonFloorNumber >= SeaCaveFactory.MAX_FLOOR && !player.seasideCleared) {
+                    finishLiberation(
+                        dest = SettlementId.SEASIDE,
+                        update = {
+                            it.copy(
+                                seasideCleared = true,
+                                seasideDepth = SeaCaveFactory.MAX_FLOOR,
+                                seasideFloorCleared = maxOf(it.seasideFloorCleared, SeaCaveFactory.MAX_FLOOR),
+                            )
+                        },
+                        lines = listOf(
+                            "대왕문어가 바다 깊은 곳으로 가라앉는다!",
+                            "해일이 걷히고 바닷가 폐허가 다시 어촌의 모습을 되찾는다.",
+                            "배가 항구에 닿고, 사람들이 집으로 돌아온다.",
+                        ),
+                    )
+                }
+            }
+            ExploreBiome.WINTER_KEEP -> {
+                if (dungeonFloorNumber >= WinterKeepFactory.MAX_FLOOR && !player.winterCleared) {
+                    finishLiberation(
+                        dest = SettlementId.WINTER_CASTLE,
+                        update = {
+                            it.copy(
+                                winterCleared = true,
+                                winterDepth = WinterKeepFactory.MAX_FLOOR,
+                                winterFloorCleared = maxOf(it.winterFloorCleared, WinterKeepFactory.MAX_FLOOR),
+                            )
+                        },
+                        lines = listOf(
+                            "납치범 두목이 쓰러지자 감방의 자물쇠가 한꺼번에 풀린다!",
+                            "아이들이 성으로 돌아오고, 영원한 겨울이 녹아내린다.",
+                            "겨울성이 본디 모습으로 되살아난다.",
+                        ),
+                    )
+                }
+            }
+            else -> Unit
+        }
     }
 
-    private fun liberateCastle() {
-        player = player.copy(
-            castleCleared = true,
-            castleDepth = CastleFactory.MAX_FLOOR,
-            castleFloorCleared = maxOf(player.castleFloorCleared, CastleFactory.MAX_FLOOR),
-        )
+    private fun finishLiberation(
+        dest: SettlementId,
+        update: (Player) -> Player,
+        lines: List<String>,
+    ) {
+        player = update(player)
         clearDungeonState()
         path.clear()
         pendingEnter = null
         walking = false
-        currentSettlement = SettlementId.GRAY_CASTLE
+        currentSettlement = dest
         currentPlace = null
         scene = Scene.VILLAGE
         menuTab = MenuTab.NONE
@@ -2500,9 +2661,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         facing = Facing.DOWN
         resetPartyTrail(heroX, heroY)
         emitSfx("door")
-        say("해골 왕의 왕관이 빛과 함께 산산이 부서진다!")
-        say("저주가 풀렸다 — Gray Castle이 White Castle로 되살아난다.")
-        say("해방된 사람들이 성으로 돌아와 다시 삶을 시작한다.")
+        lines.forEach { say(it) }
     }
 
     /** 몬스터 위치/사망 등 내부 변이 후 Compose 재구성을 유도한다. */
@@ -2519,6 +2678,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             ExploreBiome.GLACIER -> GlacierFactory.generate(floor)
             ExploreBiome.DUNGEON -> DungeonFactory.generate(floor)
             ExploreBiome.CASTLE -> CastleFactory.generate(floor)
+            ExploreBiome.IGLOO -> IglooFactory.generate(floor)
+            ExploreBiome.SEA -> SeaCaveFactory.generate(floor)
+            ExploreBiome.WINTER_KEEP -> WinterKeepFactory.generate(floor)
         }
         if (skipClearedBoss) {
             map.monsters.removeAll { it.isBoss }
@@ -2604,6 +2766,42 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         say("성채가 더 깊어진다. 해골궁수의 시위 소리가 복도를 훑는다.")
                 }
             }
+            ExploreBiome.IGLOO -> {
+                if (floor > player.iglooDepth) player = player.copy(iglooDepth = floor)
+                say("─── 이글루 빙하지대 · ${floor}지대 ───")
+                when {
+                    IglooFactory.isFinalFloor(floor) ->
+                        say("지하 20층. 얼음북극곰이 얼음 별의 한기를 지키고 있다. 쓰러뜨리면 마을이 다시 따뜻해진다.")
+                    floor == 1 ->
+                        say("한때 따뜻했던 북녘. 얼음 별이 떨어진 뒤 하얀 침묵만이 남았다.")
+                    else ->
+                        say("칼바람이 더 매서워진다. 더 깊은 빙하에 얼음북극곰이 웅크리고 있다.")
+                }
+            }
+            ExploreBiome.SEA -> {
+                if (floor > player.seasideDepth) player = player.copy(seasideDepth = floor)
+                say("─── 바다 동굴 · ${floor}층 ───")
+                when {
+                    SeaCaveFactory.isFinalFloor(floor) ->
+                        say("해저 20층. 대왕문어가 해일의 핵을 움켜쥐고 있다. 쓰러뜨리면 마을이 회복된다.")
+                    floor == 1 ->
+                        say("짠 물이 발목까지 찬다. 해일로 무너진 동굴이 아래로 이어진다.")
+                    else ->
+                        say("파도 소리가 돌벽을 때린다. 대왕문어의 촉수가 더 깊숙이 꿈틀거린다.")
+                }
+            }
+            ExploreBiome.WINTER_KEEP -> {
+                if (floor > player.winterDepth) player = player.copy(winterDepth = floor)
+                say("─── 겨울성 지하 · ${floor}층 ───")
+                when {
+                    WinterKeepFactory.isFinalFloor(floor) ->
+                        say("지하 20층. 납치범 두목이 아이들을 가두고 있다. 쓰러뜨리면 성이 봄을 되찾는다.")
+                    floor == 1 ->
+                        say("성 지하의 차가운 감방. 아이들이 사라진 뒤 겨울이 내렸다.")
+                    else ->
+                        say("납치범들의 발소리가 복도를 훑는다. 더 깊은 곳에 두목이 있다.")
+                }
+            }
         }
     }
 
@@ -2653,9 +2851,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 when (currentBiome()) {
                     ExploreBiome.FOREST -> "더 깊은 숲길로 이어지는 표식 위에 서야 한다."
                     ExploreBiome.DESERT -> "더 깊은 사막길로 이어지는 표식 위에 서야 한다."
-                    ExploreBiome.GLACIER -> "더 깊은 빙하로 이어지는 표식 위에 서야 한다."
+                    ExploreBiome.GLACIER, ExploreBiome.IGLOO -> "더 깊은 빙하로 이어지는 표식 위에 서야 한다."
                     ExploreBiome.DUNGEON -> "아래층으로 이어지는 계단 위에 서야 한다."
                     ExploreBiome.CASTLE -> "더 높은 성채로 이어지는 계단 위에 서야 한다."
+                    ExploreBiome.SEA -> "더 깊은 바다 동굴로 이어지는 계단 위에 서야 한다."
+                    ExploreBiome.WINTER_KEEP -> "더 깊은 지하로 이어지는 계단 위에 서야 한다."
                 }
             )
             return
@@ -2664,10 +2864,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             say("몸 상태로는 더 들어갈 수 없다. 물약을 쓰거나 마을로 돌아가자.")
             return
         }
-        if (currentBiome() == ExploreBiome.CASTLE &&
-            dungeonFloorNumber >= CastleFactory.MAX_FLOOR
-        ) {
-            say("이곳이 Gray Castle의 최심층이다. 언데드를 모두 처치해 저주를 끊어라.")
+        val cap = currentBiome().storyMaxFloor()
+        if (cap != null && dungeonFloorNumber >= cap) {
+            say(
+                when (currentBiome()) {
+                    ExploreBiome.CASTLE -> "이곳이 Gray Castle의 최심층이다. 언데드를 모두 처치해 저주를 끊어라."
+                    ExploreBiome.IGLOO -> "이곳이 빙하지대의 최심층이다. 얼음북극곰을 쓰러뜨려 온기를 되찾아라."
+                    ExploreBiome.SEA -> "이곳이 바다 동굴의 최심층이다. 대왕문어를 쓰러뜨려 해일을 멈춰라."
+                    ExploreBiome.WINTER_KEEP -> "이곳이 겨울성 지하의 최심층이다. 납치범 두목을 쓰러뜨려 아이들을 구하라."
+                    else -> "이곳이 최심층이다. 보스를 쓰러뜨려 저주를 끊어라."
+                }
+            )
             return
         }
         emitSfx("door")
@@ -2684,9 +2891,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             when (currentBiome()) {
                 ExploreBiome.FOREST -> "마을 쪽 바람이 폐를 채운다. 숲속 짐승들은 여전히 깊은 곳에서 숨 쉰다."
                 ExploreBiome.DESERT -> "마을 쪽 공기가 폐를 채운다. 모래 아래 괴물들은 여전히 숨 쉰다."
-                ExploreBiome.GLACIER -> "마을 쪽 온기가 손을 녹인다. 극지의 짐승들은 여전히 얼음 너머에 있다."
+                ExploreBiome.GLACIER, ExploreBiome.IGLOO ->
+                    "마을 쪽 온기가 손을 녹인다. 극지의 짐승들은 여전히 얼음 너머에 있다."
                 ExploreBiome.DUNGEON -> "지상의 공기가 폐를 채운다. 저주는 아직 지하에 웅크리고 있다."
                 ExploreBiome.CASTLE -> "성문 밖 바람이 폐를 채운다. 고성의 저주는 아직 심층에 남았다."
+                ExploreBiome.SEA -> "물기 찬 바람이 폐를 채운다. 대왕문어는 아직 해저에 남았다."
+                ExploreBiome.WINTER_KEEP -> "성문 밖 눈이 얼굴을 때린다. 납치범들은 아직 지하에 있다."
             }
         )
         emitSfx("door")
@@ -2736,8 +2946,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val base = when (currentBiome()) {
             ExploreBiome.FOREST -> ItemCatalog.forestLoot
             ExploreBiome.DESERT -> ItemCatalog.desertLoot
-            ExploreBiome.GLACIER -> ItemCatalog.glacierLoot
-            ExploreBiome.DUNGEON, ExploreBiome.CASTLE -> ItemCatalog.dungeonLoot
+            ExploreBiome.GLACIER, ExploreBiome.IGLOO -> ItemCatalog.glacierLoot
+            ExploreBiome.DUNGEON, ExploreBiome.CASTLE, ExploreBiome.SEA, ExploreBiome.WINTER_KEEP ->
+                ItemCatalog.dungeonLoot
         }
         val deep = listOf(
             ItemCatalog.hiPotion,
@@ -3236,8 +3447,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 monster.isBoss -> "보스 ${monster.name}의 일격! (HP -$dmg)"
                 biome == ExploreBiome.FOREST -> "${monster.name}이(가) 덮친다! (HP -$dmg)"
                 biome == ExploreBiome.DESERT -> "${monster.name}이(가) 찌른다! (HP -$dmg)"
-                biome == ExploreBiome.GLACIER -> "${monster.name}이(가) 할퀸다! (HP -$dmg)"
+                biome == ExploreBiome.GLACIER || biome == ExploreBiome.IGLOO ->
+                    "${monster.name}이(가) 할퀸다! (HP -$dmg)"
                 biome == ExploreBiome.CASTLE -> "${monster.name}이(가) 덮쳐온다! (HP -$dmg)"
+                biome == ExploreBiome.SEA -> "${monster.name}이(가) 휘감는다! (HP -$dmg)"
+                biome == ExploreBiome.WINTER_KEEP -> "${monster.name}이(가) 덮쳐온다! (HP -$dmg)"
                 else -> "${monster.name}이(가) 물어뜯는다! (HP -$dmg)"
             }
         )

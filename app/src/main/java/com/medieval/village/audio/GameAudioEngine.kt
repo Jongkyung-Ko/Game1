@@ -53,6 +53,8 @@ class GameAudioEngine(context: Context) {
     private var currentMood: MusicMood? = null
     private var released = false
     private var walking = false
+    private var bgmMul = 1f
+    private var sfxMul = 1f
 
     private val soundPool: SoundPool? = runCatching {
         SoundPool.Builder()
@@ -107,18 +109,8 @@ class GameAudioEngine(context: Context) {
         musicPlayer = runCatching {
             MediaPlayer.create(appContext, resId)?.apply {
                 isLooping = true
-                setVolume(
-                    when (mood) {
-                        MusicMood.TENSE -> 0.42f
-                        MusicMood.COZY -> 0.34f
-                        MusicMood.VILLAGE -> 0.36f
-                    },
-                    when (mood) {
-                        MusicMood.TENSE -> 0.42f
-                        MusicMood.COZY -> 0.34f
-                        MusicMood.VILLAGE -> 0.36f
-                    }
-                )
+                val v = moodVolume(mood)
+                setVolume(v, v)
                 start()
             }
         }.getOrNull()
@@ -135,7 +127,7 @@ class GameAudioEngine(context: Context) {
             footstepPlayer = runCatching {
                 MediaPlayer.create(appContext, R.raw.sfx_footstep)?.apply {
                     isLooping = true
-                    setVolume(0.55f, 0.55f)
+                    setVolume(0.55f * sfxMul, 0.55f * sfxMul)
                 }
             }.getOrNull()
         }
@@ -161,7 +153,31 @@ class GameAudioEngine(context: Context) {
             Sfx.SKILL_EXECUTE, Sfx.SKILL_SMOKE -> 0.82f to 1f
             else -> 0.7f to 1f
         }
-        runCatching { pool.play(id, vol, vol, 1, 0, rate) }
+        val v = (vol * sfxMul).coerceIn(0f, 1f)
+        runCatching { pool.play(id, v, v, 1, 0, rate) }
+    }
+
+    fun setUserVolume(bgm: Float, sfx: Float) {
+        bgmMul = bgm.coerceIn(0f, 1f)
+        sfxMul = sfx.coerceIn(0f, 1f)
+        applyMusicVolume()
+        val step = 0.55f * sfxMul
+        runCatching { footstepPlayer?.setVolume(step, step) }
+    }
+
+    private fun moodVolume(mood: MusicMood): Float {
+        val base = when (mood) {
+            MusicMood.TENSE -> 0.42f
+            MusicMood.COZY -> 0.34f
+            MusicMood.VILLAGE -> 0.36f
+        }
+        return (base * bgmMul).coerceIn(0f, 1f)
+    }
+
+    private fun applyMusicVolume() {
+        val mood = currentMood ?: return
+        val v = moodVolume(mood)
+        runCatching { musicPlayer?.setVolume(v, v) }
     }
 
     fun pause() {

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.IntSize
 import com.medieval.village.game.Facing
 import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
+import com.medieval.village.model.WorldFlags
 import com.medieval.village.model.SpecialSkillCatalog
 import com.medieval.village.model.Village
 import kotlin.math.roundToInt
@@ -109,12 +110,22 @@ class CustomArt(
         "desert_drake" -> "desert_drake"
         "vulture" -> "desert_fox"
         "dung_beetle", "dune_worm" -> "scorpion"
-        // 빙하
+        // 빙하 · 이글루
         "penguin", "ice_penguin", "frost_penguin", "seal" -> "penguin"
-        "polar_bear" -> "polar_bear"
+        "polar_bear", "ice_star_bear" -> "polar_bear"
         "yeti" -> "yeti"
-        "ice_wolf" -> "ice_wolf"
+        "ice_wolf", "winter_wolf" -> "ice_wolf"
         "ice_elemental" -> "ice_elemental"
+        // 바다 동굴
+        "crab" -> "scorpion"
+        "jellyfish" -> "ice_elemental"
+        "shark" -> "desert_drake"
+        "drowned", "pirate_ghost" -> "skel_soldier"
+        "sea_snake" -> "snake"
+        "giant_octopus" -> "bloater"
+        // 겨울성
+        "kidnapper", "frost_thug", "kidnapper_boss" -> "farmer"
+        "ice_guard", "cage_warden" -> "armored"
         else -> "wolf"
     }
 
@@ -221,8 +232,15 @@ class CustomArt(
                     val app = context.applicationContext
                     val villageMaps = LinkedHashMap<String, ImageBitmap>()
                     val mapAssets = buildSet {
-                        Settlements.all(false).forEach { add(it.mapAsset) }
-                        add(Settlements.castle(true).mapAsset)
+                        Settlements.all(WorldFlags()).forEach { add(it.mapAsset) }
+                        Settlements.all(
+                            WorldFlags(
+                                castleCleared = true,
+                                iglooCleared = true,
+                                seasideCleared = true,
+                                winterCleared = true,
+                            )
+                        ).forEach { add(it.mapAsset) }
                         add("village_map.png")
                     }
                     mapAssets.forEach { asset ->

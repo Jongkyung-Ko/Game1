@@ -161,6 +161,9 @@ fun TopMenuBar(vm: GameViewModel, modifier: Modifier = Modifier) {
                 PlaceId.EAST_FOREST -> "Eastern Wood" to "Reach $roman"
                 PlaceId.SOUTH_DESERT -> "Southern Waste" to "Reach $roman"
                 PlaceId.NORTH_GLACIER -> "Northern Glacier" to "Reach $roman"
+                PlaceId.IGLOO_GLACIER -> "Igloo Glacier" to "Reach $roman"
+                PlaceId.SEA_CAVE -> "Sea Cave" to "Floor $roman"
+                PlaceId.WINTER_KEEP -> "Winter Keep" to "Floor $roman"
                 else -> "Forgotten Crypt" to "Floor $roman"
             }
             val strip = skin?.infoStrip

@@ -61,7 +61,9 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         PubScreen(vm = vm, modifier = modifier)
         return
     }
-    if (id == PlaceId.DUNGEON || id == PlaceId.GRAY_CASTLE) {
+    if (id == PlaceId.DUNGEON || id == PlaceId.GRAY_CASTLE ||
+        id == PlaceId.SEA_CAVE || id == PlaceId.WINTER_KEEP
+    ) {
         DungeonScreen(vm = vm, modifier = modifier)
         return
     }
@@ -73,7 +75,7 @@ fun PlaceScreen(vm: GameViewModel, id: PlaceId, modifier: Modifier = Modifier) {
         DesertScreen(vm = vm, modifier = modifier)
         return
     }
-    if (id == PlaceId.NORTH_GLACIER) {
+    if (id == PlaceId.NORTH_GLACIER || id == PlaceId.IGLOO_GLACIER) {
         GlacierScreen(vm = vm, modifier = modifier)
         return
     }
@@ -86,8 +88,8 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
     val place = vm.placeOf(id)
     val atlas = rememberKenneyAtlas()
     val art = rememberCustomArtOrNull()
-    val npcs = remember(id, vm.currentSettlement, vm.player.castleCleared) {
-        InteriorNpcCatalog.forPlace(id, vm.currentSettlement, vm.player.castleCleared)
+    val npcs = remember(id, vm.currentSettlement, vm.player.worldFlags) {
+        InteriorNpcCatalog.forPlace(id, vm.currentSettlement, vm.player.worldFlags)
     }
     val panelOpen = vm.interiorPanelOpen
 
@@ -149,7 +151,7 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
                         frontIndex = vm.frontIndex,
                         partySlots = vm.partyDrawSlots(vm.pubHeroX, vm.pubHeroY),
                         settlementId = vm.currentSettlement,
-                        castleCleared = vm.player.castleCleared,
+                        flags = vm.player.worldFlags,
                         levelUpFxActorKey = vm.levelUpFxActorKey,
                         levelUpFxUntil = vm.levelUpFxUntil,
                     )

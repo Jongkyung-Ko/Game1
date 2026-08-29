@@ -329,8 +329,10 @@ object DungeonFactory {
         "quill_boar", "hawk",
         // 남쪽 사막
         "spitting_cobra", "sand_slinger",
-        // 북쪽 빙하
+        // 북쪽 빙하 · 이글루
         "icicle_penguin", "frost_shaman",
+        // 바다 동굴
+        "jellyfish",
     )
 
     private fun isWalkableTile(tiles: Array<DungeonTile>, x: Float, y: Float): Boolean {

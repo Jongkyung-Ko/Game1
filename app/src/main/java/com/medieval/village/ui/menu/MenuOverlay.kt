@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -157,6 +159,18 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
         Chip(
             if (p.castleCleared) "White Castle 해방"
             else "Gray Castle ${p.castleDepth}층"
+        )
+        Chip(
+            if (p.iglooCleared) "이글루 마을 해방"
+            else "이글루 빙하 ${p.iglooDepth}지대"
+        )
+        Chip(
+            if (p.seasideCleared) "바닷가 마을 해방"
+            else "바다 동굴 ${p.seasideDepth}층"
+        )
+        Chip(
+            if (p.winterCleared) "겨울성 해방"
+            else "겨울성 지하 ${p.winterDepth}층"
         )
         Chip("대련 ${vm.arenaWins}승 ${vm.arenaLosses}패")
         Chip(if (p.blessing > 0) "축복 ${p.blessing}일 남음" else "축복 없음")
@@ -434,6 +448,39 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
         Spacer(Modifier.height(10.dp))
     }
 
+    SectionTitle("소리")
+    Text(
+        "배경음악  ${ (vm.player.bgmVolume * 100).toInt() }%",
+        color = Palette.Parchment,
+        fontSize = 12.sp,
+    )
+    Slider(
+        value = vm.player.bgmVolume,
+        onValueChange = { vm.setBgmVolume(it) },
+        valueRange = 0f..1f,
+        colors = SliderDefaults.colors(
+            thumbColor = Palette.Gold,
+            activeTrackColor = Palette.Gold,
+            inactiveTrackColor = Palette.WoodLight,
+        ),
+    )
+    Text(
+        "효과음  ${ (vm.player.sfxVolume * 100).toInt() }%",
+        color = Palette.Parchment,
+        fontSize = 12.sp,
+    )
+    Slider(
+        value = vm.player.sfxVolume,
+        onValueChange = { vm.setSfxVolume(it) },
+        valueRange = 0f..1f,
+        colors = SliderDefaults.colors(
+            thumbColor = Palette.Gold,
+            activeTrackColor = Palette.Gold,
+            inactiveTrackColor = Palette.WoodLight,
+        ),
+    )
+    Spacer(Modifier.height(12.dp))
+
     SectionTitle("조작 방법")
     Text(
         "· 마을 화면에서 건물을 누르면 그곳까지 걸어가 자동으로 들어갑니다.\n" +
@@ -449,7 +496,7 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
     Spacer(Modifier.height(12.dp))
     SectionTitle("게임 정보")
     Text(
-        "중세마을 이야기 v0.4.42\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
+        "중세마을 이야기 v0.4.43\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
         color = Palette.ParchmentDim,
         fontSize = 12.sp,
         lineHeight = 17.sp

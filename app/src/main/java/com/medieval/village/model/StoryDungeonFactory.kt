@@ -4,11 +4,10 @@ import kotlin.math.hypot
 import kotlin.random.Random
 
 /**
- * 숲·사막·빙하 등 야외 탐험 지대 공통 미로 생성.
- * WALL = 장애물, FLOOR = 길, SEWER = 지형 소품(덤불·모래언덕·눈더미),
- * STAIRS_UP/DOWN = 출구/심층 표식, VAULT = 은닉 상자.
+ * 20층 스토리 던전 공통 생성.
+ * 10층에 중간 보스, 최심층에 최종 보스. 최심층에는 하층 계단이 없다.
  */
-object WildZoneGenerator {
+object StoryDungeonFactory {
 
     const val TILE = DungeonFactory.TILE
     const val COLS = DungeonFactory.COLS
@@ -18,18 +17,16 @@ object WildZoneGenerator {
         floor: Int,
         seed: Int,
         idPrefix: String,
-        shallow: List<Pair<String, String>>,
-        deep: List<Pair<String, String>>,
+        maxFloor: Int,
+        mobs: List<Pair<String, String>>,
         kindBonus: (String) -> Int,
-        basePower: Int = 8,
-        powerPerFloor: Int = 7,
-        sewerChance: Float = 0.18f,
-        /** 10층 중간 보스 (kind to 표시명). null이면 보스 없음 */
-        midBoss: Pair<String, String>? = null,
-        /** 최종 층. 지정하면 그 층에 계단이 없고 finalBoss가 등장한다. */
-        maxFloor: Int? = null,
-        finalBoss: Pair<String, String>? = null,
+        midBoss: Pair<String, String>,
+        finalBoss: Pair<String, String>,
+        sewerChance: Float = 0.10f,
+        basePower: Int = 16,
+        powerPerFloor: Int = 10,
     ): DungeonFloor {
+        val f = floor.coerceIn(1, maxFloor)
         val rng = Random(seed)
         val tiles = Array(COLS * ROWS) { DungeonTile.WALL }
 
@@ -40,60 +37,62 @@ object WildZoneGenerator {
             }
         }
 
-        val clearings = mutableListOf<Pair<IntRange, IntRange>>()
-        val clearingCount = 5 + floor.coerceAtMost(4)
-        repeat(clearingCount) {
-            val w = rng.nextInt(4, 8)
+        val rooms = mutableListOf<Pair<IntRange, IntRange>>()
+        val roomCount = 5 + f.coerceAtMost(4)
+        repeat(roomCount) {
+            val w = rng.nextInt(4, 7)
             val h = rng.nextInt(3, 6)
             val c0 = rng.nextInt(2, COLS - w - 2)
             val r0 = rng.nextInt(2, ROWS - h - 2)
             val cRange = c0 until (c0 + w)
             val rRange = r0 until (r0 + h)
-            clearings += cRange to rRange
+            rooms += cRange to rRange
             for (r in rRange) for (c in cRange) {
                 val kind = if (rng.nextFloat() < sewerChance) DungeonTile.SEWER else DungeonTile.FLOOR
                 carve(c, r, kind)
             }
         }
 
-        for (i in 0 until clearings.lastIndex) {
-            val (aC, aR) = clearings[i]
-            val (bC, bR) = clearings[i + 1]
+        for (i in 0 until rooms.lastIndex) {
+            val (aC, aR) = rooms[i]
+            val (bC, bR) = rooms[i + 1]
             var cx = aC.average().toInt()
             var cy = aR.average().toInt()
             val tx = bC.average().toInt()
             val ty = bR.average().toInt()
             while (cx != tx) {
-                carve(cx, cy, if (rng.nextFloat() < sewerChance + 0.07f) DungeonTile.SEWER else DungeonTile.FLOOR)
+                carve(cx, cy)
                 cx += if (tx > cx) 1 else -1
             }
             while (cy != ty) {
-                carve(cx, cy, if (rng.nextFloat() < sewerChance + 0.07f) DungeonTile.SEWER else DungeonTile.FLOOR)
+                carve(cx, cy)
                 cy += if (ty > cy) 1 else -1
             }
         }
 
-        val start = clearings.first()
-        val end = clearings.last()
-        val startC = start.first.average().toInt()
-        val startR = start.second.average().toInt()
-        val endC = end.first.average().toInt()
-        val endR = end.second.average().toInt()
+        val startRoom = rooms.first()
+        val endRoom = rooms.last()
+        val startC = startRoom.first.average().toInt()
+        val startR = startRoom.second.average().toInt()
+        val endC = endRoom.first.average().toInt()
+        val endR = endRoom.second.average().toInt()
         tiles[idx(startC, startR)] = DungeonTile.STAIRS_UP
-        val finalFloor = maxFloor != null && floor >= maxFloor
-        tiles[idx(endC, endR)] = if (finalFloor) DungeonTile.FLOOR else DungeonTile.STAIRS_DOWN
+        val finalFloor = f >= maxFloor
+        if (!finalFloor) {
+            tiles[idx(endC, endR)] = DungeonTile.STAIRS_DOWN
+        }
 
         val spawnX = startC * TILE + TILE / 2f
         val spawnY = startR * TILE + TILE / 2f
         val downX = endC * TILE + TILE / 2f
         val downY = endR * TILE + TILE / 2f
 
-        val chestTarget = (1 + floor / 2).coerceAtMost(3) + if (rng.nextFloat() < 0.4f) 1 else 0
+        val chestTarget = (1 + f / 2).coerceAtMost(3) + if (rng.nextFloat() < 0.35f) 1 else 0
         var chests = 0
         var chestAttempts = 0
         while (chests < chestTarget && chestAttempts < 120) {
             chestAttempts++
-            val room = clearings[rng.nextInt(clearings.size)]
+            val room = rooms[rng.nextInt(rooms.size)]
             val c = room.first.random(rng)
             val r = room.second.random(rng)
             if (c == startC && r == startR) continue
@@ -108,9 +107,8 @@ object WildZoneGenerator {
             chests++
         }
 
-        val pool = if (floor >= 3) shallow + deep else shallow
         val monsters = mutableListOf<DungeonMonster>()
-        val monsterCount = 4 + floor + rng.nextInt(0, 3)
+        val monsterCount = (4 + f + rng.nextInt(0, 3) - if (finalFloor) 2 else 0).coerceAtLeast(3)
         var attempts = 0
         while (monsters.size < monsterCount && attempts < 200) {
             attempts++
@@ -124,30 +122,30 @@ object WildZoneGenerator {
             val y = r * TILE + TILE / 2f
             if (hypot(x - spawnX, y - spawnY) < TILE * 2.5f) continue
             if (monsters.any { hypot(it.x - x, it.y - y) < TILE * 1.4f }) continue
-            val (kind, name) = pool.random(rng)
+            val (kind, name) = mobs.random(rng)
             monsters += DungeonMonster(
-                id = "$idPrefix${floor}_${monsters.size}",
+                id = "$idPrefix${f}_${monsters.size}",
                 name = name,
                 kind = kind,
                 x = x,
                 y = y,
-                power = basePower + floor * powerPerFloor + kindBonus(kind) + rng.nextInt(0, 9),
-                armor = 1 + floor / 5,
+                power = basePower + f * powerPerFloor + kindBonus(kind) + rng.nextInt(0, 10),
+                armor = 2 + f / 3,
                 ranged = DungeonFactory.isRangedKind(kind),
             )
         }
 
-        // 최종 보스 또는 10층마다 중간 보스
         val storyBoss = when {
-            finalFloor && finalBoss != null -> finalBoss to true
-            midBoss != null && floor > 0 && floor % 10 == 0 -> midBoss to false
+            finalFloor -> finalBoss to true
+            f > 0 && f % 10 == 0 -> midBoss to false
             else -> null
         }
         if (storyBoss != null) {
             val (kind, name) = storyBoss.first
             val finale = storyBoss.second
-            val power = 44 + floor * 20 + rng.nextInt(0, 14)
-            val maxHp = (power * 13).coerceAtLeast(260)
+            val power = (if (finale) 70 else 48) + f * 22 + rng.nextInt(0, 16)
+            val maxHp = (power * if (finale) 16 else 13).coerceAtLeast(if (finale) 420 else 280)
+            val label = if (finale) "최종 보스 · $name" else "중간 보스 · $name"
             val offsets = listOf(
                 -TILE * 1.6f to 0f,
                 TILE * 1.6f to 0f,
@@ -167,8 +165,8 @@ object WildZoneGenerator {
                 if (!walkable(bx, by)) continue
                 if (hypot(bx - spawnX, by - spawnY) < TILE * 3f) continue
                 monsters += DungeonMonster(
-                    id = "${idPrefix}boss_$floor",
-                    name = if (finale) "최종 보스 · $name" else "중간 보스 · $name",
+                    id = "${idPrefix}boss_$f",
+                    name = label,
                     kind = kind,
                     x = bx,
                     y = by,
@@ -176,15 +174,15 @@ object WildZoneGenerator {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 9 + floor / 2,
+                    armor = 10 + f / 2,
                 )
                 placed = true
                 break
             }
             if (!placed) {
                 monsters += DungeonMonster(
-                    id = "${idPrefix}boss_$floor",
-                    name = if (finale) "최종 보스 · $name" else "중간 보스 · $name",
+                    id = "${idPrefix}boss_$f",
+                    name = label,
                     kind = kind,
                     x = downX,
                     y = downY,
@@ -192,13 +190,13 @@ object WildZoneGenerator {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 9 + floor / 2,
+                    armor = 10 + f / 2,
                 )
             }
         }
 
         return DungeonFloor(
-            floor = floor,
+            floor = f,
             cols = COLS,
             rows = ROWS,
             tileSize = TILE,

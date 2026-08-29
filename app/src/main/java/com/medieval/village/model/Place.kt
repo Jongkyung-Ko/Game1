@@ -6,6 +6,12 @@ enum class PlaceId {
     BLACKSMITH, MAGIC_SCHOOL, MERCENARY,
     /** Gray Castle 고성 던전 입구 (저주가 풀리면 사용하지 않음) */
     GRAY_CASTLE,
+    /** 이글루 마을 빙하 던전 (해방 후 사용하지 않음) */
+    IGLOO_GLACIER,
+    /** 바닷가 폐허 바다 동굴 (해방 후 사용하지 않음) */
+    SEA_CAVE,
+    /** 겨울성 지하 던전 (해방 후 사용하지 않음) */
+    WINTER_KEEP,
 }
 
 /** 건물 외형 종류 (Canvas 렌더링 분기용) */

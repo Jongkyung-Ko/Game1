@@ -20,6 +20,7 @@ import com.medieval.village.model.InteriorRoom
 import com.medieval.village.model.Mercenary
 import com.medieval.village.model.PlaceId
 import com.medieval.village.model.SettlementId
+import com.medieval.village.model.WorldFlags
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
@@ -50,7 +51,7 @@ fun DrawScope.drawWalkableInterior(
     frontIndex: Int = 0,
     partySlots: List<PartyDrawSlot>? = null,
     settlementId: SettlementId = SettlementId.OAKHAVEN,
-    castleCleared: Boolean = false,
+    flags: WorldFlags = WorldFlags(),
     levelUpFxActorKey: String? = null,
     levelUpFxUntil: Float = 0f,
 ) {
@@ -62,7 +63,7 @@ fun DrawScope.drawWalkableInterior(
         drawInteriorFurniture(id)
     }
 
-    InteriorNpcCatalog.forPlace(id, settlementId, castleCleared).forEachIndexed { index, npc ->
+    InteriorNpcCatalog.forPlace(id, settlementId, flags).forEachIndexed { index, npc ->
         val bob = sin(animTime * 2.6f + index) * 2f
         val cx = npc.worldX
         val footY = npc.worldY + bob
@@ -157,6 +158,9 @@ private fun npcSpriteKey(npc: InteriorNpc): String =
         PlaceId.PUB -> "merchant"
         PlaceId.DUNGEON -> "warrior"
         PlaceId.GRAY_CASTLE -> "paladin"
+        PlaceId.IGLOO_GLACIER -> "mage"
+        PlaceId.SEA_CAVE -> "rogue"
+        PlaceId.WINTER_KEEP -> "warrior"
         PlaceId.EAST_FOREST -> "rogue"
         PlaceId.SOUTH_DESERT -> "rogue"
         PlaceId.NORTH_GLACIER -> "mage"

@@ -5,7 +5,18 @@ enum class SettlementId {
     OAKHAVEN,
     ASHBROOK,
     GRAY_CASTLE,
+    IGLOO,
+    SEASIDE,
+    WINTER_CASTLE,
 }
+
+/** 스토리 해방 여부 — 정착지 맵·대사가 갈린다 */
+data class WorldFlags(
+    val castleCleared: Boolean = false,
+    val iglooCleared: Boolean = false,
+    val seasideCleared: Boolean = false,
+    val winterCleared: Boolean = false,
+)
 
 data class Settlement(
     val id: SettlementId,
@@ -310,14 +321,174 @@ object Settlements {
     )
 
     fun all(castleCleared: Boolean = false): List<Settlement> =
-        listOf(oakhaven, ashbrook, castle(castleCleared))
+        all(WorldFlags(castleCleared = castleCleared))
+
+    fun all(flags: WorldFlags): List<Settlement> = listOf(
+        oakhaven,
+        ashbrook,
+        castle(flags.castleCleared),
+        igloo(flags.iglooCleared),
+        seaside(flags.seasideCleared),
+        winterCastle(flags.winterCleared),
+    )
 
     fun castle(cleared: Boolean): Settlement =
         if (cleared) whiteCastle else grayCastle
 
-    fun of(id: SettlementId, castleCleared: Boolean = false): Settlement = when (id) {
+    fun igloo(cleared: Boolean): Settlement =
+        if (cleared) iglooThawed else iglooFrozen
+
+    fun seaside(cleared: Boolean): Settlement =
+        if (cleared) seasideRestored else seasideRuins
+
+    fun winterCastle(cleared: Boolean): Settlement =
+        if (cleared) winterRestored else winterCursed
+
+    fun of(id: SettlementId, castleCleared: Boolean = false): Settlement =
+        of(id, WorldFlags(castleCleared = castleCleared))
+
+    fun of(id: SettlementId, flags: WorldFlags): Settlement = when (id) {
         SettlementId.OAKHAVEN -> oakhaven
         SettlementId.ASHBROOK -> ashbrook
-        SettlementId.GRAY_CASTLE -> castle(castleCleared)
+        SettlementId.GRAY_CASTLE -> castle(flags.castleCleared)
+        SettlementId.IGLOO -> igloo(flags.iglooCleared)
+        SettlementId.SEASIDE -> seaside(flags.seasideCleared)
+        SettlementId.WINTER_CASTLE -> winterCastle(flags.winterCleared)
     }
+
+    private val restoredServices: List<Place> = listOf(
+        Place(PlaceId.HOME, "거처", "되찾은 집", 780f, 780f, 240f, 180f, BuildingStyle.HOUSE, 0xFF9C4A34, 0xFFE8D4AC),
+        Place(PlaceId.CHURCH, "예배당", "다시 울리는 종", 480f, 300f, 200f, 190f, BuildingStyle.CHURCH, 0xFF8C8FA6, 0xFFE6E1D3),
+        Place(PlaceId.PUB, "선술집", "온기의 홀", 320f, 520f, 220f, 180f, BuildingStyle.PUB, 0xFF713B2A, 0xFFD0A66E),
+        Place(PlaceId.INN, "여관", "따뜻한 잠자리", 520f, 560f, 130f, 100f, BuildingStyle.INN, 0xFF8A5A2B, 0xFFE3CFA4),
+        Place(PlaceId.SHOP, "상점", "광장 노점", 780f, 540f, 160f, 120f, BuildingStyle.STORE, 0xFFB4573F, 0xFFEBD9B4),
+        Place(PlaceId.WEAPON_SHOP, "무기점", "되찾은 병기", 980f, 520f, 130f, 110f, BuildingStyle.ARMORY, 0xFF6B3A2E, 0xFFD8C49B),
+        Place(PlaceId.BLACKSMITH, "대장간", "모루의 불꽃", 1120f, 480f, 160f, 140f, BuildingStyle.FORGE, 0xFF5A4132, 0xFF9B8266),
+        Place(PlaceId.HOSPITAL, "치료소", "치유의 집", 300f, 720f, 160f, 130f, BuildingStyle.CLINIC, 0xFFB0B6C4, 0xFFF2F0E6),
+        Place(PlaceId.ARENA, "훈련장", "다시 열린 훈련장", 1100f, 780f, 170f, 130f, BuildingStyle.ARENA, 0xFF7A5230, 0xFFC9A87C),
+        Place(PlaceId.MERCENARY, "용병소", "귀환한 용병들", 1280f, 700f, 170f, 130f, BuildingStyle.CAMP, 0xFF4E5A3A, 0xFF8B9668),
+        Place(PlaceId.MAGIC_SCHOOL, "연구실", "되찾은 탑", 980f, 280f, 140f, 150f, BuildingStyle.TOWER, 0xFF4B3B8F, 0xFFCFC7E8),
+    )
+
+    private val restoredFolk = listOf(
+        Triple("farmer", 620f, 600f),
+        Triple("merchant", 800f, 560f),
+        Triple("shopkeeper", 740f, 540f),
+        Triple("teacher", 1000f, 340f),
+        Triple("chef", 360f, 560f),
+        Triple("doctor", 340f, 760f),
+        Triple("paladin", 1180f, 740f),
+        Triple("warrior", 1080f, 800f),
+    )
+
+    /** 이글루 마을 — 얼음 별이 떨어진 뒤 얼어붙은 거점 */
+    private val iglooFrozen: Settlement = Settlement(
+        id = SettlementId.IGLOO,
+        nameKo = "이글루 마을",
+        nameEn = "Igloo Hamlet",
+        mapAsset = "igloo_frozen.png",
+        mapX = 320f,
+        mapY = 180f,
+        blurb = "한때 따뜻했던 북녘 · 얼음 별이 떨어지며 얼어붙었다",
+        places = listOf(
+            Place(PlaceId.HOME, "얼음 오두막", "눈 속에 파묻힌 거처", 420f, 780f, 200f, 150f, BuildingStyle.HOUSE, 0xFF6A90B0, 0xFFE0F0F8),
+            Place(PlaceId.CHURCH, "얼음 사당", "얼어붙은 기도처", 300f, 300f, 180f, 170f, BuildingStyle.CHURCH, 0xFF8C8FA6, 0xFFE6E1D3),
+            Place(
+                PlaceId.IGLOO_GLACIER, "빙하지대", "지하 20층의 얼음북극곰 · Glacier",
+                1080f, 340f, 260f, 200f, BuildingStyle.GLACIER, 0xFF6A90B0, 0xFFE0F0F8
+            ),
+            Place(PlaceId.BLACKSMITH, "언 대장간", "꺼진 모루", 720f, 560f, 160f, 140f, BuildingStyle.ARMORY, 0xFF5A4132, 0xFF9B8266),
+        ),
+        townsfolk = emptyList(),
+        wellX = 640f,
+        wellY = 600f,
+    )
+
+    private val iglooThawed: Settlement = Settlement(
+        id = SettlementId.IGLOO,
+        nameKo = "이글루 마을",
+        nameEn = "Thawed Igloo",
+        mapAsset = "igloo_thawed.png",
+        mapX = 320f,
+        mapY = 180f,
+        blurb = "얼음 별의 추위가 걷힌 북녘 · 온기가 돌아왔다",
+        places = restoredServices,
+        townsfolk = restoredFolk,
+        wellX = 760f,
+        wellY = 500f,
+    )
+
+    /** 바닷가 폐허 — 대왕문어의 해일로 잠긴 마을 */
+    private val seasideRuins: Settlement = Settlement(
+        id = SettlementId.SEASIDE,
+        nameKo = "바닷가 폐허",
+        nameEn = "Seaside Ruins",
+        mapAsset = "seaside_ruins.png",
+        mapX = 280f,
+        mapY = 820f,
+        blurb = "해일에 잠긴 어촌 · 대왕문어가 바다를 뒤흔든다",
+        places = listOf(
+            Place(PlaceId.HOME, "침수된 집", "물기 찬 임시 거처", 760f, 820f, 200f, 150f, BuildingStyle.HOUSE, 0xFF3A6B8C, 0xFFC8D8E0),
+            Place(PlaceId.CHURCH, "침수 예배당", "종탑만 물 위에 남았다", 380f, 340f, 180f, 170f, BuildingStyle.CHURCH, 0xFF8C8FA6, 0xFFE6E1D3),
+            Place(
+                PlaceId.SEA_CAVE, "바다 동굴", "지하 20층의 대왕문어 · Sea Cave",
+                1180f, 460f, 260f, 210f, BuildingStyle.CAVE, 0xFF2A4A5A, 0xFF4A6A78
+            ),
+            Place(PlaceId.BLACKSMITH, "녹슨 공방", "소금에 잠긴 모루", 920f, 640f, 160f, 140f, BuildingStyle.ARMORY, 0xFF5A4132, 0xFF9B8266),
+        ),
+        townsfolk = emptyList(),
+        wellX = 700f,
+        wellY = 620f,
+    )
+
+    private val seasideRestored: Settlement = Settlement(
+        id = SettlementId.SEASIDE,
+        nameKo = "바닷가 마을",
+        nameEn = "Seaside Haven",
+        mapAsset = "seaside_restored.png",
+        mapX = 280f,
+        mapY = 820f,
+        blurb = "해일이 걷힌 어촌 · 배가 다시 항구에 닿는다",
+        places = restoredServices,
+        townsfolk = restoredFolk,
+        wellX = 760f,
+        wellY = 500f,
+    )
+
+    /** 겨울성 — 아이들이 납치된 뒤 영원한 겨울이 내린 성 */
+    private val winterCursed: Settlement = Settlement(
+        id = SettlementId.WINTER_CASTLE,
+        nameKo = "겨울성",
+        nameEn = "Winter Keep",
+        mapAsset = "winter_cursed.png",
+        mapX = 1100f,
+        mapY = 180f,
+        blurb = "아이들이 사라진 성 · 납치와 함께 겨울이 내렸다",
+        places = listOf(
+            Place(PlaceId.HOME, "성문 천막", "눈보라 속 임시 야영", 760f, 880f, 200f, 140f, BuildingStyle.CAMP, 0xFF4E5A3A, 0xFF8B9668),
+            Place(PlaceId.CHURCH, "얼어붙은 성당", "종소리 없는 예배당", 420f, 320f, 180f, 170f, BuildingStyle.CHURCH, 0xFF8C8FA6, 0xFFE6E1D3),
+            Place(
+                PlaceId.WINTER_KEEP, "지하 던전", "납치범 두목 · Winter Dungeon",
+                780f, 420f, 280f, 240f, BuildingStyle.CAVE, 0xFF3B3630, 0xFF56504A
+            ),
+            Place(PlaceId.BLACKSMITH, "버려진 무기고", "녹슨 겨울 병기", 1100f, 560f, 160f, 140f, BuildingStyle.ARMORY, 0xFF5A4132, 0xFF9B8266),
+        ),
+        townsfolk = emptyList(),
+        wellX = 700f,
+        wellY = 620f,
+    )
+
+    private val winterRestored: Settlement = Settlement(
+        id = SettlementId.WINTER_CASTLE,
+        nameKo = "겨울성",
+        nameEn = "Restored Keep",
+        mapAsset = "winter_restored.png",
+        mapX = 1100f,
+        mapY = 180f,
+        blurb = "아이들이 돌아온 성 · 봄이 성벽에 스민다",
+        places = restoredServices,
+        townsfolk = restoredFolk,
+        wellX = 760f,
+        wellY = 500f,
+    )
 }

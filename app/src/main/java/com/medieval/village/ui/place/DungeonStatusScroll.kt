@@ -22,6 +22,9 @@ fun DungeonStatusScroll(vm: GameViewModel, modifier: Modifier = Modifier) {
         PlaceId.EAST_FOREST -> "Eastern Wood"
         PlaceId.SOUTH_DESERT -> "Southern Waste"
         PlaceId.NORTH_GLACIER -> "Northern Glacier"
+        PlaceId.IGLOO_GLACIER -> "Igloo Glacier"
+        PlaceId.SEA_CAVE -> "Sea Cave"
+        PlaceId.WINTER_KEEP -> "Winter Keep"
         else -> "Forgotten Crypt"
     }
     val depthWord = if (place.isWildSite()) "Reach" else "Floor"
@@ -63,4 +66,5 @@ fun DungeonStatusScroll(vm: GameViewModel, modifier: Modifier = Modifier) {
 }
 
 private fun PlaceId?.isWildSite(): Boolean =
-    this == PlaceId.EAST_FOREST || this == PlaceId.SOUTH_DESERT || this == PlaceId.NORTH_GLACIER
+    this == PlaceId.EAST_FOREST || this == PlaceId.SOUTH_DESERT ||
+        this == PlaceId.NORTH_GLACIER || this == PlaceId.IGLOO_GLACIER

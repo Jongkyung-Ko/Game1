@@ -78,7 +78,7 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
                         detectTapGestures { tap ->
                             val wx = (tap.x - ox) / s
                             val wy = (tap.y - oy) / s
-            val hit = Settlements.all(vm.player.castleCleared).minByOrNull { st ->
+            val hit = Settlements.all(vm.player.worldFlags).minByOrNull { st ->
                                 hypot(wx - st.mapX, wy - st.mapY)
                             }
                             if (hit != null && hypot(wx - hit.mapX, wy - hit.mapY) < 70f) {
@@ -109,11 +109,17 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
                         )
                     }
 
-                    Settlements.all(vm.player.castleCleared).forEach { st ->
+                    Settlements.all(vm.player.worldFlags).forEach { st ->
                         val here = st.id == currentId
                         val pinColor = when {
                             st.id == SettlementId.GRAY_CASTLE && vm.player.castleCleared ->
                                 Color(0xFFE8F0FF)
+                            st.id == SettlementId.IGLOO && vm.player.iglooCleared ->
+                                Color(0xFFB8E0FF)
+                            st.id == SettlementId.SEASIDE && vm.player.seasideCleared ->
+                                Color(0xFF7EC8C8)
+                            st.id == SettlementId.WINTER_CASTLE && vm.player.winterCleared ->
+                                Color(0xFFF4E4C0)
                             here -> Color(0xFFFFD76A)
                             else -> Color(0xFFE85A3C)
                         }

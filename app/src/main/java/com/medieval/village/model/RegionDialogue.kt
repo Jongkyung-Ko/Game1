@@ -8,31 +8,61 @@ object RegionDialogue {
 
     fun interiorLines(
         settlementId: SettlementId,
-        castleCleared: Boolean,
+        flags: WorldFlags,
         npc: InteriorNpc,
     ): List<String> = when (settlementId) {
         SettlementId.ASHBROOK -> ashbrookInterior(npc)
         SettlementId.GRAY_CASTLE ->
-            if (castleCleared) whiteCastleInterior(npc) else grayCastleInterior(npc)
+            if (flags.castleCleared) whiteCastleInterior(npc) else grayCastleInterior(npc)
+        SettlementId.IGLOO ->
+            if (flags.iglooCleared) liberatedInterior(npc, "이글루 마을", "얼음북극곰") else iglooInterior(npc)
+        SettlementId.SEASIDE ->
+            if (flags.seasideCleared) liberatedInterior(npc, "바닷가 마을", "대왕문어") else seasideInterior(npc)
+        SettlementId.WINTER_CASTLE ->
+            if (flags.winterCleared) liberatedInterior(npc, "겨울성", "납치범 두목") else winterInterior(npc)
         SettlementId.OAKHAVEN -> npc.lines
     }
 
-    fun pubNpcs(settlementId: SettlementId, castleCleared: Boolean): List<PubNpc> =
+    fun pubNpcs(settlementId: SettlementId, flags: WorldFlags): List<PubNpc> =
         when (settlementId) {
             SettlementId.ASHBROOK -> ashbrookPub
             SettlementId.GRAY_CASTLE ->
-                if (castleCleared) whiteCastlePub else grayCastlePub
+                if (flags.castleCleared) whiteCastlePub else grayCastlePub
+            SettlementId.IGLOO ->
+                if (flags.iglooCleared) {
+                    liberatedPub("이글루 마을", "얼음북극곰", "온기가 돌아왔다")
+                } else {
+                    cursedPub("얼음 별", "빙하지대 20층", "얼음북극곰")
+                }
+            SettlementId.SEASIDE ->
+                if (flags.seasideCleared) {
+                    liberatedPub("바닷가 마을", "대왕문어", "해일이 걷혔다")
+                } else {
+                    cursedPub("해일", "바다 동굴 20층", "대왕문어")
+                }
+            SettlementId.WINTER_CASTLE ->
+                if (flags.winterCleared) {
+                    liberatedPub("겨울성", "납치범 두목", "아이들이 돌아왔다")
+                } else {
+                    cursedPub("납치", "지하 20층", "납치범 두목")
+                }
             SettlementId.OAKHAVEN -> PubNpcCatalog.oakhavenBase
         }
 
     fun placeGreeting(
         settlementId: SettlementId,
-        castleCleared: Boolean,
+        flags: WorldFlags,
         id: PlaceId,
     ): String? = when (settlementId) {
         SettlementId.ASHBROOK -> ashbrookGreeting(id)
         SettlementId.GRAY_CASTLE ->
-            if (castleCleared) whiteCastleGreeting(id) else grayCastleGreeting(id)
+            if (flags.castleCleared) whiteCastleGreeting(id) else grayCastleGreeting(id)
+        SettlementId.IGLOO ->
+            if (flags.iglooCleared) liberatedGreeting(id, "이글루 마을", "얼음북극곰") else iglooGreeting(id)
+        SettlementId.SEASIDE ->
+            if (flags.seasideCleared) liberatedGreeting(id, "바닷가 마을", "대왕문어") else seasideGreeting(id)
+        SettlementId.WINTER_CASTLE ->
+            if (flags.winterCleared) liberatedGreeting(id, "겨울성", "납치범 두목") else winterGreeting(id)
         SettlementId.OAKHAVEN -> null
     }
 
@@ -466,6 +496,193 @@ object RegionDialogue {
             lines = listOf(
                 "히끅… 포도주가… 다시 달다…!",
                 "용사… 고맙다… 저주가… 사라졌어…!",
+                "전설이… 히끅… 이뤄졌다고…!",
+            )
+        ),
+    )
+
+    // ----- Igloo / Seaside / Winter (cursed) -----
+
+    private fun iglooInterior(npc: InteriorNpc): List<String> = when (npc.placeId) {
+        PlaceId.HOME -> listOf(
+            "난롯불이 꺼진지 오래다. 숨결조차 하얗게 얼어붙는다.",
+            "예전엔 이곳이 따뜻했다고… 얼음 별이 떨어지기 전에는.",
+            "지하 20층의 얼음북극곰을 쓰러뜨려야 온기가 돌아온다.",
+        )
+        PlaceId.CHURCH -> listOf(
+            "기도가 입에서 얼어 떨어진다.",
+            "북쪽에서 떨어진 얼음 별이 이 땅을 저주했소.",
+            "빛이여, 북극곰의 한기를 녹여 주소서…",
+        )
+        PlaceId.BLACKSMITH -> listOf(
+            "모루가 얼음에 붙었다. 쇠를 두드릴 힘도 없다.",
+            "빙하지대에 들어가려면 날이 살아야 해.",
+            "얼음북극곰의 가죽은 보통 쇠로는 안 깎인다.",
+        )
+        else -> listOf(
+            "한때 따뜻했던 북녘… 지금은 하얀 침묵뿐이다.",
+            "얼음 별이 떨어지며 모든 것이 얼어붙었다.",
+            "빙하지대 20층. 그곳이 열쇠다.",
+        )
+    }
+
+    private fun iglooGreeting(id: PlaceId): String? = when (id) {
+        PlaceId.HOME -> "얼음 오두막. 난로는 차갑고, 창밖은 온통 하얗다."
+        PlaceId.CHURCH -> "얼음 사당. 기도가 입김으로만 남는다."
+        PlaceId.BLACKSMITH -> "언 대장간. 모루에 서리가 내려앉았다."
+        PlaceId.IGLOO_GLACIER -> "하얀 빙벽이 열린다. 지하 깊숙이 얼음북극곰이 잠들어 있다."
+        else -> "이글루 마을… 한때 따뜻했던 곳이 갑자기 얼어붙었다."
+    }
+
+    private fun seasideInterior(npc: InteriorNpc): List<String> = when (npc.placeId) {
+        PlaceId.HOME -> listOf(
+            "바닥이 아직 축축하다. 해일이 쓸고 지나간 자국이다.",
+            "대왕문어가 나타난 뒤로 마을이 물바다가 됐다.",
+            "바다 동굴 20층… 그곳을 정리해야 집이 마른다.",
+        )
+        PlaceId.CHURCH -> listOf(
+            "종탑만 물 위에 남았소.",
+            "바다 대왕이 해일을 일으켰다더군.",
+            "빛이여, 파도를 잠재워 주소서…",
+        )
+        PlaceId.BLACKSMITH -> listOf(
+            "소금에 모루가 녹슬었다.",
+            "문어의 촉수는 보통 쇠로는 안 잘린다.",
+            "동굴에 들어가려면 날이 살아야 해.",
+        )
+        else -> listOf(
+            "해일로 마을이 여기저기 폐허가 됐다.",
+            "대왕문어를 쓰러뜨려야 정상적인 마을로 돌아온다.",
+            "바다 동굴 20층이 열쇠다.",
+        )
+    }
+
+    private fun seasideGreeting(id: PlaceId): String? = when (id) {
+        PlaceId.HOME -> "침수된 집. 바닥에 바닷물이 아직 고여 있다."
+        PlaceId.CHURCH -> "침수 예배당. 종탑만 물 위에 남았다."
+        PlaceId.BLACKSMITH -> "녹슨 공방. 소금 냄새가 코를 찌른다."
+        PlaceId.SEA_CAVE -> "짠 바람이 동굴을 훑는다. 해저 20층에서 대왕문어가 꿈틀거린다."
+        else -> "바닷가 폐허… 대왕문어의 해일이 마을을 삼켰다."
+    }
+
+    private fun winterInterior(npc: InteriorNpc): List<String> = when (npc.placeId) {
+        PlaceId.HOME -> listOf(
+            "아이들이 사라진 뒤, 성 전체에 겨울이 내렸다.",
+            "납치범들이 지하로 아이들을 데려갔다.",
+            "두목을 쓰러뜨려야 봄이 돌아온다.",
+        )
+        PlaceId.CHURCH -> listOf(
+            "종소리가 얼어붙었소.",
+            "납치범 두목이 아이들을 가두고 있다더군.",
+            "빛이여, 잃어버린 아이들을 돌려주소서…",
+        )
+        PlaceId.BLACKSMITH -> listOf(
+            "겨울 병기만 녹슬어 쌓여 있다.",
+            "지하 20층에 들어가려면 날이 살아야 해.",
+            "납치범들은 빠르다. 방패를 낮추지 마라.",
+        )
+        else -> listOf(
+            "아이들이 납치되며 성이 겨울이 되어 버렸다.",
+            "지하 던전 20층의 두목이 열쇠다.",
+            "성을 되찾으려면 아이들을 구해야 한다.",
+        )
+    }
+
+    private fun winterGreeting(id: PlaceId): String? = when (id) {
+        PlaceId.HOME -> "성문 천막. 눈보라가 천을 흔든다."
+        PlaceId.CHURCH -> "얼어붙은 성당. 종은 침묵한다."
+        PlaceId.BLACKSMITH -> "버려진 무기고. 겨울 병기만 남았다."
+        PlaceId.WINTER_KEEP -> "성 지하로 내려가는 돌계단. 납치된 아이들의 울음이 메아리친다."
+        else -> "겨울성… 아이들이 사라진 뒤 영원한 겨울이 내렸다."
+    }
+
+    private fun liberatedInterior(npc: InteriorNpc, place: String, boss: String): List<String> =
+        listOf(
+            "용사가 $boss 을(를) 쓰러뜨려 $place 을(를) 되살렸다!",
+            "당신 덕분에 우리가 다시 숨 쉴 수 있어요.",
+            "전설이 이뤄졌어요. $place 이(가) 돌아왔습니다.",
+        )
+
+    private fun liberatedGreeting(id: PlaceId, place: String, boss: String): String? = when (id) {
+        PlaceId.HOME -> "$place 의 거처에 온기가 돈다. 저주가 풀렸다."
+        PlaceId.PUB -> "감사와 노래가 넘친다. $boss 을(를) 쓰러뜨린 용사의 이름이 불린다."
+        PlaceId.CHURCH -> "종이 다시 울린다. $place 이(가) 되살아났다."
+        else -> "$place … $boss 이(가) 쓰러진 뒤, 사람들의 감사가 거리에 흐른다."
+    }
+
+    private fun cursedPub(curse: String, depth: String, boss: String): List<PubNpc> = listOf(
+        PubNpc(
+            id = "owner", name = "피난 주점지기", role = "생존자", kind = NpcKind.OWNER,
+            x = 805f, y = 390f, spriteKey = "merchant",
+            lines = listOf(
+                "$curse 이(가) 이 땅을 삼켰지…",
+                "$depth 에 $boss 이(가) 있다.",
+                "저주가 풀리기 전엔 잔도 차갑다.",
+            )
+        ),
+        PubNpc(
+            id = "traveler", name = "떠도는 이", role = "피난민", kind = NpcKind.TRAVELER,
+            x = 335f, y = 245f, spriteKey = "rogue",
+            lines = listOf(
+                "이곳이 예전엔 다른 모습이었다…",
+                "$boss 을(를) 쓰러뜨려 우리를 구해 줘.",
+                "$depth 이(가) 열쇠야.",
+            )
+        ),
+        PubNpc(
+            id = "guild", name = "부상당한 용병", role = "길드", kind = NpcKind.GUILD_MEMBER,
+            x = 565f, y = 345f, spriteKey = "warrior",
+            lines = listOf(
+                "방패를 낮추지 마라.",
+                "$boss 은(는) 만만치 않다.",
+                "$depth 까지 갔다 온 사람은 드물어.",
+            )
+        ),
+        PubNpc(
+            id = "drunk", name = "얼어붙은 취객", role = "취객", kind = NpcKind.DRUNK,
+            x = 210f, y = 505f, spriteKey = "farmer",
+            lines = listOf(
+                "히끅… $curse … 모든 걸 가져갔지…",
+                "$boss 만 쓰러뜨리면… 히끅… 끝난대…",
+                "전설의 용사여… 와 다오…",
+            )
+        ),
+    )
+
+    private fun liberatedPub(place: String, boss: String, miracle: String): List<PubNpc> = listOf(
+        PubNpc(
+            id = "owner", name = "보릭", role = "연회 주인", kind = NpcKind.OWNER,
+            x = 805f, y = 390f, spriteKey = "merchant",
+            lines = listOf(
+                "용사여! 잔을 들자. $miracle!",
+                "당신이 $boss 을(를) 쓰러뜨려 $place 을(를) 되살렸소.",
+                "이 연회는 당신 몫이야.",
+            )
+        ),
+        PubNpc(
+            id = "traveler", name = "엘린", role = "시인", kind = NpcKind.TRAVELER,
+            x = 335f, y = 245f, spriteKey = "rogue",
+            lines = listOf(
+                "$place 이(가) 되살아났어요. 노래로 남기겠어요.",
+                "용사가 $boss 을(를) 쓰러뜨렸다. 고맙습니다!",
+                "전설이 현실이 된 날을 목격하다니.",
+            )
+        ),
+        PubNpc(
+            id = "guild", name = "케인", role = "해방 전사", kind = NpcKind.GUILD_MEMBER,
+            x = 565f, y = 345f, spriteKey = "warrior",
+            lines = listOf(
+                "당신 덕분에 우리가 돌아왔소.",
+                "$boss 이(가) 쓰러진 날… 잊지 않겠소.",
+                "전설을 이룬 자와 어깨를 나란히 하다니 영광이오.",
+            )
+        ),
+        PubNpc(
+            id = "drunk", name = "토드", role = "축객", kind = NpcKind.DRUNK,
+            x = 210f, y = 505f, spriteKey = "farmer",
+            lines = listOf(
+                "히끅… 포도주가… 다시 달다…!",
+                "용사… 고맙다… $miracle…!",
                 "전설이… 히끅… 이뤄졌다고…!",
             )
         ),

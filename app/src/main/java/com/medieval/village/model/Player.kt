@@ -37,6 +37,22 @@ data class Player(
     val desertCleared: Int = 0,
     val glacierCleared: Int = 0,
     val castleFloorCleared: Int = 0,
+    /** 이글루 마을 — 얼음북극곰 퇴치 */
+    val iglooCleared: Boolean = false,
+    val iglooDepth: Int = 0,
+    val iglooFloorCleared: Int = 0,
+    /** 바닷가 폐허 — 대왕문어 퇴치 */
+    val seasideCleared: Boolean = false,
+    val seasideDepth: Int = 0,
+    val seasideFloorCleared: Int = 0,
+    /** 겨울성 — 납치범 두목 퇴치 */
+    val winterCleared: Boolean = false,
+    val winterDepth: Int = 0,
+    val winterFloorCleared: Int = 0,
+    /** 배경음악 음량 0–1 */
+    val bgmVolume: Float = 1f,
+    /** 효과음 음량 0–1 */
+    val sfxVolume: Float = 1f,
 ) {
     val expToNext: Int
         get() {
@@ -47,6 +63,13 @@ data class Player(
     val hpRatio: Float get() = if (maxHp <= 0) 0f else hp.toFloat() / maxHp
     val mpRatio: Float get() = if (maxMp <= 0) 0f else mp.toFloat() / maxMp
     val expRatio: Float get() = exp.toFloat() / expToNext
+    val worldFlags: WorldFlags
+        get() = WorldFlags(
+            castleCleared = castleCleared,
+            iglooCleared = iglooCleared,
+            seasideCleared = seasideCleared,
+            winterCleared = winterCleared,
+        )
 }
 
 data class Skill(

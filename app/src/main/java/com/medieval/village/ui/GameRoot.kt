@@ -56,6 +56,10 @@ fun GameRoot(modifier: Modifier = Modifier) {
         }
     }
 
+    LaunchedEffect(vm.player.bgmVolume, vm.player.sfxVolume) {
+        audio.setUserVolume(vm.player.bgmVolume, vm.player.sfxVolume)
+    }
+
     LaunchedEffect(vm.scene, vm.currentPlace) {
         val mood = when {
             vm.scene == Scene.VILLAGE -> MusicMood.VILLAGE

@@ -204,10 +204,34 @@ object ItemCatalog {
         onHitMpChance = 25,
         onHitMp = 5,
     )
+    val iceStarSpear = Item(
+        "ice_star_spear", "얼음 별의 창", ItemType.WEAPON, 1320, atk = 27,
+        desc = "얼음북극곰이 지키던 별의 창. 때릴 때마다 45% 확률로 MP를 8 회복하고 HP를 4 흡수한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        lifestealHp = 4,
+        onHitMpChance = 45,
+        onHitMp = 8,
+    )
+    val tentacleSaber = Item(
+        "tentacle_saber", "촉수의 사브르", ItemType.WEAPON, 1300, atk = 26,
+        desc = "대왕문어의 촉수를 벼린 칼. 적중 시 추가 피해를 주고 HP를 7 흡수한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        lifestealHp = 7,
+        onHitBonusDamage = 9,
+    )
+    val kidnapperDirk = Item(
+        "kidnapper_dirk", "납치범의 단검", ItemType.WEAPON, 1260, atk = 25,
+        desc = "두목이 쥐던 단검. 때릴 때마다 HP를 5 흡수하고 30% 확률로 MP를 6 회복한다.",
+        weaponStyle = WeaponStyle.MELEE,
+        lifestealHp = 5,
+        onHitMpChance = 30,
+        onHitMp = 6,
+    )
 
     val bossRelics = listOf(
         vampireBlade, plagueGreatsword, magicSword,
         guardianFang, scorpionFangBlade, frostMagicSword, soulKingBlade,
+        iceStarSpear, tentacleSaber, kidnapperDirk,
     )
 
     val all: List<Item> = (
@@ -225,6 +249,12 @@ object ItemCatalog {
         "giant_scorpion" -> scorpionFangBlade
         "polar_bear" -> frostMagicSword
         "boss_skel_king" -> soulKingBlade
+        "yeti" -> frostMagicSword
+        "ice_star_bear" -> iceStarSpear
+        "shark" -> tentacleSaber
+        "giant_octopus" -> tentacleSaber
+        "cage_warden" -> kidnapperDirk
+        "kidnapper_boss" -> kidnapperDirk
         else -> null
     }
 }
