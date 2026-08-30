@@ -6,12 +6,6 @@ import android.media.MediaPlayer
 import android.media.SoundPool
 import com.medieval.village.R
 
-enum class MusicMood {
-    VILLAGE,
-    COZY,
-    TENSE
-}
-
 enum class Sfx {
     HIT,
     /** 화살 적중 */
@@ -43,7 +37,7 @@ enum class Sfx {
 
 /**
  * CC0 무료 개발자용 MP3 리소스(res/raw)를 MediaPlayer / SoundPool로 재생한다.
- * 마을·실내·던전 BGM과 발소리·전투 효과음을 담당한다.
+ * 정착지·저주/해방 상태별 BGM과 발소리·전투 효과음을 담당한다.
  */
 class GameAudioEngine(context: Context) {
 
@@ -99,10 +93,20 @@ class GameAudioEngine(context: Context) {
     fun playMusic(mood: MusicMood) {
         if (released || mood == currentMood) return
         currentMood = mood
+        android.util.Log.i("GameBgm", "play $mood")
         runCatching { musicPlayer?.release() }
         musicPlayer = null
         val resId = when (mood) {
-            MusicMood.VILLAGE -> R.raw.bgm_village
+            MusicMood.OAKHAVEN -> R.raw.bgm_village
+            MusicMood.ASHBROOK -> R.raw.bgm_ashbrook
+            MusicMood.GRAY_CURSED -> R.raw.bgm_gray_cursed
+            MusicMood.GRAY_LIBERATED -> R.raw.bgm_gray_liberated
+            MusicMood.IGLOO_CURSED -> R.raw.bgm_igloo_cursed
+            MusicMood.IGLOO_LIBERATED -> R.raw.bgm_igloo_liberated
+            MusicMood.SEASIDE_CURSED -> R.raw.bgm_seaside_cursed
+            MusicMood.SEASIDE_LIBERATED -> R.raw.bgm_seaside_liberated
+            MusicMood.WINTER_CURSED -> R.raw.bgm_winter_cursed
+            MusicMood.WINTER_LIBERATED -> R.raw.bgm_winter_liberated
             MusicMood.COZY -> R.raw.bgm_cozy
             MusicMood.TENSE -> R.raw.bgm_dungeon
         }
@@ -169,7 +173,11 @@ class GameAudioEngine(context: Context) {
         val base = when (mood) {
             MusicMood.TENSE -> 0.42f
             MusicMood.COZY -> 0.34f
-            MusicMood.VILLAGE -> 0.36f
+            MusicMood.GRAY_CURSED, MusicMood.IGLOO_CURSED,
+            MusicMood.SEASIDE_CURSED, MusicMood.WINTER_CURSED -> 0.38f
+            MusicMood.GRAY_LIBERATED, MusicMood.IGLOO_LIBERATED,
+            MusicMood.SEASIDE_LIBERATED, MusicMood.WINTER_LIBERATED -> 0.37f
+            MusicMood.OAKHAVEN, MusicMood.ASHBROOK -> 0.36f
         }
         return (base * bgmMul).coerceIn(0f, 1f)
     }

@@ -6,6 +6,24 @@ BGM
 - bgm_village.mp3 : "Town Theme" (OpenGameArt, uploader Wolfgang_) — CC-BY 3.0
   https://opengameart.org/content/town-theme-0
   Credit: Wolfgang_ / Ted Kerr (embedded metadata)
+- bgm_ashbrook.mp3 : "Medieval: The Bard's Tale" by RandomMind — CC0
+  https://opengameart.org/content/medieval-the-bards-tale
+- bgm_gray_cursed.mp3 : "Castle In The Darkness" by Pro Sensory — CC0
+  https://opengameart.org/content/castle-in-the-darkness
+- bgm_gray_liberated.mp3 : "Medieval: King's Feast" by RandomMind — CC0
+  https://opengameart.org/content/medieval-kings-feast
+- bgm_igloo_cursed.mp3 : "Ice Village" by KarateStudios — CC0
+  https://opengameart.org/content/ice-village
+- bgm_igloo_liberated.mp3 : "Medieval: Rejoicing" by RandomMind — CC0
+  https://opengameart.org/content/medieval-rejoicing
+- bgm_seaside_cursed.mp3 : "The Frigid Seas" by Joth — CC0
+  https://opengameart.org/content/the-frigid-seas
+- bgm_seaside_liberated.mp3 : "Medieval: Minstrel Dance" by RandomMind — CC0
+  https://opengameart.org/content/medieval-minstrel-dance
+- bgm_winter_cursed.mp3 : "winter courtyard" by Bobjt — CC0
+  https://opengameart.org/content/winter-courtyard
+- bgm_winter_liberated.mp3 : "the inner world" by Deeppixel — CC0
+  https://opengameart.org/content/the-inner-world-mp3
 - bgm_cozy.mp3 : "The Old Tower Inn" by RandomMind (OpenGameArt) — CC0
   https://opengameart.org/content/medieval-the-old-tower-inn
 - bgm_dungeon.mp3 : "Dungeon Ambience" / Dungeon of Galhur by yd (OpenGameArt) — CC0

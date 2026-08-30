@@ -20,8 +20,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.medieval.village.audio.GameAudioEngine
-import com.medieval.village.audio.MusicMood
 import com.medieval.village.audio.Sfx
+import com.medieval.village.audio.resolveMusicMood
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
 import com.medieval.village.game.Scene
@@ -60,14 +60,23 @@ fun GameRoot(modifier: Modifier = Modifier) {
         audio.setUserVolume(vm.player.bgmVolume, vm.player.sfxVolume)
     }
 
-    LaunchedEffect(vm.scene, vm.currentPlace) {
-        val mood = when {
-            vm.scene == Scene.VILLAGE -> MusicMood.VILLAGE
-            vm.currentPlace in setOf(PlaceId.HOME, PlaceId.INN, PlaceId.PUB) -> MusicMood.COZY
-            vm.currentPlace.isExplorePlace() || vm.currentPlace == PlaceId.ARENA -> MusicMood.TENSE
-            else -> MusicMood.VILLAGE
-        }
-        audio.playMusic(mood)
+    LaunchedEffect(
+        vm.scene,
+        vm.currentPlace,
+        vm.currentSettlement,
+        vm.player.castleCleared,
+        vm.player.iglooCleared,
+        vm.player.seasideCleared,
+        vm.player.winterCleared,
+    ) {
+        audio.playMusic(
+            resolveMusicMood(
+                inVillage = vm.scene == Scene.VILLAGE,
+                place = vm.currentPlace,
+                settlement = vm.currentSettlement,
+                flags = vm.player.worldFlags,
+            )
+        )
     }
 
     LaunchedEffect(vm.walking, vm.pubWalking, vm.dungeonWalking) {
