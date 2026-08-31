@@ -17,6 +17,7 @@ import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InteriorNpcKind
 import com.medieval.village.model.InteriorRoom
+import com.medieval.village.model.HeroJob
 import com.medieval.village.model.Mercenary
 import com.medieval.village.model.PlaceId
 import com.medieval.village.model.SettlementId
@@ -54,6 +55,7 @@ fun DrawScope.drawWalkableInterior(
     flags: WorldFlags = WorldFlags(),
     levelUpFxActorKey: String? = null,
     levelUpFxUntil: Float = 0f,
+    heroJob: HeroJob = HeroJob.WARRIOR,
 ) {
     val w = InteriorRoom.WORLD_W
     val h = InteriorRoom.WORLD_H
@@ -101,6 +103,7 @@ fun DrawScope.drawWalkableInterior(
         mercScale = 0.74f,
         frontIndex = frontIndex,
         slots = partySlots,
+        heroJob = heroJob,
     )
     if (levelUpFxActorKey != null) {
         val slots = partySlots.orEmpty()

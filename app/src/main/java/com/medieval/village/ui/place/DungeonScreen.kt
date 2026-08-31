@@ -163,6 +163,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             scale = 0.88f,
                             rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
                             specialAnimSet = specialAnimSet,
+                            heroJob = vm.player.heroJob,
                         )
                         val fxKey = vm.levelUpFxActorKey
                         if (fxKey != null) {
@@ -181,10 +182,10 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     when (vm.currentPlace) {
-                        PlaceId.GRAY_CASTLE -> "v0.4.45 Gray Castle"
-                        PlaceId.SEA_CAVE -> "v0.4.45 Sea Cave"
-                        PlaceId.WINTER_KEEP -> "v0.4.45 Winter Keep"
-                        else -> "v0.4.45 Undead nest"
+                        PlaceId.GRAY_CASTLE -> "v0.4.46 Gray Castle"
+                        PlaceId.SEA_CAVE -> "v0.4.46 Sea Cave"
+                        PlaceId.WINTER_KEEP -> "v0.4.46 Winter Keep"
+                        else -> "v0.4.46 Undead nest"
                     },
                     14f,
                     28f,

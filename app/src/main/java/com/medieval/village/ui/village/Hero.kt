@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import com.medieval.village.game.Facing
 import com.medieval.village.game.HeroAnimKind
+import com.medieval.village.model.HeroJob
 import kotlin.math.sin
 
 private val Skin = Color(0xFFE7B98F)
@@ -44,6 +45,7 @@ fun DrawScope.drawHero(
     animKind: HeroAnimKind = HeroAnimKind.IDLE,
     animFrame: Int = 0,
     specialSet: String? = null,
+    heroJob: HeroJob = HeroJob.WARRIOR,
 ) {
     val attacking = animKind == HeroAnimKind.SLASH ||
         animKind == HeroAnimKind.BOW ||
@@ -62,6 +64,7 @@ fun DrawScope.drawHero(
             animKind = animKind,
             animFrame = animFrame,
             specialSet = specialSet,
+            heroJob = heroJob,
         )
         return
     }

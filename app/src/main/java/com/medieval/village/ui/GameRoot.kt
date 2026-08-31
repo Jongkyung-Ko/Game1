@@ -131,12 +131,14 @@ fun GameRoot(modifier: Modifier = Modifier) {
     }
 
     BackHandler(
-        enabled = vm.levelUpSkillOffer != null ||
+        enabled = vm.awaitingClassSelect ||
+            vm.levelUpSkillOffer != null ||
             vm.pendingExploreChoice != null ||
             vm.menuTab != MenuTab.NONE ||
             vm.scene == Scene.INTERIOR,
     ) {
         when {
+            vm.awaitingClassSelect -> vm.cancelClassSelect()
             vm.levelUpSkillOffer != null -> vm.dismissLevelUpSkillOffer()
             vm.pendingExploreChoice != null -> vm.cancelExploreFloorChoice()
             vm.menuTab != MenuTab.NONE -> vm.menuTab = MenuTab.NONE
@@ -146,28 +148,31 @@ fun GameRoot(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(modifier = modifier.background(Palette.WoodDark)) {
-        // 메뉴·HP/MP는 씬 밖 고정 영역 — 던전 카메라 스크롤과 겹치지 않음
-        TopMenuBar(vm, Modifier.zIndex(2f))
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .clipToBounds()
-                .zIndex(1f)
-        ) {
-            when (vm.scene) {
-                Scene.VILLAGE -> VillageScene(vm, Modifier.fillMaxSize())
-                Scene.INTERIOR -> PlaceScreen(
-                    vm = vm,
-                    id = vm.currentPlace ?: PlaceId.HOME,
-                    modifier = Modifier.fillMaxSize()
-                )
+    Box(modifier = modifier.background(Palette.WoodDark)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 메뉴·HP/MP는 씬 밖 고정 영역 — 던전 카메라 스크롤과 겹치지 않음
+            TopMenuBar(vm, Modifier.zIndex(2f))
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clipToBounds()
+                    .zIndex(1f)
+            ) {
+                when (vm.scene) {
+                    Scene.VILLAGE -> VillageScene(vm, Modifier.fillMaxSize())
+                    Scene.INTERIOR -> PlaceScreen(
+                        vm = vm,
+                        id = vm.currentPlace ?: PlaceId.HOME,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                MenuOverlay(vm)
+                WorldMapOverlay(vm)
+                LevelUpSkillOverlay(vm)
+                ExploreFloorChoiceOverlay(vm)
             }
-            MenuOverlay(vm)
-            WorldMapOverlay(vm)
-            LevelUpSkillOverlay(vm)
-            ExploreFloorChoiceOverlay(vm)
         }
+        ClassSelectOverlay(vm, Modifier.fillMaxSize().zIndex(20f))
     }
 }

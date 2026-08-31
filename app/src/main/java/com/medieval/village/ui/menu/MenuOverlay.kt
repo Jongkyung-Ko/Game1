@@ -120,7 +120,7 @@ fun MenuOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
 @Composable
 private fun ColumnScope.StatusTab(vm: GameViewModel) {
     val p = vm.player
-    Text("${p.name} · ${p.title}", color = Palette.Parchment, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+    Text("${p.name} · ${p.title} · ${p.heroJob.label}", color = Palette.Parchment, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     Text("Lv.${p.level}   ${p.day}일차", color = Palette.ParchmentDim, fontSize = 12.sp)
     Spacer(Modifier.height(10.dp))
 
@@ -197,8 +197,8 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     SpecialSkillSlotEditor(
         vm = vm,
         actorKey = GameViewModel.HERO_SKILL_KEY,
-        actorLabel = "${vm.player.name} · 모험가",
-        actorClass = ActorClass.ADVENTURER,
+        actorLabel = "${vm.player.name} · ${vm.player.heroJob.label}",
+        actorClass = vm.player.heroJob.actorClass,
     )
     vm.activeParty.forEach { merc ->
         Spacer(Modifier.height(8.dp))
@@ -496,7 +496,7 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
     Spacer(Modifier.height(12.dp))
     SectionTitle("게임 정보")
     Text(
-        "중세마을 이야기 v0.4.45\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
+        "중세마을 이야기 v0.4.46\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
         color = Palette.ParchmentDim,
         fontSize = 12.sp,
         lineHeight = 17.sp
@@ -511,7 +511,7 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             WoodButton("네, 초기화", highlight = true) {
-                vm.newGame()
+                vm.requestNewGame()
                 confirmNew = false
             }
             WoodButton("아니요") { confirmNew = false }

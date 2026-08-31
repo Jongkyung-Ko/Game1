@@ -39,6 +39,7 @@ import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.model.RegionDialogue
 import com.medieval.village.model.ActorClass
+import com.medieval.village.model.HeroJob
 import com.medieval.village.model.Settlement
 import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
@@ -144,6 +145,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val saveStore = GameSaveStore(application)
 
     var player by mutableStateOf(Player())
+        private set
+
+    /** 첫 시작·새 게임 시 직업 선택 대기 */
+    var awaitingClassSelect by mutableStateOf(true)
+        private set
+    /** 한 번이라도 직업을 확정했으면 선택 화면에서 취소 가능 */
+    var hasStartedRun by mutableStateOf(false)
         private set
 
     val inventory = mutableStateListOf<InventoryEntry>()
@@ -332,7 +340,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val partyTrail = PartyTrail()
 
     init {
-        newGame()
+        // 직업을 고를 때까지 새 게임을 시작하지 않는다.
     }
 
     /** 현재 선두 기준 파티 그리기 슬롯 (궤적 추종 포함) */
@@ -435,6 +443,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             put("player", JSONObject().apply {
                 put("name", player.name)
                 put("title", player.title)
+                put("heroJob", player.heroJob.id)
                 put("level", player.level)
                 put("exp", player.exp)
                 put("hp", player.hp)
@@ -561,6 +570,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         player = Player(
             name = p.optString("name", "아서"),
             title = p.optString("title", "견습 모험가"),
+            heroJob = HeroJob.fromId(p.optString("heroJob", HeroJob.WARRIOR.id)),
             level = p.optInt("level", 1),
             exp = p.optInt("exp", 0),
             hp = p.optInt("hp", 60),
@@ -713,10 +723,29 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             scene = Scene.VILLAGE
             resetPartyTrail(heroX, heroY)
         }
+        awaitingClassSelect = false
+        hasStartedRun = true
     }
 
-    fun newGame() {
-        player = Player()
+    fun requestNewGame() {
+        awaitingClassSelect = true
+        menuTab = MenuTab.NONE
+    }
+
+    fun cancelClassSelect() {
+        if (hasStartedRun) awaitingClassSelect = false
+    }
+
+    fun confirmHeroJob(job: HeroJob) {
+        awaitingClassSelect = false
+        hasStartedRun = true
+        newGame(job)
+    }
+
+    fun newGame(job: HeroJob = HeroJob.WARRIOR) {
+        val bgm = player.bgmVolume
+        val sfx = player.sfxVolume
+        player = job.startingPlayer().copy(bgmVolume = bgm, sfxVolume = sfx)
         inventory.clear()
         equipment.clear()
         skills.clear()
@@ -749,8 +778,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         addItem(ItemCatalog.potion, 3)
         addItem(ItemCatalog.bread, 2)
-        equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.rustySword)
-        equipment[ItemType.ARMOR] = EquippedItem(ItemCatalog.leatherArmor)
+        applyStartingGear(job)
 
         currentSettlement = SettlementId.OAKHAVEN
         val home = placeOf(PlaceId.HOME)
@@ -771,6 +799,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         say("풍요의 마을… 한때 '신성한 포도주'로 번영했던 이곳에 눈을 떴다.")
         say("몇 년 전 지하 최심부에서 검붉은 '좀비석'이 발굴된 뒤, 마을은 저주에 잠식되고 있다.")
         say("문을 열고, 지상으로 스며드는 재앙의 근원을 마주하자. 실내에서는 화면을 눌러 걸어 다닐 수 있다.")
+    }
+
+    private fun applyStartingGear(job: HeroJob) {
+        equipment.clear()
+        when (job) {
+            HeroJob.KNIGHT -> {
+                equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.rustySword)
+                equipment[ItemType.SHIELD] = EquippedItem(ItemCatalog.woodShield)
+                equipment[ItemType.ARMOR] = EquippedItem(ItemCatalog.leatherArmor)
+            }
+            HeroJob.WARRIOR -> {
+                equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.rustySword)
+                equipment[ItemType.ARMOR] = EquippedItem(ItemCatalog.leatherArmor)
+            }
+            HeroJob.MAGE -> {
+                equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.oakStaff)
+            }
+            HeroJob.ARCHER -> {
+                equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.shortBow)
+                equipment[ItemType.ARMOR] = EquippedItem(ItemCatalog.leatherArmor)
+            }
+        }
     }
 
     /** 세계지도에서 정착지로 이동한다. */
@@ -960,6 +1010,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------- 이동
 
     fun tick(dt: Float) {
+        if (awaitingClassSelect) return
         animTime += dt
         if (levelUpFxActorKey != null && animTime >= levelUpFxUntil) {
             levelUpFxActorKey = null
@@ -1879,7 +1930,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun frontActorKey(): String = frontMercenary()?.id ?: HERO_SKILL_KEY
 
-    private fun frontActorClass(): ActorClass = SpecialSkillCatalog.actorClassOf(frontMercenary())
+    private fun frontActorClass(): ActorClass =
+        frontMercenary()?.let { SpecialSkillCatalog.actorClassOf(it) }
+            ?: player.heroJob.actorClass
 
     private fun actorLevelOf(actorKey: String): Int {
         if (actorKey == HERO_SKILL_KEY) return player.level
@@ -1887,7 +1940,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun actorClassOfKey(actorKey: String): ActorClass {
-        if (actorKey == HERO_SKILL_KEY) return ActorClass.ADVENTURER
+        if (actorKey == HERO_SKILL_KEY) return player.heroJob.actorClass
         return SpecialSkillCatalog.actorClassOf(party.firstOrNull { it.id == actorKey })
     }
 
@@ -3568,7 +3621,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         player = p
         if (levelsGained.isNotEmpty()) {
-            onActorLevelUp(HERO_SKILL_KEY, p.name, ActorClass.ADVENTURER, levelsGained)
+            onActorLevelUp(HERO_SKILL_KEY, p.name, player.heroJob.actorClass, levelsGained)
         }
     }
 

@@ -7,6 +7,7 @@ enum class ActorClass(val label: String) {
     ROGUE("도적"),
     MAGE("마법사"),
     PALADIN("성기사"),
+    ARCHER("궁수"),
 }
 
 /**
@@ -106,11 +107,12 @@ object SpecialSkillCatalog {
             meleeFxScale = 1.6f,
             animDuration = 0.52f,
         )
-        "adv_shot" -> SpecialVfxSpec(
-            animSet = "adv_shot",
-            projectileFxKey = "adv_fx_arrow",
-            animDuration = 0.5f,
-        )
+        "adv_shot", "arc_shot", "arc_double", "arc_pierce", "arc_rain", "arc_snipe", "arc_storm" ->
+            SpecialVfxSpec(
+                animSet = "adv_shot",
+                projectileFxKey = "adv_fx_arrow",
+                animDuration = 0.5f,
+            )
         "adv_bolt" -> SpecialVfxSpec(
             animSet = "adv_bolt",
             projectileFxKey = "adv_fx_firebolt",
@@ -142,7 +144,7 @@ object SpecialSkillCatalog {
         "adv_smash", "war_rage" -> "skill_smash"
         "adv_flurry", "rog_vital", "pal_slash" -> "skill_slash"
         "adv_charge", "war_rush" -> "skill_charge"
-        "adv_shot" -> "skill_bow"
+        "adv_shot", "arc_shot", "arc_double", "arc_pierce", "arc_rain", "arc_snipe", "arc_storm" -> "skill_bow"
         "adv_bolt", "mag_blast", "mag_meteor" -> "skill_fire"
         "adv_finisher" -> "skill_finisher"
         "war_quake" -> "skill_quake"
@@ -311,6 +313,36 @@ object SpecialSkillCatalog {
                     "pal_holy", "성역강림", "성역", ActorClass.PALADIN, 7, 17, 3.5f, WeaponStyle.MELEE,
                     "성역을 불러 적을 분쇄한다.",
                     requires = listOf("pal_wrath", "pal_guard"), mapCol = 3, mapRow = 0,
+                ),
+            )
+        )
+        // —— 궁수: 조준 / 연사 → 폭풍 ——
+        addAll(
+            listOf(
+                SpecialSkillDef(
+                    "arc_shot", "조준사격", "조준", ActorClass.ARCHER, 2, 8, 3.0f, WeaponStyle.BOW,
+                    "한 적을 정확히 겨냥한 화살.", mapCol = 0, mapRow = 0,
+                ),
+                SpecialSkillDef(
+                    "arc_double", "이연사", "연사", ActorClass.ARCHER, 3, 11, 2.9f, WeaponStyle.BOW,
+                    "두 발을 잇따라 날린다.", requires = listOf("arc_shot"), mapCol = 1, mapRow = 0,
+                ),
+                SpecialSkillDef(
+                    "arc_snipe", "저격", "저격", ActorClass.ARCHER, 5, 15, 3.4f, WeaponStyle.BOW,
+                    "약점을 노린 강력한 한 발.", requires = listOf("arc_double"), mapCol = 2, mapRow = 0,
+                ),
+                SpecialSkillDef(
+                    "arc_pierce", "관통화살", "관통", ActorClass.ARCHER, 4, 12, 3.1f, WeaponStyle.BOW,
+                    "전열을 꿰뚫는 화살.", requires = listOf("arc_shot"), mapCol = 1, mapRow = 1,
+                ),
+                SpecialSkillDef(
+                    "arc_rain", "화살비", "화살비", ActorClass.ARCHER, 5, 16, 3.2f, WeaponStyle.BOW,
+                    "전장에 화살을 쏟아붓는다.", requires = listOf("arc_pierce"), mapCol = 2, mapRow = 1,
+                ),
+                SpecialSkillDef(
+                    "arc_storm", "폭풍사격", "폭풍", ActorClass.ARCHER, 7, 18, 3.5f, WeaponStyle.BOW,
+                    "화살의 폭풍으로 전장을 덮는다.",
+                    requires = listOf("arc_snipe", "arc_rain"), mapCol = 3, mapRow = 0,
                 ),
             )
         )

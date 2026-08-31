@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.medieval.village.game.Facing
+import com.medieval.village.model.HeroJob
 import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
 import com.medieval.village.model.WorldFlags
@@ -52,7 +53,12 @@ class CustomArt(
 
     fun npcSpriteOrNull(key: String): ImageBitmap? = charOrNull(key)
 
-    fun heroSpriteOrNull(facingKey: String): ImageBitmap? = heroes[facingKey]
+    fun heroSpriteOrNull(facingKey: String, job: HeroJob = HeroJob.WARRIOR): ImageBitmap? {
+        if (job != HeroJob.WARRIOR) {
+            heroes["${job.id}_$facingKey"]?.let { return it }
+        }
+        return heroes[facingKey]
+    }
 
     fun buildingOrNull(key: String): ImageBitmap? = buildings[key]
 
@@ -265,6 +271,15 @@ class CustomArt(
                             heroes[key] = it
                         }
                     }
+                    HeroJob.entries
+                        .filter { it != HeroJob.WARRIOR }
+                        .forEach { job ->
+                            HERO_KEYS.forEach { key ->
+                                loadAsset(app, "custom/hero_${job.id}_$key.png", cleanEdges = true)?.let {
+                                    heroes["${job.id}_$key"] = it
+                                }
+                            }
+                        }
                     val buildings = LinkedHashMap<String, ImageBitmap>()
                     BUILDING_KEYS.forEach { key ->
                         // 건물 일러스트는 이미 알파가 정리되어 있으므로 가장자리 가공 없이 로드
@@ -491,6 +506,7 @@ fun DrawScope.drawCustomHero(
     animKind: com.medieval.village.game.HeroAnimKind = com.medieval.village.game.HeroAnimKind.IDLE,
     animFrame: Int = 0,
     specialSet: String? = null,
+    heroJob: HeroJob = HeroJob.WARRIOR,
 ) {
     drawAnimatedHero(
         art = art,
@@ -503,5 +519,6 @@ fun DrawScope.drawCustomHero(
         animKind = animKind,
         animFrame = animFrame,
         specialSet = specialSet,
+        heroJob = heroJob,
     )
 }

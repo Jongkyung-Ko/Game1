@@ -3,6 +3,7 @@ package com.medieval.village.model
 data class Player(
     val name: String = "아서",
     val title: String = "견습 모험가",
+    val heroJob: HeroJob = HeroJob.WARRIOR,
     val level: Int = 1,
     val exp: Int = 0,
     val hp: Int = 60,
