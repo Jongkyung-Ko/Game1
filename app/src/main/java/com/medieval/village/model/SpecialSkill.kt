@@ -113,7 +113,7 @@ object SpecialSkillCatalog {
                 projectileFxKey = "adv_fx_arrow",
                 animDuration = 0.5f,
             )
-        "adv_bolt" -> SpecialVfxSpec(
+        "adv_bolt", "mag_blast", "mag_meteor" -> SpecialVfxSpec(
             animSet = "adv_bolt",
             projectileFxKey = "adv_fx_firebolt",
             impactFxKey = "adv_fx_fireburst",

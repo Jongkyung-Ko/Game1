@@ -94,6 +94,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
             "hit" -> audio.playSfx(Sfx.HIT)
             "arrow_hit" -> audio.playSfx(Sfx.ARROW_HIT)
             "magic_hit" -> audio.playSfx(Sfx.MAGIC_HIT)
+            "magic_shot" -> audio.playSfx(Sfx.MAGIC_SHOT)
             "door" -> audio.playSfx(Sfx.DOOR)
             "click" -> audio.playSfx(Sfx.CLICK)
             "level_up" -> audio.playSfx(Sfx.LEVEL_UP)

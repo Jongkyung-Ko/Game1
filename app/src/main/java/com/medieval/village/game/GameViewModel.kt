@@ -133,7 +133,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private const val MELEE_CONE_DOT = 0.35f // ~70° 전방
         private const val ATTACK_COOLDOWN = 0.42f
         private const val SPECIAL_COOLDOWN = 2.15f
-        private const val MAGIC_MP_COST = 6
         private const val PROJECTILE_SPEED = 420f
         private const val KNOCKBACK_DISTANCE = 42f
         private const val MONSTER_AGGRO_RANGE = 175f
@@ -1868,9 +1867,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun canDungeonAttack(): Boolean = attackReady && dungeonFloor != null && !dungeonCombatLock
 
     private fun refreshAttackReady() {
-        val style = currentWeaponStyle()
-        val needsHeroMp = style == WeaponStyle.MAGIC && frontMercenary() == null
-        attackReady = attackCooldown <= 0f && (!needsHeroMp || player.mp >= MAGIC_MP_COST)
+        attackReady = attackCooldown <= 0f
     }
 
     /** 공격 버튼 — 선두가 근접 참격 또는 화살/마법 발사 */
@@ -1883,12 +1880,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             frontIndex = 0
         }
         val style = currentWeaponStyle()
-        val heroCasting = style == WeaponStyle.MAGIC && frontMercenary() == null
-        if (heroCasting && player.mp < MAGIC_MP_COST) {
-            say("마나가 부족하다.")
-            refreshAttackReady()
-            return
-        }
         attackCooldown = ATTACK_COOLDOWN
         refreshAttackReady()
         val dmg = if (frontMercenary() != null) {
@@ -1915,11 +1906,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 spawnProjectile(WeaponStyle.BOW, dmg, life = 1.15f)
             }
             WeaponStyle.MAGIC -> {
-                if (heroCasting) {
-                    player = player.copy(mp = player.mp - MAGIC_MP_COST)
-                }
-                emitSfx("click")
-                spawnProjectile(WeaponStyle.MAGIC, dmg + 3, life = 1.25f)
+                emitSfx(MagicBoltKind.BASIC.shotSfx())
+                spawnProjectile(
+                    style = WeaponStyle.MAGIC,
+                    damage = dmg + 3,
+                    life = 1.15f,
+                    radius = 14f,
+                    magicKind = MagicBoltKind.BASIC,
+                )
             }
         }
         refreshAttackReady()
@@ -2250,13 +2244,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             WeaponStyle.MAGIC -> {
+                val kind = magicKindForSkill(skill.id)
                 spawnProjectile(
                     style = WeaponStyle.MAGIC,
                     damage = dmg + 4,
                     life = 1.35f,
-                    fxSpriteKey = vfx?.projectileFxKey,
-                    impactSpriteKey = vfx?.impactFxKey,
-                    radius = if (vfx?.projectileFxKey != null) 24f else 20f,
+                    fxSpriteKey = vfx?.projectileFxKey ?: kind.projectileFxKey(),
+                    impactSpriteKey = vfx?.impactFxKey ?: kind.impactFxKey(),
+                    radius = 22f,
+                    magicKind = kind,
+                    announce = false,
                 )
             }
         }
@@ -2312,14 +2309,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             else -> {
                 val base = totalAtk / 2 + skill.power + player.intel * 2 + blessBonus() / 2
                 val dmg = (base + Random.nextInt(0, 6)).coerceAtLeast(6)
-                emitSfx(if (skill.id == "thunder") "skill_lightning" else "skill_fire")
+                val kind = magicKindForSkill(skill.id)
+                emitSfx(kind.shotSfx())
                 startAttackAnim(HeroAnimKind.MAGIC, 0.52f)
                 say("『${skill.name}』 시전! (피해 $dmg)")
                 spawnProjectile(
                     style = WeaponStyle.MAGIC,
                     damage = dmg,
                     life = 1.35f,
+                    fxSpriteKey = kind.projectileFxKey(),
+                    impactSpriteKey = kind.impactFxKey(),
                     radius = 22f,
+                    magicKind = kind,
+                    announce = false,
                 )
             }
         }
@@ -2454,6 +2456,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         fxSpriteKey: String? = null,
         impactSpriteKey: String? = null,
         radius: Float = 18f,
+        magicKind: MagicBoltKind? = null,
+        announce: Boolean = true,
     ) {
         val fx = facing.dirX()
         val fy = facing.dirY()
@@ -2479,8 +2483,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             radius = radius,
             fxSpriteKey = fxSpriteKey,
             impactSpriteKey = impactSpriteKey,
+            magicKind = magicKind,
         )
-        say(if (style == WeaponStyle.BOW) "화살을 날렸다!" else "마력을 쏘아냈다!")
+        if (announce) {
+            say(
+                when {
+                    style == WeaponStyle.BOW -> "화살을 날렸다!"
+                    magicKind == MagicBoltKind.BASIC -> "마력탄을 쏘아냈다!"
+                    else -> "마력을 쏘아냈다!"
+                }
+            )
+        }
     }
 
     private fun damageMonster(
@@ -3211,9 +3224,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 it.alive && hypot(it.x - p.x, it.y - p.y) < p.radius + 30f
             }
             if (hit != null) {
-                val hitSfx = when (p.style) {
-                    WeaponStyle.BOW -> "arrow_hit"
-                    WeaponStyle.MAGIC -> "magic_hit"
+                val hitSfx = when {
+                    p.style == WeaponStyle.BOW -> "arrow_hit"
+                    p.magicKind != null -> p.magicKind.hitSfx()
+                    p.style == WeaponStyle.MAGIC -> "magic_hit"
                     else -> "hit"
                 }
                 damageMonster(

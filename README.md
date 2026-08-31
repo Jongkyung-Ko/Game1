@@ -41,7 +41,7 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 - 문 앞에 서면 하단에 `들어가기` 버튼 표시
 - 뒤로 가기 → 메뉴 닫기 / 마을로 나가기
 
-주인공은 게임 시작 시 **기사 / 용사 / 마법사 / 궁수** 중 직업을 고른 뒤 **자기 집 안에서** 출발하며, `마을로 나가기`를 눌러 마을로 나옵니다. 걸을 때는 방향별 걷기 모션이, 공격할 때는 직업별 베기·활시위·마법 시전 모션이 재생됩니다. 레벨 5·10·15에 상위 직군으로 전직하고, 레벨 20에 각성합니다. 전직할 때마다 레벨업 능력 상승이 이전의 3배가 됩니다.
+주인공은 게임 시작 시 **기사 / 용사 / 마법사 / 궁수** 중 직업을 고른 뒤 **자기 집 안에서** 출발하며, `마을로 나가기`를 눌러 마을로 나옵니다. 걸을 때는 방향별 걷기 모션이, 공격할 때는 직업별 베기·활시위·마법 시전 모션이 재생됩니다. 마법사 기본 마력탄은 MP를 쓰지 않고, 배운 마법·특별스킬만 마나와 다른 미사일·효과음을 씁니다. 레벨 5·10·15에 상위 직군으로 전직하고, 레벨 20에 각성합니다. 전직할 때마다 레벨업 능력 상승이 이전의 3배가 됩니다.
 
 ## 음악과 동료
 
@@ -51,17 +51,17 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 - 용병은 여러 명 고용할 수 있지만 Status에서 최대 2명만 원정대로 선택합니다.
 - 선택한 용병만 마을과 각 장소 상단 그림에 등장하고 던전 전투력에 반영됩니다.
 
-## APK 다운로드 (최신: v0.4.47)
+## APK 다운로드 (최신: v0.4.49)
 
-바로 설치할 파일: [MedievalVillage-v0.4.47-debug.apk](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.47/MedievalVillage-v0.4.47-debug.apk)
+바로 설치할 파일: [MedievalVillage-v0.4.49-debug.apk](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.49/MedievalVillage-v0.4.49-debug.apk)
 
-직업 스프라이트 한 번에 받기: [HeroClassSprites-v0.4.47.zip](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.47/HeroClassSprites-v0.4.47.zip)
+직업 스프라이트 한 번에 받기: [HeroClassSprites-v0.4.49.zip](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.49/HeroClassSprites-v0.4.49.zip)
 
 이전 버전은 [Releases](https://github.com/Jongkyung-Ko/Game1/releases) 에서 받을 수 있습니다.
 
 1. 위 APK 를 폰으로 다운로드
 2. 폰 **설정 > 보안** 에서 알 수 없는 앱 설치 허용
-3. APK 를 열어 설치 → 앱 이름 **중세마을 v0.4.47**
+3. APK 를 열어 설치 → 앱 이름 **중세마을 v0.4.49**
 4. 예전 빌드와 패키지명이 다르므로 기존 앱을 지울 필요는 없습니다
 
 `v*` 태그를 푸시하면 GitHub Actions 가 자동으로 APK와 직업 스프라이트 zip 을 빌드해 Release Assets 에 올립니다.

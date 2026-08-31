@@ -12,6 +12,8 @@ enum class Sfx {
     ARROW_HIT,
     /** 마법 적중 */
     MAGIC_HIT,
+    /** 기본 마력탄 발사 (MP 없음) */
+    MAGIC_SHOT,
     DOOR,
     CLICK,
     /** 레벨업 */
@@ -68,6 +70,7 @@ class GameAudioEngine(context: Context) {
             Sfx.HIT to hit,
             Sfx.ARROW_HIT to hit,
             Sfx.MAGIC_HIT to hit,
+            Sfx.MAGIC_SHOT to pool.load(appContext, R.raw.sfx_magic_shot, 1),
             Sfx.DOOR to pool.load(appContext, R.raw.sfx_door, 1),
             Sfx.CLICK to pool.load(appContext, R.raw.sfx_click, 1),
             Sfx.LEVEL_UP to pool.load(appContext, R.raw.sfx_level_up, 1),
@@ -147,6 +150,7 @@ class GameAudioEngine(context: Context) {
         val (vol, rate) = when (sfx) {
             Sfx.ARROW_HIT -> 0.75f to 1.35f
             Sfx.MAGIC_HIT -> 0.8f to 0.72f
+            Sfx.MAGIC_SHOT -> 0.78f to 1f
             Sfx.HIT -> 0.75f to 1f
             Sfx.LEVEL_UP -> 0.92f to 1f
             Sfx.SKILL_SMASH, Sfx.SKILL_CRIT, Sfx.SKILL_QUAKE, Sfx.SKILL_BASH -> 0.9f to 1f

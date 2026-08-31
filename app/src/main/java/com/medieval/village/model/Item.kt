@@ -116,12 +116,12 @@ object ItemCatalog {
     // 마법
     val oakStaff = Item(
         "oak_staff", "참나무 지팡이", ItemType.WEAPON, 240, atk = 10,
-        desc = "마력 탄환을 쏘아낸다. 공격 시 MP를 소모한다.",
+        desc = "기본 마력탄은 MP 없이 쏜다. 마법·특별스킬만 마나를 쓴다.",
         weaponStyle = WeaponStyle.MAGIC,
     )
     val flameWand = Item(
         "flame_wand", "화염 지팡이", ItemType.WEAPON, 640, atk = 19,
-        desc = "불꽃 탄환을 발사한다. 공격 시 MP를 소모한다.",
+        desc = "기본 공격은 MP 없이 마력탄을 쏜다. 화염 계열 주문은 마나를 쓴다.",
         weaponStyle = WeaponStyle.MAGIC,
     )
 
