@@ -239,6 +239,7 @@ class CustomArt(
             "ice_elemental_walk", "ice_elemental_attack",
         )
         private const val HERO_ANIM_FRAMES = 4
+        private val FRAME_FILE_NAME = Regex("""^(.+)_([0-3])\.png$""")
 
         fun loadOrNull(context: Context): CustomArt? {
             cached?.let { return it }
@@ -316,7 +317,13 @@ class CustomArt(
                     }
                     Log.i(TAG, "Loaded interiors: ${interiors.keys}")
                     val heroAnims = LinkedHashMap<String, List<ImageBitmap>>()
-                    HERO_ANIM_SETS.forEach { set ->
+                    val frameFiles = app.assets.list("custom/hero_anim/frames") ?: emptyArray()
+                    val discovered = LinkedHashSet<String>()
+                    frameFiles.forEach { name ->
+                        FRAME_FILE_NAME.matchEntire(name)?.let { discovered += it.groupValues[1] }
+                    }
+                    val setsToLoad = if (discovered.isNotEmpty()) discovered else HERO_ANIM_SETS.toSet()
+                    setsToLoad.forEach { set ->
                         val frames = ArrayList<ImageBitmap>(HERO_ANIM_FRAMES)
                         for (i in 0 until HERO_ANIM_FRAMES) {
                             loadAsset(

@@ -9,7 +9,7 @@ import kotlin.math.floor
 
 /**
  * 히어로 애니메이션 프레임 선택.
- * walk_side / walk_down / slash / bow / magic 시트에서 고른다.
+ * 직업·전직 랭크별 walk_side / walk_down / walk_up / slash / bow / magic 시트에서 고른다.
  * specialSet 이 있으면 특별스킬 전용 시트(adv_smash 등)를 우선한다.
  */
 fun CustomArt.heroAnimSprite(
@@ -22,13 +22,8 @@ fun CustomArt.heroAnimSprite(
     heroJob: HeroJob = HeroJob.WARRIOR,
     heroRank: Int = 0,
 ): ImageBitmap? {
-    val useWarriorAnims = heroJob == HeroJob.WARRIOR && heroRank <= 0
     if (!specialSet.isNullOrBlank()) {
-        if (useWarriorAnims) {
-            heroAnimFrameOrNull(specialSet, animFrame)?.let { return it }
-        } else {
-            heroAnimFrameOrNull("${heroJob.id}_$specialSet", animFrame)?.let { return it }
-        }
+        firstHeroAnim(heroJob, heroRank, specialSet, animFrame)?.let { return it }
     }
     val attackKey = when (kind) {
         HeroAnimKind.SLASH -> "slash"
@@ -37,36 +32,23 @@ fun CustomArt.heroAnimSprite(
         else -> null
     }
     if (attackKey != null) {
-        if (useWarriorAnims) {
-            return heroAnimFrameOrNull(attackKey, animFrame)
-                ?: heroSpriteOrNull("side", heroJob, heroRank)
+        firstHeroAnim(heroJob, heroRank, attackKey, animFrame)?.let { return it }
+        val fallback = jobDefaultAttack(heroJob)
+        if (fallback != attackKey) {
+            firstHeroAnim(heroJob, heroRank, fallback, animFrame)?.let { return it }
         }
-        heroAnimFrameOrNull("${heroJob.id}_$attackKey", animFrame)?.let { return it }
         return heroSpriteOrNull("side", heroJob, heroRank)
             ?: heroSpriteOrNull("front", heroJob, heroRank)
     }
 
     val useWalk = kind == HeroAnimKind.WALK || (kind == HeroAnimKind.IDLE && walking)
-    if (useWarriorAnims) {
-        val walkKey = when (facing) {
-            Facing.DOWN -> "walk_down"
-            Facing.UP -> null // 후면 걷기 시트 없음 → 정적 back
-            Facing.LEFT, Facing.RIGHT -> "walk_side"
-        }
-        if (walkKey != null) {
-            val frame = if (useWalk) walkFrameIndex(walkPhase) else 0
-            heroAnimFrameOrNull(walkKey, frame)?.let { return it }
-        }
-    } else {
-        val walkKey = when (facing) {
-            Facing.DOWN -> "${heroJob.id}_walk_down"
-            Facing.UP -> null
-            Facing.LEFT, Facing.RIGHT -> "${heroJob.id}_walk_side"
-        }
-        if (walkKey != null && useWalk) {
-            heroAnimFrameOrNull(walkKey, walkFrameIndex(walkPhase))?.let { return it }
-        }
+    val walkSuffix = when (facing) {
+        Facing.DOWN -> "walk_down"
+        Facing.UP -> "walk_up"
+        Facing.LEFT, Facing.RIGHT -> "walk_side"
     }
+    val frame = if (useWalk) walkFrameIndex(walkPhase) else 0
+    firstHeroAnim(heroJob, heroRank, walkSuffix, frame)?.let { return it }
     val staticKey = when (facing) {
         Facing.UP -> "back"
         Facing.LEFT, Facing.RIGHT -> "side"
@@ -75,6 +57,38 @@ fun CustomArt.heroAnimSprite(
     return heroSpriteOrNull(staticKey, heroJob, heroRank)
         ?: heroSpriteOrNull("front", heroJob, heroRank)
         ?: charOrNull("warrior")
+}
+
+private fun jobDefaultAttack(job: HeroJob): String = when (job) {
+    HeroJob.MAGE -> "magic"
+    HeroJob.ARCHER -> "bow"
+    else -> "slash"
+}
+
+/** 전직 랭크 시트 → 직업 기본 시트 → (용사 0랭크) 접두사 없는 시트 */
+private fun CustomArt.firstHeroAnim(
+    job: HeroJob,
+    rank: Int,
+    suffix: String,
+    frame: Int,
+): ImageBitmap? {
+    for (key in heroAnimKeys(job, rank, suffix)) {
+        heroAnimFrameOrNull(key, frame)?.let { return it }
+    }
+    return null
+}
+
+private fun heroAnimKeys(job: HeroJob, rank: Int, suffix: String): List<String> {
+    val keys = ArrayList<String>(4)
+    val r = rank.coerceAtLeast(0)
+    if (r > 0) keys += "${job.id}_r${r}_$suffix"
+    if (job == HeroJob.WARRIOR && r <= 0) {
+        keys += suffix
+    } else {
+        keys += "${job.id}_$suffix"
+        if (job == HeroJob.WARRIOR) keys += suffix
+    }
+    return keys
 }
 
 /** 선두·후열 공통 — walkPhase 로 4프레임 순환 */
