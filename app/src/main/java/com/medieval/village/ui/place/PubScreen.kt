@@ -134,6 +134,7 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         frontIndex = vm.frontIndex,
                         slots = partySlots,
                         heroJob = vm.player.heroJob,
+                        heroRank = vm.player.spriteRank,
                     )
                     val fxKey = vm.levelUpFxActorKey
                     if (fxKey != null) {

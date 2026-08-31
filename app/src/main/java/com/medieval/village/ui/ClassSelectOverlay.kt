@@ -146,6 +146,14 @@ private fun ClassSelectContent(vm: GameViewModel, modifier: Modifier = Modifier)
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(top = 4.dp),
                             )
+                            Text(
+                                job.pathLine,
+                                color = Palette.Gold.copy(alpha = 0.85f),
+                                fontSize = 9.sp,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 12.sp,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
                         }
                     }
                     if (row.size == 1) {

@@ -64,6 +64,7 @@ data class Player(
     val hpRatio: Float get() = if (maxHp <= 0) 0f else hp.toFloat() / maxHp
     val mpRatio: Float get() = if (maxMp <= 0) 0f else mp.toFloat() / maxMp
     val expRatio: Float get() = exp.toFloat() / expToNext
+    val spriteRank: Int get() = HeroAdvancement.spriteRankAt(level)
     val worldFlags: WorldFlags
         get() = WorldFlags(
             castleCleared = castleCleared,

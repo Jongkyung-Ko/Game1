@@ -20,8 +20,9 @@ fun CustomArt.heroAnimSprite(
     animFrame: Int,
     specialSet: String? = null,
     heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ): ImageBitmap? {
-    val useWarriorAnims = heroJob == HeroJob.WARRIOR
+    val useWarriorAnims = heroJob == HeroJob.WARRIOR && heroRank <= 0
     if (!specialSet.isNullOrBlank()) {
         if (useWarriorAnims) {
             heroAnimFrameOrNull(specialSet, animFrame)?.let { return it }
@@ -38,11 +39,11 @@ fun CustomArt.heroAnimSprite(
     if (attackKey != null) {
         if (useWarriorAnims) {
             return heroAnimFrameOrNull(attackKey, animFrame)
-                ?: heroSpriteOrNull("side", heroJob)
+                ?: heroSpriteOrNull("side", heroJob, heroRank)
         }
         heroAnimFrameOrNull("${heroJob.id}_$attackKey", animFrame)?.let { return it }
-        return heroSpriteOrNull("side", heroJob)
-            ?: heroSpriteOrNull("front", heroJob)
+        return heroSpriteOrNull("side", heroJob, heroRank)
+            ?: heroSpriteOrNull("front", heroJob, heroRank)
     }
 
     val useWalk = kind == HeroAnimKind.WALK || (kind == HeroAnimKind.IDLE && walking)
@@ -71,8 +72,8 @@ fun CustomArt.heroAnimSprite(
         Facing.LEFT, Facing.RIGHT -> "side"
         Facing.DOWN -> "front"
     }
-    return heroSpriteOrNull(staticKey, heroJob)
-        ?: heroSpriteOrNull("front", heroJob)
+    return heroSpriteOrNull(staticKey, heroJob, heroRank)
+        ?: heroSpriteOrNull("front", heroJob, heroRank)
         ?: charOrNull("warrior")
 }
 
@@ -94,6 +95,7 @@ fun DrawScope.drawAnimatedHero(
     animFrame: Int = 0,
     specialSet: String? = null,
     heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     val sprite = art.heroAnimSprite(
         kind = animKind,
@@ -103,6 +105,7 @@ fun DrawScope.drawAnimatedHero(
         animFrame = animFrame,
         specialSet = specialSet,
         heroJob = heroJob,
+        heroRank = heroRank,
     ) ?: return
     // 공격 시트는 오른쪽 기준 → LEFT 일 때 반전. UP/DOWN 공격도 측면 시트 사용.
     val attacking = animKind == HeroAnimKind.SLASH ||

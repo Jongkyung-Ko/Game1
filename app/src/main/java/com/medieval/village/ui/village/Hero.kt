@@ -46,6 +46,7 @@ fun DrawScope.drawHero(
     animFrame: Int = 0,
     specialSet: String? = null,
     heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     val attacking = animKind == HeroAnimKind.SLASH ||
         animKind == HeroAnimKind.BOW ||
@@ -65,6 +66,7 @@ fun DrawScope.drawHero(
             animFrame = animFrame,
             specialSet = specialSet,
             heroJob = heroJob,
+            heroRank = heroRank,
         )
         return
     }

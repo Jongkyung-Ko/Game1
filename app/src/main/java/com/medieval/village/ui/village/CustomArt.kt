@@ -53,7 +53,17 @@ class CustomArt(
 
     fun npcSpriteOrNull(key: String): ImageBitmap? = charOrNull(key)
 
-    fun heroSpriteOrNull(facingKey: String, job: HeroJob = HeroJob.WARRIOR): ImageBitmap? {
+    fun heroSpriteOrNull(
+        facingKey: String,
+        job: HeroJob = HeroJob.WARRIOR,
+        rank: Int = 0,
+    ): ImageBitmap? {
+        val r = rank.coerceAtLeast(0)
+        if (r > 0) {
+            for (i in r downTo 1) {
+                heroes["${job.id}_r${i}_$facingKey"]?.let { return it }
+            }
+        }
         if (job != HeroJob.WARRIOR) {
             heroes["${job.id}_$facingKey"]?.let { return it }
         }
@@ -271,15 +281,26 @@ class CustomArt(
                             heroes[key] = it
                         }
                     }
-                    HeroJob.entries
-                        .filter { it != HeroJob.WARRIOR }
-                        .forEach { job ->
+                    HeroJob.entries.forEach { job ->
+                        if (job != HeroJob.WARRIOR) {
                             HERO_KEYS.forEach { key ->
                                 loadAsset(app, "custom/hero_${job.id}_$key.png", cleanEdges = true)?.let {
                                     heroes["${job.id}_$key"] = it
                                 }
                             }
                         }
+                        for (rank in 1..3) {
+                            HERO_KEYS.forEach { key ->
+                                loadAsset(
+                                    app,
+                                    "custom/hero_${job.id}_r${rank}_$key.png",
+                                    cleanEdges = true,
+                                )?.let {
+                                    heroes["${job.id}_r${rank}_$key"] = it
+                                }
+                            }
+                        }
+                    }
                     val buildings = LinkedHashMap<String, ImageBitmap>()
                     BUILDING_KEYS.forEach { key ->
                         // 건물 일러스트는 이미 알파가 정리되어 있으므로 가장자리 가공 없이 로드
@@ -507,6 +528,7 @@ fun DrawScope.drawCustomHero(
     animFrame: Int = 0,
     specialSet: String? = null,
     heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     drawAnimatedHero(
         art = art,
@@ -520,5 +542,6 @@ fun DrawScope.drawCustomHero(
         animFrame = animFrame,
         specialSet = specialSet,
         heroJob = heroJob,
+        heroRank = heroRank,
     )
 }

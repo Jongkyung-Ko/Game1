@@ -26,6 +26,7 @@ fun DrawScope.drawPartySlots(
     rearScaleFactor: Float = PARTY_REAR_SCALE_FACTOR,
     specialAnimSet: String? = null,
     heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     // 뒤쪽부터 그려 선두가 위에
     for (i in slots.lastIndex downTo 0) {
@@ -59,6 +60,7 @@ fun DrawScope.drawPartySlots(
                 animFrame = animFrame,
                 specialSet = if (slot.isFront) specialAnimSet else null,
                 heroJob = heroJob,
+                heroRank = heroRank,
             )
         } else {
             drawMercenary(
@@ -92,6 +94,7 @@ fun DrawScope.drawBattleLineParty(
     scale: Float = 0.88f,
     rearScaleFactor: Float = PARTY_REAR_SCALE_FACTOR,
     heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     val line = PartyFormation.battleLine(frontIndex, party)
     val slots = line.mapIndexed { i, actor ->
@@ -108,6 +111,7 @@ fun DrawScope.drawBattleLineParty(
         scale = scale,
         rearScaleFactor = rearScaleFactor,
         heroJob = heroJob,
+        heroRank = heroRank,
     )
 }
 
@@ -127,6 +131,7 @@ fun DrawScope.drawVillageFollowParty(
     frontAnimFrame: Int = 0,
     slots: List<PartyDrawSlot>? = null,
     heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     if (slots != null) {
         drawPartySlots(
@@ -139,6 +144,7 @@ fun DrawScope.drawVillageFollowParty(
             scale = heroScale,
             rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
             heroJob = heroJob,
+            heroRank = heroRank,
         )
         return
     }
@@ -156,6 +162,7 @@ fun DrawScope.drawVillageFollowParty(
         scale = heroScale,
         rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
         heroJob = heroJob,
+        heroRank = heroRank,
     )
 }
 

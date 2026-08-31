@@ -155,6 +155,7 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
                         levelUpFxActorKey = vm.levelUpFxActorKey,
                         levelUpFxUntil = vm.levelUpFxUntil,
                         heroJob = vm.player.heroJob,
+                        heroRank = vm.player.spriteRank,
                     )
                 }
             }

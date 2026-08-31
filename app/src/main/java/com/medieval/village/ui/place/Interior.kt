@@ -56,6 +56,7 @@ fun DrawScope.drawWalkableInterior(
     levelUpFxActorKey: String? = null,
     levelUpFxUntil: Float = 0f,
     heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     val w = InteriorRoom.WORLD_W
     val h = InteriorRoom.WORLD_H
@@ -104,6 +105,7 @@ fun DrawScope.drawWalkableInterior(
         frontIndex = frontIndex,
         slots = partySlots,
         heroJob = heroJob,
+        heroRank = heroRank,
     )
     if (levelUpFxActorKey != null) {
         val slots = partySlots.orEmpty()

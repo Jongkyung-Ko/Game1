@@ -132,6 +132,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
 
     BackHandler(
         enabled = vm.awaitingClassSelect ||
+            vm.pendingJobAdvance != null ||
             vm.levelUpSkillOffer != null ||
             vm.pendingExploreChoice != null ||
             vm.menuTab != MenuTab.NONE ||
@@ -139,6 +140,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
     ) {
         when {
             vm.awaitingClassSelect -> vm.cancelClassSelect()
+            vm.pendingJobAdvance != null -> vm.dismissJobAdvance()
             vm.levelUpSkillOffer != null -> vm.dismissLevelUpSkillOffer()
             vm.pendingExploreChoice != null -> vm.cancelExploreFloorChoice()
             vm.menuTab != MenuTab.NONE -> vm.menuTab = MenuTab.NONE
@@ -170,6 +172,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
                 MenuOverlay(vm)
                 WorldMapOverlay(vm)
                 LevelUpSkillOverlay(vm)
+                JobAdvanceOverlay(vm)
                 ExploreFloorChoiceOverlay(vm)
             }
         }

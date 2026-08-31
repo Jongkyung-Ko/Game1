@@ -40,6 +40,8 @@ import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.model.RegionDialogue
 import com.medieval.village.model.ActorClass
 import com.medieval.village.model.HeroJob
+import com.medieval.village.model.HeroAdvancement
+import com.medieval.village.model.JobAdvanceOffer
 import com.medieval.village.model.Settlement
 import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
@@ -152,6 +154,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private set
     /** 한 번이라도 직업을 확정했으면 선택 화면에서 취소 가능 */
     var hasStartedRun by mutableStateOf(false)
+        private set
+    var pendingJobAdvance by mutableStateOf<JobAdvanceOffer?>(null)
         private set
 
     val inventory = mutableStateListOf<InventoryEntry>()
@@ -725,6 +729,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         awaitingClassSelect = false
         hasStartedRun = true
+        pendingJobAdvance = null
+        player = player.copy(title = player.heroJob.titleAt(player.level))
     }
 
     fun requestNewGame() {
@@ -758,6 +764,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         skillPoints.clear()
         specialSlots.clear()
         levelUpSkillOffer = null
+        pendingJobAdvance = null
         skillMapQueue.clear()
         specialCooldown = 0f
         specialReady = true
@@ -2147,6 +2154,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         setSpecialSlot(actorKey, slotIndex, null)
     }
 
+    fun dismissJobAdvance() {
+        pendingJobAdvance = null
+    }
+
     fun dismissLevelUpSkillOffer() {
         levelUpSkillOffer = skillMapQueue.removeFirstOrNull()
     }
@@ -2163,7 +2174,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun dungeonSpecialAttack(slotIndex: Int) {
         val map = dungeonFloor ?: return
         if (dungeonCombatLock || attackCooldown > 0f || specialCooldown > 0f) return
-        if (levelUpSkillOffer != null) return
+        if (levelUpSkillOffer != null || pendingJobAdvance != null) return
         clampFrontIndex()
         val frontMerc = frontMercenary()
         if (frontMerc != null && !isMercAlive(frontMerc)) {
@@ -3601,25 +3612,52 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun gainExp(amount: Int) {
         var p = player.copy(exp = player.exp + amount)
         val levelsGained = mutableListOf<Int>()
+        var lastAdvance: JobAdvanceOffer? = null
         while (p.exp >= p.expToNext) {
             val rest = p.exp - p.expToNext
+            val newLevel = p.level + 1
+            val fromTitle = p.title
+            val fromRank = HeroAdvancement.rankIndexAt(p.level)
+            val toRank = HeroAdvancement.rankIndexAt(newLevel)
+            val mult = HeroAdvancement.growthMultAt(newLevel)
+            val hpGain = 12 * mult
+            val mpGain = 4 * mult
+            val newTitle = p.heroJob.titleAt(newLevel)
             p = p.copy(
-                level = p.level + 1,
+                level = newLevel,
                 exp = rest,
-                maxHp = p.maxHp + 12,
-                hp = p.maxHp + 12,
-                maxMp = p.maxMp + 4,
-                mp = p.maxMp + 4,
-                baseAtk = p.baseAtk + 2,
-                baseDef = p.baseDef + 1,
-                str = p.str + 1,
-                agi = p.agi + 1,
-                intel = p.intel + 1
+                title = newTitle,
+                maxHp = p.maxHp + hpGain,
+                hp = p.maxHp + hpGain,
+                maxMp = p.maxMp + mpGain,
+                mp = p.maxMp + mpGain,
+                baseAtk = p.baseAtk + 2 * mult,
+                baseDef = p.baseDef + 1 * mult,
+                str = p.str + 1 * mult,
+                agi = p.agi + 1 * mult,
+                intel = p.intel + 1 * mult,
             )
-            levelsGained += p.level
-            log.add("레벨 업! Lv.${p.level} 이(가) 되었다. 몸이 가벼워졌다.")
+            levelsGained += newLevel
+            log.add("레벨 업! Lv.$newLevel 이(가) 되었다. 성장 ×$mult")
+            if (toRank > fromRank) {
+                lastAdvance = JobAdvanceOffer(
+                    job = p.heroJob,
+                    fromTitle = fromTitle,
+                    toTitle = newTitle,
+                    newLevel = newLevel,
+                    spriteRank = HeroAdvancement.spriteRankAt(newLevel),
+                    growthMult = mult,
+                    awakening = newLevel >= 20,
+                )
+                if (newLevel >= 20) {
+                    log.add("각성! 『$newTitle』의 힘이 세 배로 깨어났다.")
+                } else {
+                    log.add("전직! 『$newTitle』이(가) 되었다.")
+                }
+            }
         }
         player = p
+        if (lastAdvance != null) pendingJobAdvance = lastAdvance
         if (levelsGained.isNotEmpty()) {
             onActorLevelUp(HERO_SKILL_KEY, p.name, player.heroJob.actorClass, levelsGained)
         }

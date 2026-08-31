@@ -136,6 +136,7 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
                         frontAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
                         slots = partySlots,
                         heroJob = vm.player.heroJob,
+                        heroRank = vm.player.spriteRank,
                     )
                     val fxKey = vm.levelUpFxActorKey
                     if (fxKey != null) {
@@ -153,9 +154,9 @@ fun VillageScene(vm: GameViewModel, modifier: Modifier = Modifier) {
 
         Text(
             text = if (art != null) {
-                "${settlement.nameEn} · v0.4.46"
+                "${settlement.nameEn} · v0.4.47"
             } else {
-                "${settlement.nameEn} · v0.4.46 (맵 로딩 실패)"
+                "${settlement.nameEn} · v0.4.47 (맵 로딩 실패)"
             },
             color = Color(0xFFFFE29A),
             fontSize = 12.sp,
