@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
 import com.medieval.village.model.ActorClass
+import com.medieval.village.model.CombatBalance
 import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.ItemType
 import com.medieval.village.model.SpecialSkillCatalog
@@ -494,9 +495,38 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
     )
 
     Spacer(Modifier.height(12.dp))
+    SectionTitle("시스템 디버그")
+    Text(
+        "마을별 난이도·적정 레벨·전투 수치 표를 엽니다. 켠 동안 세계지도 핀과 던전 두루마리에도 권장 레벨이 표시됩니다.",
+        color = Palette.ParchmentDim,
+        fontSize = 11.sp,
+        lineHeight = 15.sp,
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WoodButton(
+            text = if (vm.debugMode) "디버그 켜짐" else "디버그 켜기",
+            highlight = vm.debugMode,
+        ) { vm.toggleDebugMode() }
+        WoodButton(
+            text = "밸런스 표",
+            highlight = true,
+        ) { vm.openDebugPanel() }
+    }
+    if (vm.debugMode) {
+        val row = CombatBalance.village(vm.currentSettlement)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "현재 마을 권장  Lv.${CombatBalance.enterLabel(row)} 입장 · Lv.${CombatBalance.clearLabel(row)} 클리어  ${row.stars}",
+            color = Palette.Gold,
+            fontSize = 11.sp,
+        )
+    }
+
+    Spacer(Modifier.height(12.dp))
     SectionTitle("게임 정보")
     Text(
-        "중세마을 이야기 v0.4.49\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
+        "중세마을 이야기 v0.4.50\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
         color = Palette.ParchmentDim,
         fontSize = 12.sp,
         lineHeight = 17.sp

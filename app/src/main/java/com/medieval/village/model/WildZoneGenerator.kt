@@ -21,8 +21,7 @@ object WildZoneGenerator {
         shallow: List<Pair<String, String>>,
         deep: List<Pair<String, String>>,
         kindBonus: (String) -> Int,
-        basePower: Int = 8,
-        powerPerFloor: Int = 7,
+        zone: BalanceZone,
         sewerChance: Float = 0.18f,
         /** 10층 중간 보스 (kind to 표시명). null이면 보스 없음 */
         midBoss: Pair<String, String>? = null,
@@ -125,14 +124,17 @@ object WildZoneGenerator {
             if (hypot(x - spawnX, y - spawnY) < TILE * 2.5f) continue
             if (monsters.any { hypot(it.x - x, it.y - y) < TILE * 1.4f }) continue
             val (kind, name) = pool.random(rng)
+            val stats = CombatBalance.roll(zone, floor, kindBonus(kind), rng)
             monsters += DungeonMonster(
                 id = "$idPrefix${floor}_${monsters.size}",
                 name = name,
                 kind = kind,
                 x = x,
                 y = y,
-                power = basePower + floor * powerPerFloor + kindBonus(kind) + rng.nextInt(0, 9),
-                armor = 1 + floor / 5,
+                power = stats.power,
+                hp = stats.hp,
+                maxHp = stats.hp,
+                armor = stats.armor,
                 ranged = DungeonFactory.isRangedKind(kind),
             )
         }
@@ -146,8 +148,14 @@ object WildZoneGenerator {
         if (storyBoss != null) {
             val (kind, name) = storyBoss.first
             val finale = storyBoss.second
-            val power = 44 + floor * 20 + rng.nextInt(0, 14)
-            val maxHp = (power * 13).coerceAtLeast(260)
+            val stats = CombatBalance.roll(
+                zone = zone,
+                floor = floor,
+                rng = rng,
+                boss = if (finale) BossTier.FINAL else BossTier.MID,
+            )
+            val power = stats.power
+            val maxHp = stats.hp
             val offsets = listOf(
                 -TILE * 1.6f to 0f,
                 TILE * 1.6f to 0f,
@@ -176,7 +184,7 @@ object WildZoneGenerator {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 9 + floor / 2,
+                    armor = stats.armor,
                 )
                 placed = true
                 break
@@ -192,7 +200,7 @@ object WildZoneGenerator {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 9 + floor / 2,
+                    armor = stats.armor,
                 )
             }
         }

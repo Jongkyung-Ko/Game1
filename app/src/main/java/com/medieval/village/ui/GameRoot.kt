@@ -28,6 +28,7 @@ import com.medieval.village.game.Scene
 import com.medieval.village.game.isExplorePlace
 import com.medieval.village.model.PlaceId
 import com.medieval.village.ui.map.WorldMapOverlay
+import com.medieval.village.ui.menu.BalanceDebugOverlay
 import com.medieval.village.ui.menu.MenuOverlay
 import com.medieval.village.ui.place.PlaceScreen
 import com.medieval.village.ui.theme.Palette
@@ -136,6 +137,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
             vm.pendingJobAdvance != null ||
             vm.levelUpSkillOffer != null ||
             vm.pendingExploreChoice != null ||
+            vm.debugPanelOpen ||
             vm.menuTab != MenuTab.NONE ||
             vm.scene == Scene.INTERIOR,
     ) {
@@ -144,6 +146,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
             vm.pendingJobAdvance != null -> vm.dismissJobAdvance()
             vm.levelUpSkillOffer != null -> vm.dismissLevelUpSkillOffer()
             vm.pendingExploreChoice != null -> vm.cancelExploreFloorChoice()
+            vm.debugPanelOpen -> vm.closeDebugPanel()
             vm.menuTab != MenuTab.NONE -> vm.menuTab = MenuTab.NONE
             vm.interiorPanelOpen -> vm.closeInteriorPanel()
             vm.scene == Scene.INTERIOR && vm.currentPlace.isExplorePlace() -> vm.escapeDungeon()
@@ -177,6 +180,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
                 ExploreFloorChoiceOverlay(vm)
             }
         }
+        BalanceDebugOverlay(vm, Modifier.fillMaxSize().zIndex(18f))
         ClassSelectOverlay(vm, Modifier.fillMaxSize().zIndex(20f))
     }
 }

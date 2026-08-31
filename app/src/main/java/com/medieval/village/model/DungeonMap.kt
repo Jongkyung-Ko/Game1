@@ -241,22 +241,31 @@ object DungeonFactory {
                 "spitter" -> 2
                 else -> 1
             }
+            val stats = CombatBalance.roll(BalanceZone.DUNGEON, floor, kindBonus, rng)
             monsters += DungeonMonster(
                 id = "z${floor}_${monsters.size}",
                 name = name,
                 kind = kind,
                 x = x,
                 y = y,
-                power = 14 + floor * 10 + kindBonus + rng.nextInt(0, 10),
-                armor = 1 + floor / 4,
+                power = stats.power,
+                hp = stats.hp,
+                maxHp = stats.hp,
+                armor = stats.armor,
                 ranged = isRangedKind(kind),
             )
         }
 
         if (bossFloor) {
             val (kind, name) = bossForFloor(floor)
-            val power = 48 + floor * 22 + rng.nextInt(0, 16)
-            val maxHp = (power * 14).coerceAtLeast(280)
+            val stats = CombatBalance.roll(
+                zone = BalanceZone.DUNGEON,
+                floor = floor,
+                rng = rng,
+                boss = if (floor >= 20) BossTier.FINAL else BossTier.MID,
+            )
+            val power = stats.power
+            val maxHp = stats.hp
             // 하층 계단 근처 끝방 — 내려가기 전 마주치게
             val offsets = listOf(
                 -TILE * 1.6f to 0f,
@@ -280,7 +289,7 @@ object DungeonFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 8 + floor / 2,
+                    armor = stats.armor,
                 )
                 placed = true
                 break
@@ -298,7 +307,7 @@ object DungeonFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 8 + floor / 2,
+                    armor = stats.armor,
                 )
             }
         }

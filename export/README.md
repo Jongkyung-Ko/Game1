@@ -6,7 +6,7 @@
 
 릴리즈에 올라가면 이 링크로 한 번에 받을 수 있습니다.
 
-- **zip:** https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.49/HeroClassSprites-v0.4.49.zip
+- **zip:** https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.50/HeroClassSprites-v0.4.50.zip
 - 저장소 복사본: [`export/HeroClassSprites.zip`](../export/HeroClassSprites.zip)
 
 zip 안 구성:

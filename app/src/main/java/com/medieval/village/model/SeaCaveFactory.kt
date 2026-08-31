@@ -34,7 +34,6 @@ object SeaCaveFactory {
             midBoss = "shark" to "상어 두목",
             finalBoss = "giant_octopus" to "대왕문어",
             sewerChance = 0.16f,
-            basePower = 15,
-            powerPerFloor = 10,
+            zone = BalanceZone.SEA,
         )
 }

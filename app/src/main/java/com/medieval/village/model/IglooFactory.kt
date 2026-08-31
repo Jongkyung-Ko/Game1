@@ -42,8 +42,7 @@ object IglooFactory {
                     else -> 1
                 }
             },
-            basePower = 11,
-            powerPerFloor = 8,
+            zone = BalanceZone.IGLOO,
             sewerChance = 0.22f,
             midBoss = "yeti" to "설인 우두머리",
             maxFloor = MAX_FLOOR,

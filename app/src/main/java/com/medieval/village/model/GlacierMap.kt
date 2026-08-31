@@ -41,8 +41,7 @@ object GlacierFactory {
                     else -> 0
                 }
             },
-            basePower = 9,
-            powerPerFloor = 8,
+            zone = BalanceZone.GLACIER,
             sewerChance = 0.20f,
             midBoss = "polar_bear" to "빙하의 군주",
         )

@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import com.medieval.village.model.CombatBalance
 import com.medieval.village.model.CastleFactory
 import com.medieval.village.model.DesertFactory
 import com.medieval.village.model.DungeonFactory
@@ -205,6 +206,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     var currentPlace by mutableStateOf<PlaceId?>(PlaceId.HOME)
         private set
     var menuTab by mutableStateOf(MenuTab.NONE)
+
+    /** 시스템 디버그 — 마을 난이도·전투 밸런스 표 */
+    var debugMode by mutableStateOf(false)
+    var debugPanelOpen by mutableStateOf(false)
+        private set
+
+    fun toggleDebugMode() {
+        debugMode = !debugMode
+        if (!debugMode) debugPanelOpen = false
+    }
+
+    fun openDebugPanel() {
+        debugMode = true
+        debugPanelOpen = true
+    }
+
+    fun closeDebugPanel() {
+        debugPanelOpen = false
+    }
 
     /** 탐험 입구에서 1층/클리어 층 선택 대기 */
     var pendingExploreChoice by mutableStateOf<ExploreFloorChoice?>(null)
@@ -485,6 +505,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 put("bgmVolume", player.bgmVolume.toDouble())
                 put("sfxVolume", player.sfxVolume.toDouble())
             })
+            put("debugMode", debugMode)
             put("inventory", JSONArray().apply {
                 inventory.forEach { entry ->
                     put(JSONObject().apply {
@@ -618,6 +639,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             bgmVolume = p.optDouble("bgmVolume", 1.0).toFloat().coerceIn(0f, 1f),
             sfxVolume = p.optDouble("sfxVolume", 1.0).toFloat().coerceIn(0f, 1f),
         )
+        debugMode = json.optBoolean("debugMode", debugMode)
 
         inventory.clear()
         val inv = json.optJSONArray("inventory") ?: JSONArray()
@@ -3471,14 +3493,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val ny = dy / len
         val speed = PROJECTILE_SPEED * 0.72f
         val style = if (monsterUsesMagicShot(monster)) WeaponStyle.MAGIC else WeaponStyle.BOW
-        val base = (monster.power - totalDef / 2).coerceAtLeast(3)
+        val damage = CombatBalance.rangedHit(monster.power, totalDef)
         dungeonProjectiles += DungeonProjectile(
             x = monster.x + nx * 20f,
             y = monster.y - 26f + ny * 12f,
             vx = nx * speed,
             vy = ny * speed,
             style = style,
-            damage = (base * 0.8f).roundToInt().coerceAtLeast(3),
+            damage = damage,
             life = 2.1f,
             radius = 16f,
             hostile = true,
@@ -3513,12 +3535,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun resolveMonsterAttackHit(monster: DungeonMonster) {
-        val base = (monster.power - totalDef).coerceAtLeast(3) + Random.nextInt(0, 4)
-        val dmg = if (monster.isBoss) {
-            (base * 1.55f).toInt().coerceAtLeast(base + 8)
-        } else {
-            base
-        }
+        val dmg = CombatBalance.meleeHit(monster.power, totalDef, monster.isBoss) + Random.nextInt(0, 4)
         val biome = currentBiome()
         say(
             when {

@@ -49,6 +49,7 @@ import kotlin.math.roundToInt
 @Composable
 fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
     if (vm.menuTab != MenuTab.WORLD_MAP) return
+    val debugMode = vm.debugMode
 
     val art = rememberCustomArtOrNull()
     val continent = art?.continentMap
@@ -144,21 +145,40 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
                                 textAlign = Paint.Align.CENTER
                             }
                             val label = st.nameKo
+                            val ladder = if (debugMode) {
+                                com.medieval.village.model.CombatBalance.village(st.id)
+                            } else {
+                                null
+                            }
                             val tw = paint.measureText(label)
+                            val sub = ladder?.let { "권장 Lv.${com.medieval.village.model.CombatBalance.enterLabel(it)}–${it.clearHi}" }
+                            val subW = if (sub != null) {
+                                val sp = Paint(paint).apply { textSize = 18f }
+                                sp.measureText(sub)
+                            } else 0f
+                            val boxW = maxOf(tw, subW)
                             val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                                 color = android.graphics.Color.argb(0xDD, 0x1A, 0x12, 0x0C)
                             }
                             val ly = st.mapY + r + 36f
+                            val extra = if (sub != null) 22f else 0f
                             canvas.nativeCanvas.drawRoundRect(
-                                st.mapX - tw / 2f - 12f,
+                                st.mapX - boxW / 2f - 12f,
                                 ly - 28f,
-                                st.mapX + tw / 2f + 12f,
-                                ly + 8f,
+                                st.mapX + boxW / 2f + 12f,
+                                ly + 8f + extra,
                                 10f,
                                 10f,
                                 bg
                             )
                             canvas.nativeCanvas.drawText(label, st.mapX, ly, paint)
+                            if (sub != null) {
+                                val subPaint = Paint(paint).apply {
+                                    textSize = 18f
+                                    color = android.graphics.Color.parseColor("#D9A441")
+                                }
+                                canvas.nativeCanvas.drawText(sub, st.mapX, ly + 22f, subPaint)
+                            }
                         }
                     }
                 }

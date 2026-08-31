@@ -33,7 +33,6 @@ object WinterKeepFactory {
             midBoss = "cage_warden" to "감옥 간수장",
             finalBoss = "kidnapper_boss" to "납치범 두목",
             sewerChance = 0.08f,
-            basePower = 16,
-            powerPerFloor = 10,
+            zone = BalanceZone.WINTER,
         )
 }

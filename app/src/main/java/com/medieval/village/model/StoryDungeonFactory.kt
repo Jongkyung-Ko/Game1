@@ -23,8 +23,7 @@ object StoryDungeonFactory {
         midBoss: Pair<String, String>,
         finalBoss: Pair<String, String>,
         sewerChance: Float = 0.10f,
-        basePower: Int = 16,
-        powerPerFloor: Int = 10,
+        zone: BalanceZone,
     ): DungeonFloor {
         val f = floor.coerceIn(1, maxFloor)
         val rng = Random(seed)
@@ -123,14 +122,17 @@ object StoryDungeonFactory {
             if (hypot(x - spawnX, y - spawnY) < TILE * 2.5f) continue
             if (monsters.any { hypot(it.x - x, it.y - y) < TILE * 1.4f }) continue
             val (kind, name) = mobs.random(rng)
+            val stats = CombatBalance.roll(zone, f, kindBonus(kind), rng)
             monsters += DungeonMonster(
                 id = "$idPrefix${f}_${monsters.size}",
                 name = name,
                 kind = kind,
                 x = x,
                 y = y,
-                power = basePower + f * powerPerFloor + kindBonus(kind) + rng.nextInt(0, 10),
-                armor = 2 + f / 3,
+                power = stats.power,
+                hp = stats.hp,
+                maxHp = stats.hp,
+                armor = stats.armor,
                 ranged = DungeonFactory.isRangedKind(kind),
             )
         }
@@ -143,8 +145,14 @@ object StoryDungeonFactory {
         if (storyBoss != null) {
             val (kind, name) = storyBoss.first
             val finale = storyBoss.second
-            val power = (if (finale) 70 else 48) + f * 22 + rng.nextInt(0, 16)
-            val maxHp = (power * if (finale) 16 else 13).coerceAtLeast(if (finale) 420 else 280)
+            val stats = CombatBalance.roll(
+                zone = zone,
+                floor = f,
+                rng = rng,
+                boss = if (finale) BossTier.FINAL else BossTier.MID,
+            )
+            val power = stats.power
+            val maxHp = stats.hp
             val label = if (finale) "최종 보스 · $name" else "중간 보스 · $name"
             val offsets = listOf(
                 -TILE * 1.6f to 0f,
@@ -174,7 +182,7 @@ object StoryDungeonFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 10 + f / 2,
+                    armor = stats.armor,
                 )
                 placed = true
                 break
@@ -190,7 +198,7 @@ object StoryDungeonFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 10 + f / 2,
+                    armor = stats.armor,
                 )
             }
         }

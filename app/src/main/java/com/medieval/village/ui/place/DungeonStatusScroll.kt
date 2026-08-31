@@ -56,6 +56,17 @@ fun DungeonStatusScroll(vm: GameViewModel, modifier: Modifier = Modifier) {
                 else -> "Thou art hale and steady of hand."
             }
         )
+        if (vm.debugMode) {
+            val zone = com.medieval.village.model.CombatBalance.zoneOf(place)
+            if (zone != null) {
+                val target = com.medieval.village.model.CombatBalance.targetLevel(zone, floor)
+                add("Debug · 권장 Lv.${"%.1f".format(target)}  ${zone.stars}")
+                val trash = com.medieval.village.model.CombatBalance.roll(
+                    zone, floor, rng = kotlin.random.Random(0),
+                )
+                add("잡몹 P${trash.power} HP${trash.hp} AR${trash.armor}  너 ATK${vm.totalAtk}/DEF${vm.totalDef}")
+            }
+        }
     }
 
     ClassicScroll(
