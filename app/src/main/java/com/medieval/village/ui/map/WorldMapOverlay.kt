@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
+import com.medieval.village.game.isExplorePlace
 import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
 import com.medieval.village.model.Village
@@ -71,15 +72,17 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
             val ox = (wPx - Village.W * s) / 2f
             val oy = (hPx - Village.H * s) / 2f
             val currentId = vm.currentSettlement
+            val canTravel = vm.canTravelWorldMap()
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(s, ox, oy) {
+                    .pointerInput(s, ox, oy, canTravel) {
                         detectTapGestures { tap ->
+                            if (!canTravel) return@detectTapGestures
                             val wx = (tap.x - ox) / s
                             val wy = (tap.y - oy) / s
-            val hit = Settlements.all(vm.player.worldFlags).minByOrNull { st ->
+                            val hit = Settlements.all(vm.player.worldFlags).minByOrNull { st ->
                                 hypot(wx - st.mapX, wy - st.mapY)
                             }
                             if (hit != null && hypot(wx - hit.mapX, wy - hit.mapY) < 70f) {
@@ -123,6 +126,8 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
                                 Color(0xFFF4E4C0)
                             here -> Color(0xFFFFD76A)
                             else -> Color(0xFFE85A3C)
+                        }.let { c ->
+                            if (!canTravel && !here) c.copy(alpha = 0.38f) else c
                         }
                         val r = if (here) 22f else 18f
                         drawCircle(pinColor, radius = r, center = Offset(st.mapX, st.mapY))
@@ -198,7 +203,11 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
         )
 
         Text(
-            text = "마을을 눌러 이동 · 현재: ${vm.settlement.nameKo}",
+            text = if (vm.currentPlace.isExplorePlace()) {
+                "탐험 중 · 지도만 볼 수 있음 · 현재: ${vm.settlement.nameKo}"
+            } else {
+                "마을을 눌러 이동 · 현재: ${vm.settlement.nameKo}"
+            },
             color = Palette.ParchmentDim,
             fontSize = 12.sp,
             modifier = Modifier

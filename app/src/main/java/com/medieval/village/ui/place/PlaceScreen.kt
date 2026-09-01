@@ -119,7 +119,7 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(id, scale, offsetX, offsetY, panelOpen) {
+                    .pointerInput(id, scale, offsetX, offsetY, panelOpen, vm.hasHomeWarp) {
                         detectTapGestures { tap ->
                             if (vm.interiorPanelOpen) return@detectTapGestures
                             val x = (tap.x - offsetX) / scale
@@ -127,7 +127,15 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
                             val npc = npcs.minByOrNull {
                                 hypot(x - it.worldX, y - it.worldY)
                             }?.takeIf { hypot(x - it.worldX, y - it.worldY) < 100f }
-                            if (npc != null) vm.approachInteriorNpc(npc) else vm.walkInInterior(x, y)
+                            if (vm.hasHomeWarp &&
+                                hypot(x - InteriorRoom.WARP_X, y - InteriorRoom.WARP_Y) < 90f
+                            ) {
+                                vm.resumeHomeWarp()
+                            } else if (npc != null) {
+                                vm.approachInteriorNpc(npc)
+                            } else {
+                                vm.walkInInterior(x, y)
+                            }
                         }
                     }
             ) {
@@ -156,6 +164,7 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
                         levelUpFxUntil = vm.levelUpFxUntil,
                         heroJob = vm.player.heroJob,
                         heroRank = vm.player.spriteRank,
+                        showHomeWarp = vm.hasHomeWarp,
                     )
                 }
             }
@@ -228,6 +237,11 @@ private fun WalkableInteriorScreen(vm: GameViewModel, id: PlaceId, rootModifier:
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     WoodButton("메뉴 열기", Modifier.weight(1f), highlight = true) {
                         vm.openInteriorPanel()
+                    }
+                    if (vm.hasHomeWarp) {
+                        WoodButton("워프로 돌아가기", Modifier.weight(1f), highlight = true) {
+                            vm.resumeHomeWarp()
+                        }
                     }
                     WoodButton("마을로 나가기", Modifier.weight(1f)) { vm.leavePlace() }
                 }
@@ -390,6 +404,16 @@ private fun ColumnScope.HomeActions(vm: GameViewModel) {
     )
     Spacer(modifier.height(8.dp))
     WoodButton("잠자기 (무료 · 완전 회복)", highlight = true) { vm.sleepAtHome() }
+    if (vm.hasHomeWarp) {
+        Spacer(modifier.height(8.dp))
+        WoodButton("워프로 탐험 지점 돌아가기", highlight = true) { vm.resumeHomeWarp() }
+        Text(
+            "포털스톤으로 연 문이 아직 열려 있다. 열었던 바로 그 자리로 돌아간다.",
+            color = Palette.ParchmentDim,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
 }
 
 @Composable

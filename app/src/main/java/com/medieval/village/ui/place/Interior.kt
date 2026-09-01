@@ -57,6 +57,7 @@ fun DrawScope.drawWalkableInterior(
     levelUpFxUntil: Float = 0f,
     heroJob: HeroJob = HeroJob.WARRIOR,
     heroRank: Int = 0,
+    showHomeWarp: Boolean = false,
 ) {
     val w = InteriorRoom.WORLD_W
     val h = InteriorRoom.WORLD_H
@@ -64,6 +65,9 @@ fun DrawScope.drawWalkableInterior(
     // 풀룸 일러스트에 가구가 이미 들어가 있으면 벡터 가구는 생략
     if (!hasCartoonRoom) {
         drawInteriorFurniture(id)
+    }
+    if (showHomeWarp) {
+        drawHomeWarpGate(InteriorRoom.WARP_X, InteriorRoom.WARP_Y)
     }
 
     InteriorNpcCatalog.forPlace(id, settlementId, flags).forEachIndexed { index, npc ->
@@ -273,4 +277,28 @@ private fun DrawScope.drawSpeechBubble(cx: Float, top: Float, text: String, room
         top - 12f,
         paint.apply { color = android.graphics.Color.parseColor("#2A1A10") }
     )
+}
+
+private fun DrawScope.drawHomeWarpGate(cx: Float, footY: Float) {
+    val ts = 88f
+    val x = cx - ts / 2f
+    val y = footY - ts * 0.55f
+    drawOval(
+        Color(0x55203860),
+        Offset(x + ts * 0.12f, y + ts * 0.18f),
+        Size(ts * 0.76f, ts * 0.64f),
+    )
+    drawOval(
+        Color(0xAA3AB0E0),
+        Offset(x + ts * 0.22f, y + ts * 0.26f),
+        Size(ts * 0.56f, ts * 0.48f),
+        style = Stroke(3.5f),
+    )
+    drawOval(
+        Color(0xCC8FE8FF),
+        Offset(x + ts * 0.32f, y + ts * 0.34f),
+        Size(ts * 0.36f, ts * 0.32f),
+    )
+    drawCircle(Color(0xEEF4FFFF), radius = ts * 0.08f, center = Offset(cx, footY - ts * 0.22f))
+    drawLabelTiny("워프", cx - 16f, footY + 14f)
 }

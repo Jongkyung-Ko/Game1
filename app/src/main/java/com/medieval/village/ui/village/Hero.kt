@@ -29,6 +29,9 @@ private val Steel = Color(0xFFBFC5CC)
 private val SteelDark = Color(0xFF7E858C)
 private val Gold = Color(0xFFD9A441)
 
+/** 주인공 스프라이트 표시 배율 (기존 대비 1.5배) */
+const val HERO_SIZE_MULT = 1.5f
+
 /**
  * 걸어다니는 중세 모험가.
  * 커스텀 히어로 스프라이트가 있으면 그걸 쓰고, 없으면 Canvas 도형으로 그린다.
@@ -53,13 +56,14 @@ fun DrawScope.drawHero(
         animKind == HeroAnimKind.MAGIC ||
         specialSet != null
     val bob = if (walking && !attacking) sin(phase) * 2.5f else 0f
+    val drawScale = scale * HERO_SIZE_MULT
     if (art != null) {
         drawCustomHero(
             art = art,
             x = x,
             y = y + bob,
             facing = facing,
-            worldHeight = 96f * scale,
+            worldHeight = 96f * drawScale,
             walking = walking,
             walkPhase = phase,
             animKind = animKind,
@@ -70,8 +74,8 @@ fun DrawScope.drawHero(
         )
         return
     }
-    if (scale != 1f) {
-        scale(scale, scale, pivot = Offset(x, y)) {
+    if (drawScale != 1f) {
+        scale(drawScale, drawScale, pivot = Offset(x, y)) {
             drawHeroBody(x, y, facing, walking, phase)
         }
     } else {

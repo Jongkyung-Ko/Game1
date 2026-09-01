@@ -118,6 +118,18 @@ fun ExploreBiome.floorLabel(n: Int): String = when (this) {
     ExploreBiome.DUNGEON, ExploreBiome.CASTLE, ExploreBiome.SEA, ExploreBiome.WINTER_KEEP -> "${n}층"
 }
 
+/** 포털스톤으로 연 워프 — 집과 탐험지를 잇는다. */
+data class ParkedWarp(
+    val settlementId: SettlementId,
+    val placeId: PlaceId,
+    val floor: Int,
+    val heroX: Float,
+    val heroY: Float,
+    val facing: Facing,
+    val portalCol: Int,
+    val portalRow: Int,
+)
+
 /** 옛 세이브는 도달 깊이에서 10층 단위를 복원한다. */
 private fun checkpointOrDepth(stored: Int, depth: Int): Int {
     val fromStored = (stored / 10) * 10
@@ -149,8 +161,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     var player by mutableStateOf(Player())
         private set
 
+    /** 타이틀(로고) 화면 — 시작하기/이어하기 */
+    var awaitingTitle by mutableStateOf(true)
+        private set
     /** 첫 시작·새 게임 시 직업 선택 대기 */
-    var awaitingClassSelect by mutableStateOf(true)
+    var awaitingClassSelect by mutableStateOf(false)
         private set
     /** 한 번이라도 직업을 확정했으면 선택 화면에서 취소 가능 */
     var hasStartedRun by mutableStateOf(false)
@@ -289,6 +304,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var dungeonFloorNumber by mutableStateOf(1)
         private set
+    /** 집으로 이어 둔 워프 (탐험 맵은 유지) */
+    var parkedWarp by mutableStateOf<ParkedWarp?>(null)
+        private set
+    private var parkedDungeonFloor: DungeonFloor? = null
+    val hasHomeWarp: Boolean
+        get() = parkedWarp != null && currentPlace == PlaceId.HOME
     var dungeonHeroX by mutableFloatStateOf(0f)
         private set
     var dungeonHeroY by mutableFloatStateOf(0f)
@@ -506,6 +527,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 put("sfxVolume", player.sfxVolume.toDouble())
             })
             put("debugMode", debugMode)
+            val warp = parkedWarp
+            if (warp != null) {
+                put("parkedWarp", JSONObject().apply {
+                    put("settlementId", warp.settlementId.name)
+                    put("placeId", warp.placeId.name)
+                    put("floor", warp.floor)
+                    put("heroX", warp.heroX.toDouble())
+                    put("heroY", warp.heroY.toDouble())
+                    put("facing", warp.facing.name)
+                    put("portalCol", warp.portalCol)
+                    put("portalRow", warp.portalRow)
+                })
+            }
             put("inventory", JSONArray().apply {
                 inventory.forEach { entry ->
                     put(JSONObject().apply {
@@ -640,6 +674,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             sfxVolume = p.optDouble("sfxVolume", 1.0).toFloat().coerceIn(0f, 1f),
         )
         debugMode = json.optBoolean("debugMode", debugMode)
+        parkedDungeonFloor = null
+        parkedWarp = json.optJSONObject("parkedWarp")?.let { w ->
+            runCatching {
+                ParkedWarp(
+                    settlementId = SettlementId.valueOf(w.getString("settlementId")),
+                    placeId = PlaceId.valueOf(w.getString("placeId")),
+                    floor = w.optInt("floor", 1),
+                    heroX = w.optDouble("heroX", 0.0).toFloat(),
+                    heroY = w.optDouble("heroY", 0.0).toFloat(),
+                    facing = Facing.valueOf(w.optString("facing", Facing.DOWN.name)),
+                    portalCol = w.optInt("portalCol", 0),
+                    portalRow = w.optInt("portalRow", 0),
+                )
+            }.getOrNull()
+        }
 
         inventory.clear()
         val inv = json.optJSONArray("inventory") ?: JSONArray()
@@ -749,22 +798,42 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             resetPartyTrail(heroX, heroY)
         }
         awaitingClassSelect = false
+        awaitingTitle = false
         hasStartedRun = true
         pendingJobAdvance = null
         player = player.copy(title = player.heroJob.titleAt(player.level))
     }
 
+    fun startFromTitle() {
+        awaitingTitle = false
+        awaitingClassSelect = true
+    }
+
+    fun continueFromTitle(slot: Int) {
+        if (loadGame(slot)) {
+            awaitingTitle = false
+            awaitingClassSelect = false
+        }
+    }
+
     fun requestNewGame() {
+        awaitingTitle = false
         awaitingClassSelect = true
         menuTab = MenuTab.NONE
     }
 
     fun cancelClassSelect() {
-        if (hasStartedRun) awaitingClassSelect = false
+        if (hasStartedRun) {
+            awaitingClassSelect = false
+        } else {
+            awaitingClassSelect = false
+            awaitingTitle = true
+        }
     }
 
     fun confirmHeroJob(job: HeroJob) {
         awaitingClassSelect = false
+        awaitingTitle = false
         hasStartedRun = true
         newGame(job)
     }
@@ -851,9 +920,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** 세계지도에서 정착지로 이동한다. */
+    /** 세계지도에서 정착지로 이동한다. 탐험 중에는 보기만 가능하다. */
+    fun canTravelWorldMap(): Boolean = !currentPlace.isExplorePlace()
+
     fun travelToSettlement(id: SettlementId) {
-        if (currentPlace.isExplorePlace()) clearDungeonState()
+        if (!canTravelWorldMap()) {
+            say("탐험 중에는 다른 마을로 떠날 수 없다. 세계지도는 살펴볼 수만 있다.")
+            return
+        }
         path.clear()
         pendingEnter = null
         pubTarget = null
@@ -1038,7 +1112,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------- 이동
 
     fun tick(dt: Float) {
-        if (awaitingClassSelect) return
+        if (awaitingTitle || awaitingClassSelect) return
         animTime += dt
         if (levelUpFxActorKey != null && animTime >= levelUpFxUntil) {
             levelUpFxActorKey = null
@@ -1277,6 +1351,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             pubSpeakerId = null
         }
         if (id.isExplorePlace()) {
+            clearParkedWarp()
             val biome = id.exploreBiome()
             val cleared = biome?.let { clearedCheckpoint(it) } ?: 0
             if (biome != null && cleared >= 10) {
@@ -1478,8 +1553,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         dungeonHint = "portal"
         refreshDungeonFloor()
         emitSfx("door")
-        say("포털스톤이 갈라지며 집으로 이어지는 푸른 문이 열렸다.")
-        say("포털 위에서 ‘집으로’를 누르면 오두막으로 돌아간다. 탐험을 떠나면 문은 사라진다.")
+        say("포털스톤이 갈라지며 집과 이어지는 푸른 문이 열렸다.")
+        say("포털 위에서 ‘집으로’를 누르면 오두막으로 간다. 집의 워프로 언제든 이 자리로 돌아올 수 있다.")
         return true
     }
 
@@ -1822,6 +1897,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------- 던전 (라그나로크식 도보 탐험)
 
     private fun clearDungeonState() {
+        clearParkedWarp()
+        hideLiveDungeon()
+    }
+
+    private fun clearParkedWarp() {
+        parkedWarp = null
+        parkedDungeonFloor = null
+    }
+
+    private fun hideLiveDungeon() {
         dungeonFloor = null
         dungeonFloorNumber = 1
         dungeonHeroX = 0f
@@ -3062,16 +3147,30 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return pool.random()
     }
 
-    /** 포털스톤으로 연 문을 타고 주인공 집(HOME)으로 귀환한다. */
+    /** 포털스톤으로 연 문을 타고 주인공 집(HOME)으로 귀환한다. 워프는 남는다. */
     fun enterHomePortal() {
         val map = dungeonFloor ?: return
         if (map.tileKindAt(dungeonHeroX, dungeonHeroY) != DungeonTile.PORTAL) {
             say("집으로 이어지는 포털 위에 서야 한다.")
             return
         }
+        val col = (dungeonHeroX / map.tileSize).toInt()
+        val row = (dungeonHeroY / map.tileSize).toInt()
+        val place = currentPlace ?: return
+        parkedWarp = ParkedWarp(
+            settlementId = currentSettlement,
+            placeId = place,
+            floor = dungeonFloorNumber,
+            heroX = dungeonHeroX,
+            heroY = dungeonHeroY,
+            facing = facing,
+            portalCol = col,
+            portalRow = row,
+        )
+        parkedDungeonFloor = map
         say("포털이 빛나며 오두막으로 당신을 끌어당긴다.")
         emitSfx("door")
-        clearDungeonState()
+        hideLiveDungeon()
         path.clear()
         pendingEnter = null
         pubTarget = null
@@ -3080,14 +3179,50 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         pubWalking = false
         interiorSpeech = null
         interiorSpeakerId = null
-        val home = placeOf(PlaceId.HOME)
-        heroX = home.doorX
-        heroY = home.doorY
+        interiorPanelOpen = false
+        pubHeroX = InteriorRoom.WARP_X
+        pubHeroY = InteriorRoom.WARP_Y
         facing = Facing.DOWN
         currentPlace = PlaceId.HOME
         scene = Scene.INTERIOR
         menuTab = MenuTab.NONE
-        say("익숙한 오두막의 공기가 폐를 채운다. 던전으로 돌아가면 그 포털은 이미 닫혀 있을 것이다.")
+        resetPartyTrail(pubHeroX, pubHeroY)
+        say("익숙한 오두막. 푸른 워프가 아직 열려 있다. 그 문으로 탐험 지점에 다시 설 수 있다.")
+    }
+
+    /** 집의 워프를 타고 포털을 연 자리로 돌아간다. */
+    fun resumeHomeWarp() {
+        val warp = parkedWarp ?: run {
+            say("열려 있는 워프가 없다.")
+            return
+        }
+        if (currentPlace != PlaceId.HOME) {
+            say("집의 워프 앞에서만 돌아갈 수 있다.")
+            return
+        }
+        currentSettlement = warp.settlementId
+        currentPlace = warp.placeId
+        scene = Scene.INTERIOR
+        menuTab = MenuTab.NONE
+        interiorPanelOpen = false
+        val live = parkedDungeonFloor
+        if (live != null && live.floor == warp.floor) {
+            dungeonFloor = live
+            dungeonFloorNumber = warp.floor
+        } else {
+            enterExploreFloor(warp.floor)
+            dungeonFloor?.setTile(warp.portalCol, warp.portalRow, DungeonTile.PORTAL)
+            parkedDungeonFloor = dungeonFloor
+        }
+        dungeonHeroX = warp.heroX
+        dungeonHeroY = warp.heroY
+        facing = warp.facing
+        dungeonWalking = false
+        dungeonTarget = null
+        dungeonHint = "portal"
+        resetPartyTrail(dungeonHeroX, dungeonHeroY)
+        emitSfx("door")
+        say("워프가 당신을 포털을 열었던 자리로 되돌린다. 문은 그대로 남아 있다.")
     }
 
     private fun tickDungeon(dt: Float) {

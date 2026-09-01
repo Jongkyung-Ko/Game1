@@ -170,8 +170,8 @@ private fun ClassSelectContent(vm: GameViewModel, modifier: Modifier = Modifier)
             )
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (vm.hasStartedRun) {
-                    WoodButton("취소") { vm.cancelClassSelect() }
+                WoodButton(if (vm.hasStartedRun) "취소" else "뒤로") {
+                    vm.cancelClassSelect()
                 }
                 WoodButton("이 직업으로 출발", highlight = true) {
                     vm.confirmHeroJob(selected)

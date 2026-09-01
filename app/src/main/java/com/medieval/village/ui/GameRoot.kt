@@ -133,7 +133,8 @@ fun GameRoot(modifier: Modifier = Modifier) {
     }
 
     BackHandler(
-        enabled = vm.awaitingClassSelect ||
+        enabled = vm.awaitingTitle ||
+            vm.awaitingClassSelect ||
             vm.pendingJobAdvance != null ||
             vm.levelUpSkillOffer != null ||
             vm.pendingExploreChoice != null ||
@@ -142,6 +143,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
             vm.scene == Scene.INTERIOR,
     ) {
         when {
+            vm.awaitingTitle -> Unit
             vm.awaitingClassSelect -> vm.cancelClassSelect()
             vm.pendingJobAdvance != null -> vm.dismissJobAdvance()
             vm.levelUpSkillOffer != null -> vm.dismissLevelUpSkillOffer()
@@ -157,7 +159,9 @@ fun GameRoot(modifier: Modifier = Modifier) {
     Box(modifier = modifier.background(Palette.WoodDark)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // 메뉴·HP/MP는 씬 밖 고정 영역 — 던전 카메라 스크롤과 겹치지 않음
-            TopMenuBar(vm, Modifier.zIndex(2f))
+            if (!vm.awaitingTitle) {
+                TopMenuBar(vm, Modifier.zIndex(2f))
+            }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -182,5 +186,6 @@ fun GameRoot(modifier: Modifier = Modifier) {
         }
         BalanceDebugOverlay(vm, Modifier.fillMaxSize().zIndex(18f))
         ClassSelectOverlay(vm, Modifier.fillMaxSize().zIndex(20f))
+        TitleOverlay(vm, Modifier.fillMaxSize().zIndex(22f))
     }
 }
