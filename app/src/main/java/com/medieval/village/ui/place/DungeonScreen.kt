@@ -183,10 +183,10 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                 drawMinimap(map, heroX, heroY, viewW, viewH)
                 drawLabel(
                     when (vm.currentPlace) {
-                        PlaceId.GRAY_CASTLE -> "v0.4.51 Gray Castle"
-                        PlaceId.SEA_CAVE -> "v0.4.51 Sea Cave"
-                        PlaceId.WINTER_KEEP -> "v0.4.51 Winter Keep"
-                        else -> "v0.4.51 Undead nest"
+                        PlaceId.GRAY_CASTLE -> "v0.4.52 Gray Castle"
+                        PlaceId.SEA_CAVE -> "v0.4.52 Sea Cave"
+                        PlaceId.WINTER_KEEP -> "v0.4.52 Winter Keep"
+                        else -> "v0.4.52 Undead nest"
                     },
                     14f,
                     28f,

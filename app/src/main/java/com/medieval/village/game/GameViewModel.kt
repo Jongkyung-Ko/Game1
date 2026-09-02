@@ -1860,7 +1860,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
             party[idx] = m
             if (levelsGained.isNotEmpty()) {
-                onActorLevelUp(id, m.name, SpecialSkillCatalog.actorClassOf(m), levelsGained)
+                onActorLevelUp(id, m.name, levelsGained)
             }
         }
     }
@@ -2169,11 +2169,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun onActorLevelUp(
         actorKey: String,
         actorName: String,
-        cls: ActorClass,
         levelsGained: List<Int>,
     ) {
         if (levelsGained.isEmpty()) return
-        val newLevel = levelsGained.last()
         ensureActorSkillState(actorKey)
         val gained = levelsGained.size
         skillPoints[actorKey] = (skillPoints[actorKey] ?: 0) + gained
@@ -2182,14 +2180,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         levelUpFxActorKey = actorKey
         levelUpFxUntil = animTime + 2.0f
         say("$actorName 스킬포인트 +$gained (보유 ${skillPoints[actorKey]})")
-        openSkillMap(
-            actorKey = actorKey,
-            actorName = actorName,
-            actorClass = cls,
-            actorLevel = newLevel,
-            pointsGranted = gained,
-            fromLevelUp = true,
-        )
+        say("Status에서 스킬맵을 열어 배우거나 강화할 수 있다.")
     }
 
     fun openSkillMap(
@@ -3825,7 +3816,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         player = p
         if (lastAdvance != null) pendingJobAdvance = lastAdvance
         if (levelsGained.isNotEmpty()) {
-            onActorLevelUp(HERO_SKILL_KEY, p.name, player.heroJob.actorClass, levelsGained)
+            onActorLevelUp(HERO_SKILL_KEY, p.name, levelsGained)
         }
     }
 

@@ -190,7 +190,7 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     Spacer(Modifier.height(10.dp))
     SectionTitle("직업 스킬맵 (전투)")
     Text(
-        "직군별로만 배울 수 있다. 레벨업으로 SP를 모아 스킬을 배우거나 강화한다.",
+        "레벨업으로 SP를 받는다. Status에서 스킬맵을 열어 배우거나 강화한다.",
         color = Palette.ParchmentDim,
         fontSize = 11.sp,
     )
@@ -526,7 +526,7 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
     Spacer(Modifier.height(12.dp))
     SectionTitle("게임 정보")
     Text(
-        "중세마을 이야기 v0.4.51\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
+        "중세마을 이야기 v0.4.52\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
         color = Palette.ParchmentDim,
         fontSize = 12.sp,
         lineHeight = 17.sp

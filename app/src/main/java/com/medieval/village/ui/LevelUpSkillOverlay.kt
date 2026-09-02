@@ -7,19 +7,20 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
@@ -44,7 +46,7 @@ import com.medieval.village.ui.theme.Palette
 import com.medieval.village.ui.village.rememberCustomArtOrNull
 
 /**
- * 직군별 스킬맵 — 레벨업/메뉴에서 스킬을 배우거나 랭크업하고, 전투 슬롯에 장착한다.
+ * 직군별 스킬맵 — Status 메뉴에서 스킬을 배우거나 랭크업하고, 전투 슬롯에 장착한다.
  */
 @Composable
 fun LevelUpSkillOverlay(vm: GameViewModel) {
@@ -63,42 +65,43 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
     val selected = selectedId?.let { SpecialSkillCatalog.byId(it) }
     val rank = selectedId?.let { vm.skillRankOf(offer.actorKey, it) } ?: 0
 
-    Column(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xCC120C08))
-            .padding(10.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .padding(6.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Palette.WoodDark, RoundedCornerShape(14.dp))
-                .border(2.dp, Palette.Gold, RoundedCornerShape(14.dp))
-                .padding(12.dp)
-                .verticalScroll(rememberScrollState())
+                .heightIn(max = maxHeight)
+                .background(Palette.WoodDark, RoundedCornerShape(12.dp))
+                .border(2.dp, Palette.Gold, RoundedCornerShape(12.dp))
+                .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
-            Text(
-                if (offer.fromLevelUp) {
-                    "레벨 업! ${offer.actorName} Lv.${offer.actorLevel}"
-                } else {
-                    "${offer.actorName} 스킬맵"
-                },
-                color = Palette.Gold,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "${offer.actorClass.label} 전용 · SP $points" +
-                    if (offer.fromLevelUp && offer.pointsGranted > 0) " (이번에 +${offer.pointsGranted})" else "",
-                color = Palette.ParchmentDim,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "${offer.actorName} 스킬맵",
+                        color = Palette.Gold,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        "${offer.actorClass.label} · SP $points" +
+                            if (offer.fromLevelUp && offer.pointsGranted > 0) " (+${offer.pointsGranted})" else "",
+                        color = Palette.ParchmentDim,
+                        fontSize = 11.sp,
+                    )
+                }
+                WoodButton("완료", highlight = true) {
+                    vm.confirmLevelUpSkillOffer()
+                }
+            }
 
-            Text("스킬맵 — 노드를 눌러 선택", color = Palette.Parchment, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
             SkillMapGraph(
                 skills = tree,
                 actorKey = offer.actorKey,
@@ -108,8 +111,8 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
                 art = art,
             )
 
-            Spacer(Modifier.height(10.dp))
             if (selected != null) {
+                Spacer(Modifier.height(4.dp))
                 SkillDetailPanel(
                     skill = selected,
                     rank = rank,
@@ -122,10 +125,12 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
                 )
             }
 
-            Spacer(Modifier.height(10.dp))
-            Text("전투 장착 슬롯 (최대 ${SpecialSkillCatalog.MAX_SLOTS})", color = Palette.Parchment, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 slots.forEachIndexed { index, id ->
                     val def = id?.let { SpecialSkillCatalog.byId(it) }
                     val r = if (id != null) vm.skillRankOf(offer.actorKey, id) else 0
@@ -135,41 +140,40 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
                             .weight(1f)
                             .background(
                                 if (selectedSlotUi) Color(0xFF5A3A22) else Color(0xFF2A1C12),
-                                RoundedCornerShape(10.dp),
+                                RoundedCornerShape(8.dp),
                             )
                             .border(
                                 if (selectedSlotUi) 2.dp else 1.dp,
                                 if (selectedSlotUi) Palette.Gold else Color(0xFF6A5040),
-                                RoundedCornerShape(10.dp),
+                                RoundedCornerShape(8.dp),
                             )
                             .clickable { selectedSlot = index }
-                            .padding(8.dp),
+                            .padding(vertical = 4.dp, horizontal = 2.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text("슬롯 ${index + 1}", color = Palette.ParchmentDim, fontSize = 10.sp)
-                        Spacer(Modifier.height(4.dp))
                         SkillIcon(
                             skillId = id,
-                            size = 44.dp,
+                            size = 32.dp,
                             art = art,
                             enabled = def != null,
                             circular = true,
                         )
                         Text(
                             when {
-                                def == null -> "비움"
+                                def == null -> "빈칸"
                                 r > 1 -> "Lv.$r"
                                 else -> def.shortName
                             },
                             color = if (def != null) Palette.Gold else Palette.ParchmentDim,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
+                            maxLines = 1,
                         )
                     }
                 }
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                 WoodButton("슬롯에 장착", Modifier.weight(1f)) {
                     val id = selectedId ?: return@WoodButton
@@ -182,10 +186,6 @@ fun LevelUpSkillOverlay(vm: GameViewModel) {
                 WoodButton("비우기", Modifier.weight(1f)) {
                     vm.clearSpecialSlot(offer.actorKey, selectedSlot)
                 }
-            }
-            Spacer(Modifier.height(8.dp))
-            WoodButton("완료", Modifier.fillMaxWidth(), highlight = true) {
-                vm.confirmLevelUpSkillOffer()
             }
         }
     }
@@ -210,66 +210,64 @@ private fun SkillDetailPanel(
     val mpNow = if (learned) SpecialSkillCatalog.mpCostAt(skill, rank) else skill.mpCost
     val prereqNames = skill.requires.mapNotNull { SpecialSkillCatalog.byId(it)?.name }
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF241810), RoundedCornerShape(10.dp))
-            .border(1.dp, Color(0xFF6A5040), RoundedCornerShape(10.dp))
-            .padding(10.dp)
+            .background(Color(0xFF241810), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFF6A5040), RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SkillIcon(skillId = skill.id, size = 52.dp, art = art, enabled = learned || canLearn)
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(skill.name, color = Palette.Gold, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                Text(skill.desc, color = Palette.ParchmentDim, fontSize = 11.sp)
+        SkillIcon(skillId = skill.id, size = 36.dp, art = art, enabled = learned || canLearn)
+        Spacer(Modifier.width(8.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                skill.name,
+                color = Palette.Gold,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Text(
+                skill.desc,
+                color = Palette.ParchmentDim,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                when {
+                    learned -> "랭크 $rank/${skill.maxRank} · ×${"%.1f".format(multNow)} · MP $mpNow"
+                    else -> "미습득 · ×${"%.1f".format(skill.damageMult)} · MP ${skill.mpCost} · Lv.${skill.unlockLevel}"
+                },
+                color = Palette.Parchment,
+                fontSize = 10.sp,
+                maxLines = 1,
+            )
+            if (prereqNames.isNotEmpty() && !learned) {
+                Text("선행: ${prereqNames.joinToString(" · ")}", color = Palette.ParchmentDim, fontSize = 9.sp, maxLines = 1)
+            }
+            if (actorLevel < skill.unlockLevel && !learned) {
+                Text("Lv.${skill.unlockLevel} 필요 (현재 $actorLevel)", color = Palette.Health, fontSize = 9.sp)
             }
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            when {
-                learned -> "랭크 $rank/${skill.maxRank} · ×${"%.1f".format(multNow)} · MP $mpNow"
-                else -> "미습득 · 기본 ×${"%.1f".format(skill.damageMult)} · MP ${skill.mpCost} · 필요 Lv.${skill.unlockLevel}"
-            },
-            color = Palette.Parchment,
-            fontSize = 12.sp,
-        )
-        if (prereqNames.isNotEmpty()) {
-            Text("선행: ${prereqNames.joinToString(" · ")}", color = Palette.ParchmentDim, fontSize = 11.sp)
-        }
-        if (actorLevel < skill.unlockLevel && !learned) {
-            Text("캐릭터 Lv.${skill.unlockLevel} 이상 필요 (현재 $actorLevel)", color = Palette.Health, fontSize = 11.sp)
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            when {
-                !learned -> WoodButton(
-                    "배우기 (${skill.learnCost}SP)",
-                    Modifier.weight(1f),
-                    highlight = canLearn && points >= skill.learnCost,
-                ) {
-                    if (vm.learnSpecialSkill(actorKey, skill.id)) {
-                        vm.setSpecialSlot(actorKey, selectedSlot, skill.id)
-                    }
+        Spacer(Modifier.width(6.dp))
+        when {
+            !learned -> WoodButton(
+                "배우기 ${skill.learnCost}SP",
+                highlight = canLearn && points >= skill.learnCost,
+            ) {
+                if (vm.learnSpecialSkill(actorKey, skill.id)) {
+                    vm.setSpecialSlot(actorKey, selectedSlot, skill.id)
                 }
-                canRank -> WoodButton(
-                    "강화 (${skill.rankUpCost}SP) →×${"%.1f".format(multNext)}",
-                    Modifier.weight(1f),
-                    highlight = points >= skill.rankUpCost,
-                ) {
-                    vm.rankUpSpecialSkill(actorKey, skill.id)
-                }
-                else -> Text(
-                    "최대 랭크",
-                    color = Palette.Gold,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(vertical = 10.dp),
-                    textAlign = TextAlign.Center,
-                )
             }
+            canRank -> WoodButton(
+                "강화 ${skill.rankUpCost}SP",
+                highlight = points >= skill.rankUpCost,
+            ) {
+                vm.rankUpSpecialSkill(actorKey, skill.id)
+            }
+            else -> Text("MAX", color = Palette.Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -285,17 +283,17 @@ private fun SkillMapGraph(
 ) {
     val cols = (skills.maxOfOrNull { it.mapCol } ?: 0) + 1
     val rows = (skills.maxOfOrNull { it.mapRow } ?: 0) + 1
-    val cellW = 86.dp
-    val cellH = 92.dp
+    val cellW = 70.dp
+    val cellH = 62.dp
     val byPos = skills.associateBy { it.mapCol to it.mapRow }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .background(Color(0xFF1A120C), RoundedCornerShape(10.dp))
-            .border(1.dp, Color(0xFF5A4030), RoundedCornerShape(10.dp))
-            .padding(8.dp)
+            .background(Color(0xFF1A120C), RoundedCornerShape(8.dp))
+            .border(1.dp, Color(0xFF5A4030), RoundedCornerShape(8.dp))
+            .padding(4.dp)
     ) {
         Box(modifier = Modifier.width(cellW * cols).height(cellH * rows)) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -313,7 +311,7 @@ private fun SkillMapGraph(
                             color = if (learned) Color(0xFFD9A441) else Color(0xFF5A4030),
                             start = Offset(x0, y0),
                             end = Offset(x1, y1),
-                            strokeWidth = if (learned) 3.5f else 2f,
+                            strokeWidth = if (learned) 3f else 2f,
                             cap = StrokeCap.Round,
                             pathEffect = if (learned) null else PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
                         )
@@ -331,7 +329,7 @@ private fun SkillMapGraph(
                         modifier = Modifier
                             .offset(x = cellW * c, y = cellH * r)
                             .size(cellW, cellH)
-                            .padding(4.dp)
+                            .padding(3.dp)
                             .background(
                                 when {
                                     selected -> Color(0xFF5A3A18)
@@ -339,7 +337,7 @@ private fun SkillMapGraph(
                                     available -> Color(0xFF2A2418)
                                     else -> Color(0xFF1A1410)
                                 },
-                                RoundedCornerShape(10.dp),
+                                RoundedCornerShape(8.dp),
                             )
                             .border(
                                 width = if (selected) 2.dp else 1.dp,
@@ -349,16 +347,16 @@ private fun SkillMapGraph(
                                     available -> Color(0xFF8A7050)
                                     else -> Color(0xFF4A3A2A)
                                 },
-                                RoundedCornerShape(10.dp),
+                                RoundedCornerShape(8.dp),
                             )
                             .clickable { onSelect(skill.id) }
-                            .padding(4.dp),
+                            .padding(2.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
                         SkillIcon(
                             skillId = skill.id,
-                            size = 40.dp,
+                            size = 26.dp,
                             art = art,
                             enabled = learned || available,
                             showBorder = false,
@@ -369,7 +367,7 @@ private fun SkillMapGraph(
                                 learned || available -> Palette.Parchment
                                 else -> Color(0xFF6A5A4A)
                             },
-                            fontSize = 10.sp,
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
                             maxLines = 1,
@@ -385,7 +383,7 @@ private fun SkillMapGraph(
                                 available -> Palette.Mana
                                 else -> Color(0xFF5A4A3A)
                             },
-                            fontSize = 9.sp,
+                            fontSize = 8.sp,
                         )
                     }
                 }
