@@ -2315,44 +2315,39 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             duration = vfx?.animDuration ?: 0.52f,
             specialSet = if (heroFront) vfx?.animSet else null,
         )
-        if (heroFront && vfx != null) {
-            spawnSpecialMeleeFx(vfx)
-        }
+        spawnSpecialSkillBurst(skill.id, vfx)
         when (skill.style) {
             WeaponStyle.MELEE -> {
-                if (skill.id == "adv_charge" && heroFront) {
-                    lungeForward(map, 36f)
+                if ((skill.id == "adv_charge" || skill.id == "war_rush") && heroFront) {
+                    lungeForward(map, 48f)
+                }
+                val wide = skill.actorClass == ActorClass.ADVENTURER ||
+                    skill.actorClass == ActorClass.WARRIOR ||
+                    skill.actorClass == ActorClass.PALADIN
+                val rangeMult = when (skill.id) {
+                    "war_spin", "war_quake", "pal_holy", "adv_finisher" -> 2.1f
+                    "war_rush", "adv_charge", "war_rage" -> 1.9f
+                    else -> if (wide) 1.72f else 1.28f
+                }
+                val cone = when (skill.id) {
+                    "war_spin", "war_quake", "pal_holy" -> -1f
+                    else -> if (wide) 0.02f else MELEE_CONE_DOT
                 }
                 performMeleeSlash(
                     map = map,
                     damage = dmg,
-                    emitCrescent = vfx?.meleeFxKey == null,
-                    slashPower = if (vfx?.meleeFxKey == null) 1.45f else 1f,
-                    slashDuration = if (vfx?.meleeFxKey == null) 0.48f else 0.34f,
+                    emitCrescent = true,
+                    slashPower = if (wide) 1.85f else 1.4f,
+                    slashDuration = 0.52f,
+                    rangeMult = rangeMult,
+                    coneDot = cone,
+                    skillId = skill.id,
                 )
             }
-            WeaponStyle.BOW -> {
-                spawnProjectile(
-                    style = WeaponStyle.BOW,
-                    damage = dmg,
-                    life = 1.25f,
-                    fxSpriteKey = vfx?.projectileFxKey,
-                    impactSpriteKey = vfx?.impactFxKey,
-                    radius = if (vfx?.projectileFxKey != null) 22f else 18f,
-                )
-            }
+            WeaponStyle.BOW -> spawnBowSpecial(skill.id, dmg, vfx)
             WeaponStyle.MAGIC -> {
                 val kind = magicKindForSkill(skill.id)
-                spawnProjectile(
-                    style = WeaponStyle.MAGIC,
-                    damage = dmg + 4,
-                    life = 1.35f,
-                    fxSpriteKey = vfx?.projectileFxKey ?: kind.projectileFxKey(),
-                    impactSpriteKey = vfx?.impactFxKey ?: kind.impactFxKey(),
-                    radius = 22f,
-                    magicKind = kind,
-                    announce = false,
-                )
+                spawnMagicSpecial(skill.id, dmg + 4, kind, vfx)
             }
         }
         refreshAttackReady()
@@ -2472,26 +2467,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun spawnSpecialMeleeFx(vfx: SpecialVfxSpec) {
-        val key = vfx.meleeFxKey ?: return
+    private fun spawnSpecialSkillBurst(skillId: String, vfx: SpecialVfxSpec?) {
         val origin = slashFxOrigin()
+        val fwdX = facing.dirX()
+        val fwdY = facing.dirY()
         specialSkillFx += SpecialSkillFx(
-            x = origin.first,
-            y = origin.second,
+            x = origin.first + fwdX * 16f,
+            y = origin.second + fwdY * 10f,
             facing = facing,
-            spriteKey = key,
-            duration = vfx.meleeFxDuration,
-            scale = vfx.meleeFxScale,
+            spriteKey = vfx?.meleeFxKey.orEmpty(),
+            duration = (vfx?.meleeFxDuration ?: 0.62f) + 0.12f,
+            scale = (vfx?.meleeFxScale ?: 1.7f) + 0.25f,
+            skillId = skillId,
         )
-        // 필살은 빔을 한 줄 더
-        if (key == "adv_fx_finisher") {
+        if (skillId == "adv_finisher" || skillId == "war_quake" || skillId == "pal_holy") {
             specialSkillFx += SpecialSkillFx(
-                x = origin.first + facing.dirX() * 40f,
-                y = origin.second + facing.dirY() * 28f,
+                x = origin.first + fwdX * 54f,
+                y = origin.second + fwdY * 36f,
                 facing = facing,
-                spriteKey = "adv_fx_beam",
-                duration = 0.48f,
-                scale = 1.2f,
+                spriteKey = if (skillId == "adv_finisher") "adv_fx_beam" else "",
+                duration = 0.55f,
+                scale = 1.45f,
+                skillId = skillId,
             )
         }
         dungeonCombatFrame++
@@ -2509,6 +2506,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         emitCrescent: Boolean = true,
         slashPower: Float = 1f,
         slashDuration: Float = 0.34f,
+        rangeMult: Float = 1f,
+        coneDot: Float = MELEE_CONE_DOT,
+        skillId: String = "",
     ) {
         val origin = slashFxOrigin()
         if (emitCrescent) {
@@ -2520,7 +2520,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 power = slashPower,
             )
         }
-        val range = MELEE_RANGE * (0.92f + 0.18f * slashPower)
+        val range = MELEE_RANGE * (0.92f + 0.18f * slashPower) * rangeMult
         val fx = facing.dirX()
         val fy = facing.dirY()
         val hits = map.monsters.filter { monster ->
@@ -2529,8 +2529,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val dy = monster.y - dungeonHeroY
             val dist = hypot(dx, dy)
             if (dist > range || dist < 1f) return@filter false
+            if (coneDot < 0f) return@filter true
             val dot = (dx * fx + dy * fy) / dist
-            dot >= MELEE_CONE_DOT
+            dot >= coneDot
         }
         if (hits.isEmpty()) {
             say("칼날이 허공을 가른다.")
@@ -2541,11 +2542,92 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val kdy = monster.y - dungeonHeroY
             // 휘두르기 효과음은 이미 재생됨 — 여기서는 넉백만
             damageMonster(monster, damage, knockDx = kdx, knockDy = kdy, hitSfx = null)
+            if (skillId.isNotEmpty()) {
+                specialSkillFx += SpecialSkillFx(
+                    x = monster.x,
+                    y = monster.y - 22f,
+                    facing = facing,
+                    duration = 0.42f,
+                    scale = 1.15f,
+                    skillId = skillId,
+                )
+            }
         }
     }
 
     private fun slashFxOrigin(): Pair<Float, Float> =
         dungeonHeroX + facing.dirX() * 18f to dungeonHeroY + facing.dirY() * 10f - 28f
+
+    private fun spawnBowSpecial(skillId: String, damage: Int, vfx: SpecialVfxSpec?) {
+        when (skillId) {
+            "arc_double" -> {
+                spawnProjectile(WeaponStyle.BOW, (damage * 0.72f).roundToInt(), 1.2f, vfx?.projectileFxKey, skillLook = skillId, angleOffsetDeg = -11f, announce = false)
+                spawnProjectile(WeaponStyle.BOW, (damage * 0.72f).roundToInt(), 1.2f, vfx?.projectileFxKey, skillLook = skillId, angleOffsetDeg = 11f, announce = false)
+            }
+            "arc_snipe" -> spawnProjectile(
+                WeaponStyle.BOW, (damage * 1.15f).roundToInt(), 1.55f, vfx?.projectileFxKey,
+                radius = 16f, skillLook = skillId, speedMult = 1.45f, announce = false,
+            )
+            "arc_pierce" -> spawnProjectile(
+                WeaponStyle.BOW, damage, 1.4f, vfx?.projectileFxKey,
+                radius = 24f, skillLook = skillId, pierceLeft = 3, announce = false,
+            )
+            "arc_rain" -> {
+                repeat(5) { i ->
+                    val side = (i - 2) * 26f
+                    spawnProjectile(
+                        WeaponStyle.BOW, (damage * 0.42f).roundToInt(), 1.15f, vfx?.projectileFxKey,
+                        skillLook = skillId, announce = false,
+                        originX = dungeonHeroX + facing.dirY() * side + facing.dirX() * (30f + i * 8f),
+                        originY = dungeonHeroY - 110f + i * 6f,
+                        vxOverride = facing.dirX() * 90f,
+                        vyOverride = PROJECTILE_SPEED * 0.95f,
+                    )
+                }
+            }
+            "arc_storm" -> {
+                listOf(-24f, -12f, 0f, 12f, 24f, -8f, 8f).forEach { deg ->
+                    spawnProjectile(
+                        WeaponStyle.BOW, (damage * 0.38f).roundToInt(), 1.2f, vfx?.projectileFxKey,
+                        skillLook = skillId, angleOffsetDeg = deg, speedMult = 1.1f, announce = false,
+                    )
+                }
+            }
+            else -> spawnProjectile(
+                WeaponStyle.BOW, damage, 1.25f, vfx?.projectileFxKey,
+                radius = 22f, skillLook = skillId, announce = false,
+            )
+        }
+    }
+
+    private fun spawnMagicSpecial(skillId: String, damage: Int, kind: MagicBoltKind, vfx: SpecialVfxSpec?) {
+        when (skillId) {
+            "mag_meteor" -> {
+                spawnProjectile(
+                    WeaponStyle.MAGIC, damage, 1.2f, vfx?.projectileFxKey, vfx?.impactFxKey,
+                    radius = 30f, magicKind = kind, skillLook = skillId, announce = false,
+                    originX = dungeonHeroX + facing.dirX() * 20f,
+                    originY = dungeonHeroY - 130f,
+                    vxOverride = facing.dirX() * 140f,
+                    vyOverride = PROJECTILE_SPEED * 0.85f,
+                )
+            }
+            "mag_chain" -> {
+                spawnProjectile(WeaponStyle.MAGIC, damage, 1.3f, vfx?.projectileFxKey, vfx?.impactFxKey, 22f, kind, false, 2, skillId, speedMult = 1.2f)
+            }
+            "mag_ice" -> spawnProjectile(WeaponStyle.MAGIC, damage, 1.35f, vfx?.projectileFxKey, vfx?.impactFxKey, 24f, kind, false, skillLook = skillId)
+            "mag_orb" -> spawnProjectile(WeaponStyle.MAGIC, damage, 1.4f, vfx?.projectileFxKey, vfx?.impactFxKey, 26f, kind, false, skillLook = skillId, speedMult = 0.85f)
+            "mag_ruin" -> {
+                spawnProjectile(WeaponStyle.MAGIC, damage, 1.4f, vfx?.projectileFxKey, vfx?.impactFxKey, 28f, kind, false, skillLook = skillId)
+                spawnProjectile(WeaponStyle.MAGIC, (damage * 0.5f).roundToInt(), 1.2f, null, null, 20f, kind, false, skillLook = skillId, angleOffsetDeg = -16f)
+                spawnProjectile(WeaponStyle.MAGIC, (damage * 0.5f).roundToInt(), 1.2f, null, null, 20f, kind, false, skillLook = skillId, angleOffsetDeg = 16f)
+            }
+            else -> spawnProjectile(
+                WeaponStyle.MAGIC, damage, 1.35f, vfx?.projectileFxKey ?: kind.projectileFxKey(),
+                vfx?.impactFxKey ?: kind.impactFxKey(), 24f, kind, false, skillLook = skillId,
+            )
+        }
+    }
 
     private fun spawnProjectile(
         style: WeaponStyle,
@@ -2556,25 +2638,41 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         radius: Float = 18f,
         magicKind: MagicBoltKind? = null,
         announce: Boolean = true,
+        pierceLeft: Int = 0,
+        skillLook: String? = null,
+        angleOffsetDeg: Float = 0f,
+        speedMult: Float = 1f,
+        originX: Float? = null,
+        originY: Float? = null,
+        vxOverride: Float? = null,
+        vyOverride: Float? = null,
     ) {
         val fx = facing.dirX()
         val fy = facing.dirY()
-        // 대각 패드 입력 중이면 그 방향으로도 보정
         val px = if (abs(dungeonPadX) + abs(dungeonPadY) > 0.2f) dungeonPadX else fx
         val py = if (abs(dungeonPadX) + abs(dungeonPadY) > 0.2f) dungeonPadY else fy
         val len = hypot(px, py).coerceAtLeast(0.01f)
-        val nx = px / len
-        val ny = py / len
+        var nx = px / len
+        var ny = py / len
+        if (angleOffsetDeg != 0f) {
+            val rad = Math.toRadians(angleOffsetDeg.toDouble())
+            val c = kotlin.math.cos(rad).toFloat()
+            val s = kotlin.math.sin(rad).toFloat()
+            val rx = nx * c - ny * s
+            val ry = nx * s + ny * c
+            nx = rx
+            ny = ry
+        }
         facing = if (abs(nx) > abs(ny)) {
             if (nx > 0) Facing.RIGHT else Facing.LEFT
         } else {
             if (ny > 0) Facing.DOWN else Facing.UP
         }
         dungeonProjectiles += DungeonProjectile(
-            x = dungeonHeroX + nx * 22f,
-            y = dungeonHeroY + ny * 10f - 30f,
-            vx = nx * PROJECTILE_SPEED,
-            vy = ny * PROJECTILE_SPEED,
+            x = originX ?: (dungeonHeroX + nx * 22f),
+            y = originY ?: (dungeonHeroY + ny * 10f - 30f),
+            vx = vxOverride ?: (nx * PROJECTILE_SPEED * speedMult),
+            vy = vyOverride ?: (ny * PROJECTILE_SPEED * speedMult),
             style = style,
             damage = damage,
             life = life,
@@ -2582,6 +2680,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             fxSpriteKey = fxSpriteKey,
             impactSpriteKey = impactSpriteKey,
             magicKind = magicKind,
+            pierceLeft = pierceLeft,
+            skillLook = skillLook,
         )
         if (announce) {
             say(
@@ -3369,7 +3469,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 return@forEach
             }
             val hit = map.monsters.firstOrNull {
-                it.alive && hypot(it.x - p.x, it.y - p.y) < p.radius + 30f
+                it.alive &&
+                    it.id !in p.alreadyHit &&
+                    hypot(it.x - p.x, it.y - p.y) < p.radius + 30f
             }
             if (hit != null) {
                 val hitSfx = when {
@@ -3385,17 +3487,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     knockDy = p.vy,
                     hitSfx = hitSfx,
                 )
-                p.impactSpriteKey?.let { key ->
-                    specialSkillFx += SpecialSkillFx(
-                        x = hit.x,
-                        y = hit.y - 24f,
-                        facing = facing,
-                        spriteKey = key,
-                        duration = 0.42f,
-                        scale = 1.35f,
-                    )
+                p.alreadyHit += hit.id
+                specialSkillFx += SpecialSkillFx(
+                    x = hit.x,
+                    y = hit.y - 24f,
+                    facing = facing,
+                    spriteKey = p.impactSpriteKey.orEmpty(),
+                    duration = 0.42f,
+                    scale = 1.35f,
+                    skillId = p.skillLook.orEmpty(),
+                )
+                if (p.pierceLeft > 0) {
+                    p.pierceLeft -= 1
+                } else {
+                    doomed += p
                 }
-                doomed += p
             }
         }
         if (doomed.isNotEmpty()) {

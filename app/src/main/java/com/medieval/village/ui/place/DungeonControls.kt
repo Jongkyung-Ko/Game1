@@ -407,14 +407,15 @@ fun DrawScope.drawMeleeSlashFx(fx: MeleeSlashFx) {
     drawCircle(Color(0xFFFFFFFF).copy(alpha = 0.85f * fade), 6.5f * fade * power, Offset(tipX, tipY))
 }
 
-/** 특별스킬 스프라이트 FX */
+/** 특별스킬 스프라이트 + 스킬별 화려한 캔버스 FX */
 fun DrawScope.drawSpecialSkillFx(fx: SpecialSkillFx, art: CustomArt?) {
-    val fade = (1f - fx.progress * 0.45f).coerceIn(0.35f, 1f)
-    val bmp = art?.heroAnimFrameOrNull(fx.spriteKey, fx.frame)
+    if (fx.skillId.isNotEmpty()) {
+        drawUniqueSkillBurst(fx)
+    }
+    val bmp = if (fx.spriteKey.isNotEmpty()) art?.heroAnimFrameOrNull(fx.spriteKey, fx.frame) else null
     if (bmp != null) {
         val mirror = fx.facing == Facing.LEFT || fx.facing == Facing.UP
         val h = 88f * fx.scale * (1f + fx.progress * 0.12f)
-        // drawCustomSprite 은 alpha 미지원 → 크기·위치로 연출
         drawCustomSprite(
             image = bmp,
             cx = fx.x,
@@ -422,15 +423,19 @@ fun DrawScope.drawSpecialSkillFx(fx: SpecialSkillFx, art: CustomArt?) {
             worldHeight = h,
             mirrorX = mirror,
         )
-        return
+    } else if (fx.skillId.isEmpty()) {
+        val fade = (1f - fx.progress * 0.45f).coerceIn(0.35f, 1f)
+        val r = (36f + fx.progress * 28f) * fx.scale
+        drawCircle(Color(0x66FFE29A).copy(alpha = 0.45f * fade), r, Offset(fx.x, fx.y))
+        drawCircle(Color(0xAAFFF8E0).copy(alpha = 0.55f * fade), r * 0.45f, Offset(fx.x, fx.y))
     }
-    // 폴백: 골드 버스트
-    val r = (36f + fx.progress * 28f) * fx.scale
-    drawCircle(Color(0x66FFE29A).copy(alpha = 0.45f * fade), r, Offset(fx.x, fx.y))
-    drawCircle(Color(0xAAFFF8E0).copy(alpha = 0.55f * fade), r * 0.45f, Offset(fx.x, fx.y))
 }
 
 fun DrawScope.drawDungeonProjectile(p: DungeonProjectile, art: CustomArt? = null) {
+    if (p.skillLook != null) {
+        drawSkillLookProjectile(p)
+        return
+    }
     val key = p.fxSpriteKey
     if (key != null && art != null) {
         val frame = (((1.4f - p.life) * 8f).toInt() % 4 + 4) % 4
@@ -476,6 +481,49 @@ fun DrawScope.drawDungeonProjectile(p: DungeonProjectile, art: CustomArt? = null
         }
         else -> {
             drawCircle(Color(0xFFE8D9B8), 6f, Offset(p.x, p.y))
+        }
+    }
+}
+
+private fun DrawScope.drawSkillLookProjectile(p: DungeonProjectile) {
+    val ang = atan2(p.vy, p.vx)
+    val c = Offset(p.x, p.y)
+    val tip = Offset(p.x + cos(ang) * 20f, p.y + sin(ang) * 20f)
+    val tail = Offset(p.x - cos(ang) * 16f, p.y - sin(ang) * 16f)
+    when (p.skillLook) {
+        "arc_snipe" -> {
+            drawLine(Color(0x88FFE080), tail, Offset(p.x + cos(ang) * 36f, p.y + sin(ang) * 36f), 7f, StrokeCap.Round)
+            drawLine(Color(0xFFFFF6C8), c, tip, 2.6f, StrokeCap.Round)
+            drawCircle(Color.White, 3.2f, tip)
+        }
+        "arc_pierce" -> {
+            drawLine(Color(0x8840E0E8), tail, Offset(p.x + cos(ang) * 28f, p.y + sin(ang) * 28f), 9f)
+            drawLine(Color(0xFF8FF8FF), tail, tip, 3.6f, StrokeCap.Round)
+            drawCircle(Color(0xFFC8FFFF), 4.5f, tip)
+        }
+        "arc_double" -> {
+            drawLine(Color(0xFFFFC14A), tail, tip, 5f, StrokeCap.Round)
+            drawCircle(Color(0xFFFFF0B0), 4f, tip)
+        }
+        "arc_rain" -> {
+            drawLine(Color(0xFFFFE08A), Offset(p.x - 3f, p.y - 14f), Offset(p.x + 4f, p.y + 16f), 3.4f, StrokeCap.Round)
+            drawCircle(Color.White, 2.6f, Offset(p.x + 4f, p.y + 16f))
+        }
+        "arc_storm" -> {
+            drawLine(Color(0xFFFFD060), tail, tip, 4.2f, StrokeCap.Round)
+            drawCircle(Color(0xFFFFF0A0), 3.8f, tip)
+            drawCircle(Color(0x66FFE080), 10f, c)
+        }
+        "mag_ice" -> drawMagicBolt(p.copy(magicKind = MagicBoltKind.ICE))
+        "mag_orb" -> drawMagicBolt(p.copy(magicKind = MagicBoltKind.ORB))
+        "mag_meteor", "mag_blast", "adv_bolt" -> drawMagicBolt(p.copy(magicKind = MagicBoltKind.FIRE))
+        "mag_chain" -> drawMagicBolt(p.copy(magicKind = MagicBoltKind.LIGHTNING))
+        "mag_ruin" -> drawMagicBolt(p.copy(magicKind = MagicBoltKind.HOLY))
+        else -> if (p.style == WeaponStyle.BOW) {
+            drawLine(Color(0xFFFFE29A), tail, tip, 4.8f, StrokeCap.Round)
+            drawCircle(Color.White, 3.4f, tip)
+        } else {
+            drawMagicBolt(p)
         }
     }
 }

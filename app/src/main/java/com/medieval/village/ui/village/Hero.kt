@@ -29,8 +29,8 @@ private val Steel = Color(0xFFBFC5CC)
 private val SteelDark = Color(0xFF7E858C)
 private val Gold = Color(0xFFD9A441)
 
-/** 주인공 스프라이트 표시 배율 (기존 대비 1.5배) */
-const val HERO_SIZE_MULT = 1.5f
+/** 주인공 스프라이트 표시 배율 (원래 대비 약간 크게, 1.5배보다는 작게) */
+const val HERO_SIZE_MULT = 1.28f
 
 /**
  * 걸어다니는 중세 모험가.

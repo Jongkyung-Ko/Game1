@@ -51,17 +51,17 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 - 용병은 여러 명 고용할 수 있지만 Status에서 최대 2명만 원정대로 선택합니다.
 - 선택한 용병만 마을과 각 장소 상단 그림에 등장하고 던전 전투력에 반영됩니다.
 
-## APK 다운로드 (최신: v0.4.52)
+## APK 다운로드 (최신: v0.4.53)
 
-바로 설치할 파일: [MedievalVillage-v0.4.52-debug.apk](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.52/MedievalVillage-v0.4.52-debug.apk)
+바로 설치할 파일: [MedievalVillage-v0.4.53-debug.apk](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.53/MedievalVillage-v0.4.53-debug.apk)
 
-직업 스프라이트 한 번에 받기: [HeroClassSprites-v0.4.52.zip](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.52/HeroClassSprites-v0.4.52.zip)
+직업 스프라이트 한 번에 받기: [HeroClassSprites-v0.4.53.zip](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.53/HeroClassSprites-v0.4.53.zip)
 
 이전 버전은 [Releases](https://github.com/Jongkyung-Ko/Game1/releases) 에서 받을 수 있습니다.
 
 1. 위 APK 를 폰으로 다운로드
 2. 폰 **설정 > 보안** 에서 알 수 없는 앱 설치 허용
-3. APK 를 열어 설치 → 앱 이름 **중세마을 v0.4.52**
+3. APK 를 열어 설치 → 앱 이름 **중세마을 v0.4.53**
 4. 예전 빌드와 패키지명이 다르므로 기존 앱을 지울 필요는 없습니다
 
 `v*` 태그를 푸시하면 GitHub Actions 가 자동으로 APK와 직업 스프라이트 zip 을 빌드해 Release Assets 에 올립니다.
