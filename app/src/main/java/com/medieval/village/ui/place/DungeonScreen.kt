@@ -5,10 +5,8 @@ import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -43,6 +42,7 @@ import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
 import com.medieval.village.model.PlaceId
 import com.medieval.village.ui.MessageLog
+import com.medieval.village.ui.dungeonPlayZoom
 import com.medieval.village.ui.mapZoomGestures
 import com.medieval.village.ui.rememberMapZoomState
 import com.medieval.village.ui.skin.DungeonArt
@@ -97,15 +97,26 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
             val partySlots = vm.partyDrawSlots(heroX, heroY)
             val mapZoom = rememberMapZoomState()
             val viewSize = Size(widthPx, heightPx)
+            val enlarge = dungeonPlayZoom(vm.dungeonMapEnlarged)
+            val watermarkY = with(density) { 76.dp.toPx() }
+            LaunchedEffect(enlarge) {
+                if (enlarge > 1f) mapZoom.reset()
+            }
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(floor?.floor, widthPx, heightPx, mapZoom.zoom, mapZoom.pan) {
+                    .pointerInput(floor?.floor, widthPx, heightPx, enlarge, mapZoom.zoom, mapZoom.pan) {
                         detectTapGestures { tap ->
                             val map = vm.dungeonFloor ?: return@detectTapGestures
-                            val content = mapZoom.screenToContent(tap, viewSize)
-                            val cam = cameraOffset(map, vm.dungeonHeroX, vm.dungeonHeroY, widthPx, heightPx)
+                            val viewW = widthPx / enlarge
+                            val viewH = heightPx / enlarge
+                            val cam = cameraOffset(map, vm.dungeonHeroX, vm.dungeonHeroY, viewW, viewH)
+                            val content = if (enlarge > 1f) {
+                                Offset(tap.x / enlarge, tap.y / enlarge)
+                            } else {
+                                mapZoom.screenToContent(tap, viewSize)
+                            }
                             val worldX = content.x + cam.first
                             val worldY = content.y + cam.second
                             val col = (worldX / map.tileSize).toInt()
@@ -115,7 +126,7 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                             }
                         }
                     }
-                    .mapZoomGestures(mapZoom)
+                    .then(if (enlarge > 1f) Modifier else Modifier.mapZoomGestures(mapZoom))
             ) {
                 @Suppress("UNUSED_EXPRESSION")
                 combatFrame
@@ -135,65 +146,79 @@ fun DungeonScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                     return@Canvas
                 }
 
-                val viewW = size.width.coerceAtLeast(1f)
-                val viewH = size.height.coerceAtLeast(1f)
+                val viewW = (size.width / enlarge).coerceAtLeast(1f)
+                val viewH = (size.height / enlarge).coerceAtLeast(1f)
                 val (camX, camY) = cameraOffset(map, heroX, heroY, viewW, viewH)
-                withMapZoom(mapZoom) {
+                val drawWorld: DrawScope.() -> Unit = {
+                    if (dungeonArt != null) {
+                        drawArtDungeonFloor(dungeonArt, map, camX, camY, viewW, viewH)
+                    } else if (atlas != null) {
+                        drawHybridDungeonFloor(atlas, map)
+                    } else {
+                        drawDungeonFloorFallback(map)
+                    }
+                    map.monsters.filter { it.alive }.forEach { monster ->
+                        drawDungeonMonster(atlas, art, monster)
+                    }
+                    projectiles.forEach { drawDungeonProjectile(it, art) }
+                    drawPartySlots(
+                        slots = partySlots,
+                        walking = walking,
+                        walkPhase = walkPhase,
+                        frontAnimKind = heroAnimKind,
+                        frontAnimFrame = heroAnimFrame,
+                        art = art,
+                        scale = 0.88f,
+                        rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
+                        specialAnimSet = specialAnimSet,
+                        heroJob = vm.player.heroJob,
+                        heroRank = vm.player.spriteRank,
+                    )
+                    val fxKey = vm.levelUpFxActorKey
+                    if (fxKey != null) {
+                        val slot = partySlots.firstOrNull { it.actorKey == fxKey }
+                            ?: partySlots.firstOrNull()
+                        if (slot != null) {
+                            val rem = (vm.levelUpFxUntil - vm.animTime).coerceAtLeast(0f)
+                            val progress = (1f - rem / 2f).coerceIn(0f, 1f)
+                            drawLevelUpBurst(slot.x, slot.y, progress, vm.animTime)
+                        }
+                    }
+                    slashFx?.let { drawMeleeSlashFx(it) }
+                    specialFx.forEach { drawSpecialSkillFx(it, art) }
+                }
+                if (enlarge > 1f) {
                     withTransform({
+                        scale(enlarge, enlarge, Offset.Zero)
                         translate(-camX, -camY)
-                    }) {
-                        if (dungeonArt != null) {
-                            drawArtDungeonFloor(dungeonArt, map, camX, camY, viewW, viewH)
-                        } else if (atlas != null) {
-                            drawHybridDungeonFloor(atlas, map)
-                        } else {
-                            drawDungeonFloorFallback(map)
-                        }
-                        map.monsters.filter { it.alive }.forEach { monster ->
-                            drawDungeonMonster(atlas, art, monster)
-                        }
-                        projectiles.forEach { drawDungeonProjectile(it, art) }
-                        drawPartySlots(
-                            slots = partySlots,
-                            walking = walking,
-                            walkPhase = walkPhase,
-                            frontAnimKind = heroAnimKind,
-                            frontAnimFrame = heroAnimFrame,
-                            art = art,
-                            scale = 0.88f,
-                            rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
-                            specialAnimSet = specialAnimSet,
-                            heroJob = vm.player.heroJob,
-                            heroRank = vm.player.spriteRank,
-                        )
-                        val fxKey = vm.levelUpFxActorKey
-                        if (fxKey != null) {
-                            val slot = partySlots.firstOrNull { it.actorKey == fxKey }
-                                ?: partySlots.firstOrNull()
-                            if (slot != null) {
-                                val rem = (vm.levelUpFxUntil - vm.animTime).coerceAtLeast(0f)
-                                val progress = (1f - rem / 2f).coerceIn(0f, 1f)
-                                drawLevelUpBurst(slot.x, slot.y, progress, vm.animTime)
-                            }
-                        }
-                        slashFx?.let { drawMeleeSlashFx(it) }
-                        specialFx.forEach { drawSpecialSkillFx(it, art) }
+                    }, drawWorld)
+                } else {
+                    withMapZoom(mapZoom) {
+                        withTransform({
+                            translate(-camX, -camY)
+                        }, drawWorld)
                     }
                 }
-                drawMinimap(map, heroX, heroY, viewW, viewH)
+                drawMinimap(map, heroX, heroY, size.width, size.height)
                 drawLabel(
                     when (vm.currentPlace) {
-                        PlaceId.GRAY_CASTLE -> "v0.4.53 Gray Castle"
-                        PlaceId.SEA_CAVE -> "v0.4.53 Sea Cave"
-                        PlaceId.WINTER_KEEP -> "v0.4.53 Winter Keep"
-                        else -> "v0.4.53 Undead nest"
+                        PlaceId.GRAY_CASTLE -> "v0.4.54 Gray Castle"
+                        PlaceId.SEA_CAVE -> "v0.4.54 Sea Cave"
+                        PlaceId.WINTER_KEEP -> "v0.4.54 Winter Keep"
+                        else -> "v0.4.54 Undead nest"
                     },
                     14f,
-                    28f,
+                    watermarkY,
                     18f,
                     Color(0xFF5A4231),
                 )
             }
+            DungeonEnlargeButton(
+                vm = vm,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp),
+            )
         }
 
         DungeonBottomChrome(

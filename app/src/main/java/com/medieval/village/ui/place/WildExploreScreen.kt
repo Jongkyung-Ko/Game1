@@ -5,10 +5,8 @@ import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
@@ -41,6 +40,7 @@ import com.medieval.village.model.DungeonFloor
 import com.medieval.village.model.DungeonMonster
 import com.medieval.village.model.DungeonTile
 import com.medieval.village.ui.MessageLog
+import com.medieval.village.ui.dungeonPlayZoom
 import com.medieval.village.ui.mapZoomGestures
 import com.medieval.village.ui.rememberMapZoomState
 import com.medieval.village.ui.skin.DungeonArt
@@ -101,7 +101,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFC8D9A4),
         border = Color(0xFF3A5028),
         canvasBg = Color(0xFFDCE8B8),
-        watermark = "v0.4.53 Eastern forest",
+        watermark = "v0.4.54 Eastern forest",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -119,7 +119,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFE8D4A0),
         border = Color(0xFF8A5A28),
         canvasBg = Color(0xFFF0E0B0),
-        watermark = "v0.4.53 Southern desert",
+        watermark = "v0.4.54 Southern desert",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -137,7 +137,7 @@ private fun themeUi(theme: WildTheme, zone: Int, record: Int, foeCount: Int): Wi
         mapFrameBg = Color(0xFFD0E0F0),
         border = Color(0xFF3A5A78),
         canvasBg = Color(0xFFE8F0F8),
-        watermark = "v0.4.53 Northern glacier",
+        watermark = "v0.4.54 Northern glacier",
         exitHint = "↑ 탈출",
         deepHint = "↓ 들어가기",
         moveHint = "왼쪽 패드 이동 · 오른쪽 공격 · 상자는 탭",
@@ -190,15 +190,26 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
             val partySlots = vm.partyDrawSlots(heroX, heroY)
             val mapZoom = rememberMapZoomState()
             val viewSize = Size(widthPx, heightPx)
+            val enlarge = dungeonPlayZoom(vm.dungeonMapEnlarged)
+            val watermarkY = with(density) { 76.dp.toPx() }
+            LaunchedEffect(enlarge) {
+                if (enlarge > 1f) mapZoom.reset()
+            }
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(floor?.floor, widthPx, heightPx, theme, mapZoom.zoom, mapZoom.pan) {
+                    .pointerInput(floor?.floor, widthPx, heightPx, theme, enlarge, mapZoom.zoom, mapZoom.pan) {
                         detectTapGestures { tap ->
                             val map = vm.dungeonFloor ?: return@detectTapGestures
-                            val content = mapZoom.screenToContent(tap, viewSize)
-                            val cam = wildCamera(map, vm.dungeonHeroX, vm.dungeonHeroY, widthPx, heightPx)
+                            val viewW = widthPx / enlarge
+                            val viewH = heightPx / enlarge
+                            val cam = wildCamera(map, vm.dungeonHeroX, vm.dungeonHeroY, viewW, viewH)
+                            val content = if (enlarge > 1f) {
+                                Offset(tap.x / enlarge, tap.y / enlarge)
+                            } else {
+                                mapZoom.screenToContent(tap, viewSize)
+                            }
                             val worldX = content.x + cam.first
                             val worldY = content.y + cam.second
                             val col = (worldX / map.tileSize).toInt()
@@ -208,7 +219,7 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                             }
                         }
                     }
-                    .mapZoomGestures(mapZoom)
+                    .then(if (enlarge > 1f) Modifier else Modifier.mapZoomGestures(mapZoom))
             ) {
                 @Suppress("UNUSED_EXPRESSION")
                 combatFrame
@@ -226,64 +237,78 @@ fun WildExploreScreen(vm: GameViewModel, theme: WildTheme, modifier: Modifier = 
                     wildLabel("지도를 펼치는 중…", size.width * 0.28f, size.height * 0.5f, 28f, ui.border)
                     return@Canvas
                 }
-                val viewW = size.width.coerceAtLeast(1f)
-                val viewH = size.height.coerceAtLeast(1f)
+                val viewW = (size.width / enlarge).coerceAtLeast(1f)
+                val viewH = (size.height / enlarge).coerceAtLeast(1f)
                 val (camX, camY) = wildCamera(map, heroX, heroY, viewW, viewH)
-                withMapZoom(mapZoom) {
-                    withTransform({ translate(-camX, -camY) }) {
-                        if (wildArt != null) {
-                            drawArtWildFloor(
-                                wild = wildArt,
-                                dungeon = dungeonArt,
-                                map = map,
-                                camX = camX,
-                                camY = camY,
-                                viewW = viewW,
-                                viewH = viewH,
-                                backdrop = ui.chromeBg,
-                                shade = ui.shade,
-                            )
-                        } else {
-                            when (theme) {
-                                WildTheme.FOREST -> drawForestFloor(atlas, map)
-                                WildTheme.DESERT -> drawDesertFloor(atlas, map)
-                                WildTheme.GLACIER -> drawGlacierFloor(atlas, map)
-                            }
-                        }
-                        map.monsters.filter { it.alive }.forEach { monster ->
-                            drawWildBeast(atlas, art, theme, monster)
-                        }
-                        projectiles.forEach { drawDungeonProjectile(it, art) }
-                        drawPartySlots(
-                            slots = partySlots,
-                            walking = walking,
-                            walkPhase = walkPhase,
-                            frontAnimKind = heroAnimKind,
-                            frontAnimFrame = heroAnimFrame,
-                            art = art,
-                            scale = 0.88f,
-                            rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
-                            specialAnimSet = specialAnimSet,
-                            heroJob = vm.player.heroJob,
-                            heroRank = vm.player.spriteRank,
+                val drawWorld: DrawScope.() -> Unit = {
+                    if (wildArt != null) {
+                        drawArtWildFloor(
+                            wild = wildArt,
+                            dungeon = dungeonArt,
+                            map = map,
+                            camX = camX,
+                            camY = camY,
+                            viewW = viewW,
+                            viewH = viewH,
+                            backdrop = ui.chromeBg,
+                            shade = ui.shade,
                         )
-                        val fxKey = vm.levelUpFxActorKey
-                        if (fxKey != null) {
-                            val slot = partySlots.firstOrNull { it.actorKey == fxKey }
-                                ?: partySlots.firstOrNull()
-                            if (slot != null) {
-                                val rem = (vm.levelUpFxUntil - vm.animTime).coerceAtLeast(0f)
-                                val progress = (1f - rem / 2f).coerceIn(0f, 1f)
-                                drawLevelUpBurst(slot.x, slot.y, progress, vm.animTime)
-                            }
+                    } else {
+                        when (theme) {
+                            WildTheme.FOREST -> drawForestFloor(atlas, map)
+                            WildTheme.DESERT -> drawDesertFloor(atlas, map)
+                            WildTheme.GLACIER -> drawGlacierFloor(atlas, map)
                         }
-                        slashFx?.let { drawMeleeSlashFx(it) }
-                        specialFx.forEach { drawSpecialSkillFx(it, art) }
+                    }
+                    map.monsters.filter { it.alive }.forEach { monster ->
+                        drawWildBeast(atlas, art, theme, monster)
+                    }
+                    projectiles.forEach { drawDungeonProjectile(it, art) }
+                    drawPartySlots(
+                        slots = partySlots,
+                        walking = walking,
+                        walkPhase = walkPhase,
+                        frontAnimKind = heroAnimKind,
+                        frontAnimFrame = heroAnimFrame,
+                        art = art,
+                        scale = 0.88f,
+                        rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
+                        specialAnimSet = specialAnimSet,
+                        heroJob = vm.player.heroJob,
+                        heroRank = vm.player.spriteRank,
+                    )
+                    val fxKey = vm.levelUpFxActorKey
+                    if (fxKey != null) {
+                        val slot = partySlots.firstOrNull { it.actorKey == fxKey }
+                            ?: partySlots.firstOrNull()
+                        if (slot != null) {
+                            val rem = (vm.levelUpFxUntil - vm.animTime).coerceAtLeast(0f)
+                            val progress = (1f - rem / 2f).coerceIn(0f, 1f)
+                            drawLevelUpBurst(slot.x, slot.y, progress, vm.animTime)
+                        }
+                    }
+                    slashFx?.let { drawMeleeSlashFx(it) }
+                    specialFx.forEach { drawSpecialSkillFx(it, art) }
+                }
+                if (enlarge > 1f) {
+                    withTransform({
+                        scale(enlarge, enlarge, Offset.Zero)
+                        translate(-camX, -camY)
+                    }, drawWorld)
+                } else {
+                    withMapZoom(mapZoom) {
+                        withTransform({ translate(-camX, -camY) }, drawWorld)
                     }
                 }
-                drawWildMinimap(map, theme, heroX, heroY, viewW, viewH)
-                wildLabel(ui.watermark, 14f, 28f, 18f, ui.border)
+                drawWildMinimap(map, theme, heroX, heroY, size.width, size.height)
+                wildLabel(ui.watermark, 14f, watermarkY, 18f, ui.border)
             }
+            DungeonEnlargeButton(
+                vm = vm,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp),
+            )
         }
 
         DungeonBottomChrome(

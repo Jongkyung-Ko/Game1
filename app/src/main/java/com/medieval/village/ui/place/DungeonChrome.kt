@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -149,5 +150,17 @@ fun DungeonBottomChrome(
             onSpecial = { slot -> vm.dungeonSpecialAttack(slot) },
         )
         DungeonActionRow(vm)
+    }
+}
+
+/** 던전 지도 왼쪽 위 — 확대 플레이 토글 */
+@Composable
+fun DungeonEnlargeButton(vm: GameViewModel, modifier: Modifier = Modifier) {
+    ClassicButton(
+        text = if (vm.dungeonMapEnlarged) "−" else "+",
+        modifier = modifier.size(56.dp),
+        highlight = vm.dungeonMapEnlarged,
+    ) {
+        vm.toggleDungeonMapEnlarge()
     }
 }

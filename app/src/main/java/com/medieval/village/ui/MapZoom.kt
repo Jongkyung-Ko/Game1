@@ -82,6 +82,11 @@ fun Modifier.mapZoomGestures(state: MapZoomState): Modifier =
         }
     }
 
+/** 던전 (+) 확대 플레이 배율 — 타일과 캐릭터가 크게 보이고 카메라는 주인공을 따라간다. */
+const val DUNGEON_ENLARGE_ZOOM = 2.25f
+
+fun dungeonPlayZoom(enlarged: Boolean): Float = if (enlarged) DUNGEON_ENLARGE_ZOOM else 1f
+
 fun DrawScope.withMapZoom(state: MapZoomState, block: DrawScope.() -> Unit) {
     val pivot = Offset(size.width / 2f, size.height / 2f)
     withTransform({

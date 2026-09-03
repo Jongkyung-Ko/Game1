@@ -318,6 +318,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var dungeonHint by mutableStateOf("")
         private set
+    /** 던전·탐험 지도를 확대한 채로 플레이 */
+    var dungeonMapEnlarged by mutableStateOf(false)
+
+    fun toggleDungeonMapEnlarge() {
+        dungeonMapEnlarged = !dungeonMapEnlarged
+    }
     /** UI에서 재생할 일회성 효과음 신호 */
     var sfxSignal by mutableStateOf(0)
         private set
