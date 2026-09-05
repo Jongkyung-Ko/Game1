@@ -13,7 +13,7 @@ enum class DungeonTile {
     VAULT,
     /** 이미 연 보물상자 */
     CHEST_OPEN,
-    /** 포털스톤으로 연 일시 포털 — 집(HOME)으로 귀환. 던전을 떠나면 사라진다. */
+    /** 포털스톤으로 연 워프 — 집과 탐험지를 잇는다. 떠나도 사라지지 않는다. */
     PORTAL
 }
 
@@ -241,22 +241,31 @@ object DungeonFactory {
                 "spitter" -> 2
                 else -> 1
             }
+            val stats = CombatBalance.roll(BalanceZone.DUNGEON, floor, kindBonus, rng)
             monsters += DungeonMonster(
                 id = "z${floor}_${monsters.size}",
                 name = name,
                 kind = kind,
                 x = x,
                 y = y,
-                power = 14 + floor * 10 + kindBonus + rng.nextInt(0, 10),
-                armor = 1 + floor / 4,
+                power = stats.power,
+                hp = stats.hp,
+                maxHp = stats.hp,
+                armor = stats.armor,
                 ranged = isRangedKind(kind),
             )
         }
 
         if (bossFloor) {
             val (kind, name) = bossForFloor(floor)
-            val power = 48 + floor * 22 + rng.nextInt(0, 16)
-            val maxHp = (power * 14).coerceAtLeast(280)
+            val stats = CombatBalance.roll(
+                zone = BalanceZone.DUNGEON,
+                floor = floor,
+                rng = rng,
+                boss = if (floor >= 20) BossTier.FINAL else BossTier.MID,
+            )
+            val power = stats.power
+            val maxHp = stats.hp
             // 하층 계단 근처 끝방 — 내려가기 전 마주치게
             val offsets = listOf(
                 -TILE * 1.6f to 0f,
@@ -280,7 +289,7 @@ object DungeonFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 8 + floor / 2,
+                    armor = stats.armor,
                 )
                 placed = true
                 break
@@ -298,7 +307,7 @@ object DungeonFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 8 + floor / 2,
+                    armor = stats.armor,
                 )
             }
         }
@@ -329,8 +338,10 @@ object DungeonFactory {
         "quill_boar", "hawk",
         // 남쪽 사막
         "spitting_cobra", "sand_slinger",
-        // 북쪽 빙하
+        // 북쪽 빙하 · 이글루
         "icicle_penguin", "frost_shaman",
+        // 바다 동굴
+        "jellyfish",
     )
 
     private fun isWalkableTile(tiles: Array<DungeonTile>, x: Float, y: Float): Boolean {

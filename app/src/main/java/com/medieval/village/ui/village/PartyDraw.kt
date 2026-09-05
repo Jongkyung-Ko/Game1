@@ -5,6 +5,7 @@ import com.medieval.village.game.Facing
 import com.medieval.village.game.HeroAnimKind
 import com.medieval.village.game.PartyDrawSlot
 import com.medieval.village.game.PartyFormation
+import com.medieval.village.model.HeroJob
 import com.medieval.village.model.Mercenary
 
 /** 선두 대비 후열 크기 비율 */
@@ -24,6 +25,8 @@ fun DrawScope.drawPartySlots(
     scale: Float = 0.88f,
     rearScaleFactor: Float = PARTY_REAR_SCALE_FACTOR,
     specialAnimSet: String? = null,
+    heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     // 뒤쪽부터 그려 선두가 위에
     for (i in slots.lastIndex downTo 0) {
@@ -56,6 +59,8 @@ fun DrawScope.drawPartySlots(
                 animKind = animKind,
                 animFrame = animFrame,
                 specialSet = if (slot.isFront) specialAnimSet else null,
+                heroJob = heroJob,
+                heroRank = heroRank,
             )
         } else {
             drawMercenary(
@@ -88,6 +93,8 @@ fun DrawScope.drawBattleLineParty(
     art: CustomArt?,
     scale: Float = 0.88f,
     rearScaleFactor: Float = PARTY_REAR_SCALE_FACTOR,
+    heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     val line = PartyFormation.battleLine(frontIndex, party)
     val slots = line.mapIndexed { i, actor ->
@@ -103,6 +110,8 @@ fun DrawScope.drawBattleLineParty(
         art = art,
         scale = scale,
         rearScaleFactor = rearScaleFactor,
+        heroJob = heroJob,
+        heroRank = heroRank,
     )
 }
 
@@ -121,6 +130,8 @@ fun DrawScope.drawVillageFollowParty(
     frontAnimKind: HeroAnimKind = if (walking) HeroAnimKind.WALK else HeroAnimKind.IDLE,
     frontAnimFrame: Int = 0,
     slots: List<PartyDrawSlot>? = null,
+    heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     if (slots != null) {
         drawPartySlots(
@@ -132,6 +143,8 @@ fun DrawScope.drawVillageFollowParty(
             art = art,
             scale = heroScale,
             rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
+            heroJob = heroJob,
+            heroRank = heroRank,
         )
         return
     }
@@ -148,6 +161,8 @@ fun DrawScope.drawVillageFollowParty(
         art = art,
         scale = heroScale,
         rearScaleFactor = PARTY_REAR_SCALE_FACTOR,
+        heroJob = heroJob,
+        heroRank = heroRank,
     )
 }
 

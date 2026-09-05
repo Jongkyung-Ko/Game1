@@ -9,6 +9,10 @@ object InteriorRoom {
     const val SPAWN_X = 220f
     const val SPAWN_Y = 580f
 
+    /** 집으로 돌아온 워프 문 */
+    const val WARP_X = 820f
+    const val WARP_Y = 560f
+
     fun clampX(x: Float): Float = x.coerceIn(90f, WORLD_W - 90f)
     fun clampY(y: Float): Float = y.coerceIn(200f, WORLD_H - 45f)
 }

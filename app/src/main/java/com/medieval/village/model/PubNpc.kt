@@ -84,6 +84,6 @@ object PubNpcCatalog {
 
     val all: List<PubNpc> get() = oakhavenBase
 
-    fun forSettlement(settlementId: SettlementId, castleCleared: Boolean = false): List<PubNpc> =
-        RegionDialogue.pubNpcs(settlementId, castleCleared)
+    fun forSettlement(settlementId: SettlementId, flags: WorldFlags = WorldFlags()): List<PubNpc> =
+        RegionDialogue.pubNpcs(settlementId, flags)
 }

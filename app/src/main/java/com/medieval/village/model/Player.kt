@@ -3,6 +3,7 @@ package com.medieval.village.model
 data class Player(
     val name: String = "아서",
     val title: String = "견습 모험가",
+    val heroJob: HeroJob = HeroJob.WARRIOR,
     val level: Int = 1,
     val exp: Int = 0,
     val hp: Int = 60,
@@ -31,6 +32,28 @@ data class Player(
     val castleDepth: Int = 0,
     /** Gray Castle 10층 클리어 — White Castle로 해방 */
     val castleCleared: Boolean = false,
+    /** 중간 보스를 쓰러뜨린 최고 10층 단위 (재진입 시 바로 내려갈 수 있는 층) */
+    val dungeonCleared: Int = 0,
+    val forestCleared: Int = 0,
+    val desertCleared: Int = 0,
+    val glacierCleared: Int = 0,
+    val castleFloorCleared: Int = 0,
+    /** 이글루 마을 — 얼음북극곰 퇴치 */
+    val iglooCleared: Boolean = false,
+    val iglooDepth: Int = 0,
+    val iglooFloorCleared: Int = 0,
+    /** 바닷가 폐허 — 대왕문어 퇴치 */
+    val seasideCleared: Boolean = false,
+    val seasideDepth: Int = 0,
+    val seasideFloorCleared: Int = 0,
+    /** 겨울성 — 납치범 두목 퇴치 */
+    val winterCleared: Boolean = false,
+    val winterDepth: Int = 0,
+    val winterFloorCleared: Int = 0,
+    /** 배경음악 음량 0–1 */
+    val bgmVolume: Float = 1f,
+    /** 효과음 음량 0–1 */
+    val sfxVolume: Float = 1f,
 ) {
     val expToNext: Int
         get() {
@@ -41,6 +64,14 @@ data class Player(
     val hpRatio: Float get() = if (maxHp <= 0) 0f else hp.toFloat() / maxHp
     val mpRatio: Float get() = if (maxMp <= 0) 0f else mp.toFloat() / maxMp
     val expRatio: Float get() = exp.toFloat() / expToNext
+    val spriteRank: Int get() = HeroAdvancement.spriteRankAt(level)
+    val worldFlags: WorldFlags
+        get() = WorldFlags(
+            castleCleared = castleCleared,
+            iglooCleared = iglooCleared,
+            seasideCleared = seasideCleared,
+            winterCleared = winterCleared,
+        )
 }
 
 data class Skill(

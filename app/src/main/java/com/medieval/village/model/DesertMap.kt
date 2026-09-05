@@ -41,8 +41,7 @@ object DesertFactory {
                     else -> 0
                 }
             },
-            basePower = 9,
-            powerPerFloor = 7,
+            zone = BalanceZone.DESERT,
             sewerChance = 0.16f,
             midBoss = "giant_scorpion" to "모래폭풍의 전갈왕",
         )

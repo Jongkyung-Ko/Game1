@@ -21,11 +21,13 @@ object WildZoneGenerator {
         shallow: List<Pair<String, String>>,
         deep: List<Pair<String, String>>,
         kindBonus: (String) -> Int,
-        basePower: Int = 8,
-        powerPerFloor: Int = 7,
+        zone: BalanceZone,
         sewerChance: Float = 0.18f,
         /** 10층 중간 보스 (kind to 표시명). null이면 보스 없음 */
         midBoss: Pair<String, String>? = null,
+        /** 최종 층. 지정하면 그 층에 계단이 없고 finalBoss가 등장한다. */
+        maxFloor: Int? = null,
+        finalBoss: Pair<String, String>? = null,
     ): DungeonFloor {
         val rng = Random(seed)
         val tiles = Array(COLS * ROWS) { DungeonTile.WALL }
@@ -77,7 +79,8 @@ object WildZoneGenerator {
         val endC = end.first.average().toInt()
         val endR = end.second.average().toInt()
         tiles[idx(startC, startR)] = DungeonTile.STAIRS_UP
-        tiles[idx(endC, endR)] = DungeonTile.STAIRS_DOWN
+        val finalFloor = maxFloor != null && floor >= maxFloor
+        tiles[idx(endC, endR)] = if (finalFloor) DungeonTile.FLOOR else DungeonTile.STAIRS_DOWN
 
         val spawnX = startC * TILE + TILE / 2f
         val spawnY = startR * TILE + TILE / 2f
@@ -121,23 +124,38 @@ object WildZoneGenerator {
             if (hypot(x - spawnX, y - spawnY) < TILE * 2.5f) continue
             if (monsters.any { hypot(it.x - x, it.y - y) < TILE * 1.4f }) continue
             val (kind, name) = pool.random(rng)
+            val stats = CombatBalance.roll(zone, floor, kindBonus(kind), rng)
             monsters += DungeonMonster(
                 id = "$idPrefix${floor}_${monsters.size}",
                 name = name,
                 kind = kind,
                 x = x,
                 y = y,
-                power = basePower + floor * powerPerFloor + kindBonus(kind) + rng.nextInt(0, 9),
-                armor = 1 + floor / 5,
+                power = stats.power,
+                hp = stats.hp,
+                maxHp = stats.hp,
+                armor = stats.armor,
                 ranged = DungeonFactory.isRangedKind(kind),
             )
         }
 
-        // 10층마다 중간 보스
-        if (midBoss != null && floor > 0 && floor % 10 == 0) {
-            val (kind, name) = midBoss
-            val power = 44 + floor * 20 + rng.nextInt(0, 14)
-            val maxHp = (power * 13).coerceAtLeast(260)
+        // 최종 보스 또는 10층마다 중간 보스
+        val storyBoss = when {
+            finalFloor && finalBoss != null -> finalBoss to true
+            midBoss != null && floor > 0 && floor % 10 == 0 -> midBoss to false
+            else -> null
+        }
+        if (storyBoss != null) {
+            val (kind, name) = storyBoss.first
+            val finale = storyBoss.second
+            val stats = CombatBalance.roll(
+                zone = zone,
+                floor = floor,
+                rng = rng,
+                boss = if (finale) BossTier.FINAL else BossTier.MID,
+            )
+            val power = stats.power
+            val maxHp = stats.hp
             val offsets = listOf(
                 -TILE * 1.6f to 0f,
                 TILE * 1.6f to 0f,
@@ -158,7 +176,7 @@ object WildZoneGenerator {
                 if (hypot(bx - spawnX, by - spawnY) < TILE * 3f) continue
                 monsters += DungeonMonster(
                     id = "${idPrefix}boss_$floor",
-                    name = "중간 보스 · $name",
+                    name = if (finale) "최종 보스 · $name" else "중간 보스 · $name",
                     kind = kind,
                     x = bx,
                     y = by,
@@ -166,7 +184,7 @@ object WildZoneGenerator {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 9 + floor / 2,
+                    armor = stats.armor,
                 )
                 placed = true
                 break
@@ -174,7 +192,7 @@ object WildZoneGenerator {
             if (!placed) {
                 monsters += DungeonMonster(
                     id = "${idPrefix}boss_$floor",
-                    name = "중간 보스 · $name",
+                    name = if (finale) "최종 보스 · $name" else "중간 보스 · $name",
                     kind = kind,
                     x = downX,
                     y = downY,
@@ -182,7 +200,7 @@ object WildZoneGenerator {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 9 + floor / 2,
+                    armor = stats.armor,
                 )
             }
         }

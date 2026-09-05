@@ -17,9 +17,11 @@ import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InteriorNpcKind
 import com.medieval.village.model.InteriorRoom
+import com.medieval.village.model.HeroJob
 import com.medieval.village.model.Mercenary
 import com.medieval.village.model.PlaceId
 import com.medieval.village.model.SettlementId
+import com.medieval.village.model.WorldFlags
 import com.medieval.village.ui.village.CustomArt
 import com.medieval.village.ui.village.DungeonTiles
 import com.medieval.village.ui.village.KenneyAtlas
@@ -50,9 +52,12 @@ fun DrawScope.drawWalkableInterior(
     frontIndex: Int = 0,
     partySlots: List<PartyDrawSlot>? = null,
     settlementId: SettlementId = SettlementId.OAKHAVEN,
-    castleCleared: Boolean = false,
+    flags: WorldFlags = WorldFlags(),
     levelUpFxActorKey: String? = null,
     levelUpFxUntil: Float = 0f,
+    heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
+    showHomeWarp: Boolean = false,
 ) {
     val w = InteriorRoom.WORLD_W
     val h = InteriorRoom.WORLD_H
@@ -61,8 +66,11 @@ fun DrawScope.drawWalkableInterior(
     if (!hasCartoonRoom) {
         drawInteriorFurniture(id)
     }
+    if (showHomeWarp) {
+        drawHomeWarpGate(InteriorRoom.WARP_X, InteriorRoom.WARP_Y)
+    }
 
-    InteriorNpcCatalog.forPlace(id, settlementId, castleCleared).forEachIndexed { index, npc ->
+    InteriorNpcCatalog.forPlace(id, settlementId, flags).forEachIndexed { index, npc ->
         val bob = sin(animTime * 2.6f + index) * 2f
         val cx = npc.worldX
         val footY = npc.worldY + bob
@@ -100,6 +108,8 @@ fun DrawScope.drawWalkableInterior(
         mercScale = 0.74f,
         frontIndex = frontIndex,
         slots = partySlots,
+        heroJob = heroJob,
+        heroRank = heroRank,
     )
     if (levelUpFxActorKey != null) {
         val slots = partySlots.orEmpty()
@@ -157,6 +167,9 @@ private fun npcSpriteKey(npc: InteriorNpc): String =
         PlaceId.PUB -> "merchant"
         PlaceId.DUNGEON -> "warrior"
         PlaceId.GRAY_CASTLE -> "paladin"
+        PlaceId.IGLOO_GLACIER -> "mage"
+        PlaceId.SEA_CAVE -> "rogue"
+        PlaceId.WINTER_KEEP -> "warrior"
         PlaceId.EAST_FOREST -> "rogue"
         PlaceId.SOUTH_DESERT -> "rogue"
         PlaceId.NORTH_GLACIER -> "mage"
@@ -264,4 +277,28 @@ private fun DrawScope.drawSpeechBubble(cx: Float, top: Float, text: String, room
         top - 12f,
         paint.apply { color = android.graphics.Color.parseColor("#2A1A10") }
     )
+}
+
+private fun DrawScope.drawHomeWarpGate(cx: Float, footY: Float) {
+    val ts = 88f
+    val x = cx - ts / 2f
+    val y = footY - ts * 0.55f
+    drawOval(
+        Color(0x55203860),
+        Offset(x + ts * 0.12f, y + ts * 0.18f),
+        Size(ts * 0.76f, ts * 0.64f),
+    )
+    drawOval(
+        Color(0xAA3AB0E0),
+        Offset(x + ts * 0.22f, y + ts * 0.26f),
+        Size(ts * 0.56f, ts * 0.48f),
+        style = Stroke(3.5f),
+    )
+    drawOval(
+        Color(0xCC8FE8FF),
+        Offset(x + ts * 0.32f, y + ts * 0.34f),
+        Size(ts * 0.36f, ts * 0.32f),
+    )
+    drawCircle(Color(0xEEF4FFFF), radius = ts * 0.08f, center = Offset(cx, footY - ts * 0.22f))
+    drawLabelTiny("워프", cx - 16f, footY + 14f)
 }

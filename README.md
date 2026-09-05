@@ -41,25 +41,30 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 - 문 앞에 서면 하단에 `들어가기` 버튼 표시
 - 뒤로 가기 → 메뉴 닫기 / 마을로 나가기
 
-주인공은 게임 시작 시 **자기 집 안에서** 출발하며, `마을로 나가기`를 눌러 마을로 나옵니다.
+앱을 켜면 영문 **MEDIEVAL VILLAGE** 타이틀에서 `시작하기`(직업 선택) 또는 `이어하기`(세이브 불러오기)를 고릅니다. 주인공은 **기사 / 용사 / 마법사 / 궁수** 중 직업을 고른 뒤 **자기 집 안에서** 출발하며, `마을로 나가기`를 눌러 마을로 나옵니다. 던전에서 세계지도는 볼 수 있지만 다른 마을로 이동할 수는 없습니다. 포털스톤으로 연 워프는 집과 탐험 지점을 잇고, 떠나도 사라지지 않습니다. 걸을 때는 방향별 걷기 모션이, 공격할 때는 직업별 베기·활시위·마법 시전 모션이 재생됩니다. 마법사 기본 마력탄은 MP를 쓰지 않고, 배운 마법·특별스킬만 마나와 다른 미사일·효과음을 씁니다. 레벨 5·10·15에 상위 직군으로 전직하고, 레벨 20에 각성합니다. 전직할 때마다 레벨업 능력 상승이 이전의 3배가 됩니다.
 
 ## 음악과 동료
 
-- 마을은 평화로운 테마, 집·INN·PUB은 아늑한 테마, 던전·대련소는 긴장 테마가 재생됩니다.
+- 정착지마다 배경음악이 다르고, 저주받은 마을·성과 해방된 곳은 다른 곡이 재생됩니다. 던전·대련소는 긴장 테마입니다.
 - 걸을 때는 배경음 위에 발소리가 함께 재생됩니다.
 - 음원은 앱에서 PCM으로 합성하므로 별도 오디오 파일이나 네트워크 연결이 필요 없습니다.
 - 용병은 여러 명 고용할 수 있지만 Status에서 최대 2명만 원정대로 선택합니다.
 - 선택한 용병만 마을과 각 장소 상단 그림에 등장하고 던전 전투력에 반영됩니다.
 
-## APK 다운로드
+## APK 다운로드 (최신: v0.4.55)
 
-최신 설치 파일은 [Releases](https://github.com/Jongkyung-Ko/Game1/releases) 에서 받을 수 있습니다.
+바로 설치할 파일: [MedievalVillage-v0.4.55-debug.apk](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.55/MedievalVillage-v0.4.55-debug.apk)
 
-1. Assets 의 `MedievalVillage-vX.Y.Z-debug.apk` 다운로드
+직업 스프라이트 한 번에 받기: [HeroClassSprites-v0.4.55.zip](https://github.com/Jongkyung-Ko/Game1/releases/download/v0.4.55/HeroClassSprites-v0.4.55.zip)
+
+이전 버전은 [Releases](https://github.com/Jongkyung-Ko/Game1/releases) 에서 받을 수 있습니다.
+
+1. 위 APK 를 폰으로 다운로드
 2. 폰 **설정 > 보안** 에서 알 수 없는 앱 설치 허용
-3. APK 를 열어 설치 → 앱 이름 **중세마을 이야기**
+3. APK 를 열어 설치 → 앱 이름 **중세마을 v0.4.55**
+4. 예전 빌드와 패키지명이 다르므로 기존 앱을 지울 필요는 없습니다
 
-`v*` 태그를 푸시하면 GitHub Actions 가 자동으로 APK 를 빌드해 Release Assets 에 올립니다.
+`v*` 태그를 푸시하면 GitHub Actions 가 자동으로 APK와 직업 스프라이트 zip 을 빌드해 Release Assets 에 올립니다.
 
 ## 실행 방법
 
@@ -67,14 +72,25 @@ Kotlin + Jetpack Compose 로 만든 안드로이드 모바일 RPG 초안입니�
 2. `File > Open` 으로 이 폴더를 엽니다
 3. Gradle Sync가 끝나면 (SDK·Gradle 자동 다운로드) 상단 `Run ▶` 실행
 
-명령줄에서 빌드하려면 JDK 17과 Android SDK 34가 필요합니다.
+명령줄에서 빌드하려면 JDK 17과 Android SDK 34가 필요합니다. Gradle Wrapper(`./gradlew`)가 포함되어 있습니다.
 
 ```bash
 ./gradlew assembleDebug
+# APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-> `gradle/wrapper/gradle-wrapper.jar` 는 저장소에 포함되어 있지 않습니다.
-> Android Studio가 첫 Sync 때 생성하며, 직접 만들려면 `gradle wrapper` 를 한 번 실행하세요.
+### 에뮬레이터에서 APK 실행
+
+Android SDK 34와 `medieval` AVD가 있으면 명령줄만으로 디버그 APK를 띄울 수 있습니다.
+
+```bash
+scripts/emulator-install.sh          # SDK 패키지 + AVD (한 번만)
+scripts/emulator-run-apk.sh          # 부팅 → 설치 → 실행
+# 화면 미러 (VNC DISPLAY=:1). scrcpy가 안 되면 클릭 전달 스크린샷 미러로 넘어갑니다.
+scripts/emulator-show.sh
+```
+
+일부 Cloud Agent 호스트는 `/dev/kvm`이 있어도 중첩 KVM에서 게스트 vCPU 생성이 실패합니다. 그 경우 스크립트가 소프트웨어 가속(`-accel off`)으로 넘어갑니다. TCG 부팅은 수 분이 걸릴 수 있습니다. 로컬 PC에서 KVM이 정상이면 `EMULATOR_ACCEL=on scripts/emulator-start.sh` 로 강제할 수 있습니다.
 
 ## 프로젝트 구조
 

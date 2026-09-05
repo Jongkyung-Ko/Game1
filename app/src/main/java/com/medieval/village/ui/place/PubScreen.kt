@@ -57,13 +57,19 @@ import kotlin.math.roundToInt
 @Composable
 fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
     val art = rememberCustomArtOrNull()
-    val pubNpcs = remember(vm.currentSettlement, vm.player.castleCleared) {
-        PubNpcCatalog.forSettlement(vm.currentSettlement, vm.player.castleCleared)
+    val pubNpcs = remember(vm.currentSettlement, vm.player.worldFlags) {
+        PubNpcCatalog.forSettlement(vm.currentSettlement, vm.player.worldFlags)
     }
     val pubTitle = when (vm.currentSettlement) {
         SettlementId.ASHBROOK -> "PUB · 강변의 재 선술집"
         SettlementId.GRAY_CASTLE ->
             if (vm.player.castleCleared) "PUB · 해방 연회장" else "PUB · 저주의 잔향"
+        SettlementId.IGLOO ->
+            if (vm.player.iglooCleared) "PUB · 녹은 난로" else "PUB · 얼어붙은 잔"
+        SettlementId.SEASIDE ->
+            if (vm.player.seasideCleared) "PUB · 항구 주점" else "PUB · 침수된 선술집"
+        SettlementId.WINTER_CASTLE ->
+            if (vm.player.winterCleared) "PUB · 해방 연회장" else "PUB · 겨울의 잔향"
         else -> "PUB · 신성한 잔 선술집"
     }
     Column(modifier = modifier.fillMaxSize().background(Palette.WoodDark)) {
@@ -127,6 +133,8 @@ fun PubScreen(vm: GameViewModel, modifier: Modifier = Modifier) {
                         mercScale = 0.76f,
                         frontIndex = vm.frontIndex,
                         slots = partySlots,
+                        heroJob = vm.player.heroJob,
+                        heroRank = vm.player.spriteRank,
                     )
                     val fxKey = vm.levelUpFxActorKey
                     if (fxKey != null) {

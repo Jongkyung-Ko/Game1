@@ -17,8 +17,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import com.medieval.village.game.Facing
+import com.medieval.village.model.HeroJob
 import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
+import com.medieval.village.model.WorldFlags
 import com.medieval.village.model.SpecialSkillCatalog
 import com.medieval.village.model.Village
 import kotlin.math.roundToInt
@@ -51,7 +53,22 @@ class CustomArt(
 
     fun npcSpriteOrNull(key: String): ImageBitmap? = charOrNull(key)
 
-    fun heroSpriteOrNull(facingKey: String): ImageBitmap? = heroes[facingKey]
+    fun heroSpriteOrNull(
+        facingKey: String,
+        job: HeroJob = HeroJob.WARRIOR,
+        rank: Int = 0,
+    ): ImageBitmap? {
+        val r = rank.coerceAtLeast(0)
+        if (r > 0) {
+            for (i in r downTo 1) {
+                heroes["${job.id}_r${i}_$facingKey"]?.let { return it }
+            }
+        }
+        if (job != HeroJob.WARRIOR) {
+            heroes["${job.id}_$facingKey"]?.let { return it }
+        }
+        return heroes[facingKey]
+    }
 
     fun buildingOrNull(key: String): ImageBitmap? = buildings[key]
 
@@ -109,12 +126,22 @@ class CustomArt(
         "desert_drake" -> "desert_drake"
         "vulture" -> "desert_fox"
         "dung_beetle", "dune_worm" -> "scorpion"
-        // 빙하
+        // 빙하 · 이글루
         "penguin", "ice_penguin", "frost_penguin", "seal" -> "penguin"
-        "polar_bear" -> "polar_bear"
+        "polar_bear", "ice_star_bear" -> "polar_bear"
         "yeti" -> "yeti"
-        "ice_wolf" -> "ice_wolf"
+        "ice_wolf", "winter_wolf" -> "ice_wolf"
         "ice_elemental" -> "ice_elemental"
+        // 바다 동굴
+        "crab" -> "scorpion"
+        "jellyfish" -> "ice_elemental"
+        "shark" -> "desert_drake"
+        "drowned", "pirate_ghost" -> "skel_soldier"
+        "sea_snake" -> "snake"
+        "giant_octopus" -> "bloater"
+        // 겨울성
+        "kidnapper", "frost_thug", "kidnapper_boss" -> "farmer"
+        "ice_guard", "cage_warden" -> "armored"
         else -> "wolf"
     }
 
@@ -212,6 +239,7 @@ class CustomArt(
             "ice_elemental_walk", "ice_elemental_attack",
         )
         private const val HERO_ANIM_FRAMES = 4
+        private val FRAME_FILE_NAME = Regex("""^(.+)_([0-3])\.png$""")
 
         fun loadOrNull(context: Context): CustomArt? {
             cached?.let { return it }
@@ -221,8 +249,15 @@ class CustomArt(
                     val app = context.applicationContext
                     val villageMaps = LinkedHashMap<String, ImageBitmap>()
                     val mapAssets = buildSet {
-                        Settlements.all(false).forEach { add(it.mapAsset) }
-                        add(Settlements.castle(true).mapAsset)
+                        Settlements.all(WorldFlags()).forEach { add(it.mapAsset) }
+                        Settlements.all(
+                            WorldFlags(
+                                castleCleared = true,
+                                iglooCleared = true,
+                                seasideCleared = true,
+                                winterCleared = true,
+                            )
+                        ).forEach { add(it.mapAsset) }
                         add("village_map.png")
                     }
                     mapAssets.forEach { asset ->
@@ -247,6 +282,26 @@ class CustomArt(
                             heroes[key] = it
                         }
                     }
+                    HeroJob.entries.forEach { job ->
+                        if (job != HeroJob.WARRIOR) {
+                            HERO_KEYS.forEach { key ->
+                                loadAsset(app, "custom/hero_${job.id}_$key.png", cleanEdges = true)?.let {
+                                    heroes["${job.id}_$key"] = it
+                                }
+                            }
+                        }
+                        for (rank in 1..3) {
+                            HERO_KEYS.forEach { key ->
+                                loadAsset(
+                                    app,
+                                    "custom/hero_${job.id}_r${rank}_$key.png",
+                                    cleanEdges = true,
+                                )?.let {
+                                    heroes["${job.id}_r${rank}_$key"] = it
+                                }
+                            }
+                        }
+                    }
                     val buildings = LinkedHashMap<String, ImageBitmap>()
                     BUILDING_KEYS.forEach { key ->
                         // 건물 일러스트는 이미 알파가 정리되어 있으므로 가장자리 가공 없이 로드
@@ -262,7 +317,13 @@ class CustomArt(
                     }
                     Log.i(TAG, "Loaded interiors: ${interiors.keys}")
                     val heroAnims = LinkedHashMap<String, List<ImageBitmap>>()
-                    HERO_ANIM_SETS.forEach { set ->
+                    val frameFiles = app.assets.list("custom/hero_anim/frames") ?: emptyArray()
+                    val discovered = LinkedHashSet<String>()
+                    frameFiles.forEach { name ->
+                        FRAME_FILE_NAME.matchEntire(name)?.let { discovered += it.groupValues[1] }
+                    }
+                    val setsToLoad = if (discovered.isNotEmpty()) discovered else HERO_ANIM_SETS.toSet()
+                    setsToLoad.forEach { set ->
                         val frames = ArrayList<ImageBitmap>(HERO_ANIM_FRAMES)
                         for (i in 0 until HERO_ANIM_FRAMES) {
                             loadAsset(
@@ -473,6 +534,8 @@ fun DrawScope.drawCustomHero(
     animKind: com.medieval.village.game.HeroAnimKind = com.medieval.village.game.HeroAnimKind.IDLE,
     animFrame: Int = 0,
     specialSet: String? = null,
+    heroJob: HeroJob = HeroJob.WARRIOR,
+    heroRank: Int = 0,
 ) {
     drawAnimatedHero(
         art = art,
@@ -485,5 +548,7 @@ fun DrawScope.drawCustomHero(
         animKind = animKind,
         animFrame = animFrame,
         specialSet = specialSet,
+        heroJob = heroJob,
+        heroRank = heroRank,
     )
 }

@@ -131,22 +131,31 @@ object CastleFactory {
                 "skel_archer" -> 5
                 else -> 3
             }
+            val stats = CombatBalance.roll(BalanceZone.CASTLE, f, kindBonus, rng)
             monsters += DungeonMonster(
                 id = "c${f}_${monsters.size}",
                 name = name,
                 kind = kind,
                 x = x,
                 y = y,
-                power = 16 + f * 11 + kindBonus + rng.nextInt(0, 10),
-                armor = 2 + f / 3,
+                power = stats.power,
+                hp = stats.hp,
+                maxHp = stats.hp,
+                armor = stats.armor,
                 ranged = DungeonFactory.isRangedKind(kind),
             )
         }
 
         if (finalFloor) {
             val (kind, name) = boss
-            val power = 62 + f * 24 + rng.nextInt(0, 16)
-            val maxHp = (power * 15).coerceAtLeast(360)
+            val stats = CombatBalance.roll(
+                zone = BalanceZone.CASTLE,
+                floor = f,
+                rng = rng,
+                boss = BossTier.FINAL,
+            )
+            val power = stats.power
+            val maxHp = stats.hp
             val offsets = listOf(
                 -TILE * 1.6f to 0f,
                 TILE * 1.6f to 0f,
@@ -169,7 +178,7 @@ object CastleFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 12,
+                    armor = stats.armor,
                 )
                 placed = true
                 break
@@ -185,7 +194,7 @@ object CastleFactory {
                     isBoss = true,
                     hp = maxHp,
                     maxHp = maxHp,
-                    armor = 12,
+                    armor = stats.armor,
                 )
             }
         }

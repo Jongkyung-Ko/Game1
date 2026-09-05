@@ -1,0 +1,2 @@
+# Treat sprite pack as binary (do not diff as text).
+export/*.zip binary

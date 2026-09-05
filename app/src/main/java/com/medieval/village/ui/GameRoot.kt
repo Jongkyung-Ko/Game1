@@ -20,14 +20,17 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.medieval.village.audio.GameAudioEngine
-import com.medieval.village.audio.MusicMood
+import com.medieval.village.audio.GameNarrationEngine
 import com.medieval.village.audio.Sfx
+import com.medieval.village.audio.resolveMusicMood
 import com.medieval.village.game.GameViewModel
+import com.medieval.village.model.Prologue
 import com.medieval.village.game.MenuTab
 import com.medieval.village.game.Scene
 import com.medieval.village.game.isExplorePlace
 import com.medieval.village.model.PlaceId
 import com.medieval.village.ui.map.WorldMapOverlay
+import com.medieval.village.ui.menu.BalanceDebugOverlay
 import com.medieval.village.ui.menu.MenuOverlay
 import com.medieval.village.ui.place.PlaceScreen
 import com.medieval.village.ui.theme.Palette
@@ -38,6 +41,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
     val vm: GameViewModel = viewModel()
     val context = LocalContext.current
     val audio = remember(context) { GameAudioEngine(context) }
+    val narration = remember(context) { GameNarrationEngine(context) }
     val haptics = remember(context) { GameHaptics(context) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -45,7 +49,10 @@ fun GameRoot(modifier: Modifier = Modifier) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> audio.resume()
-                Lifecycle.Event.ON_PAUSE -> audio.pause()
+                Lifecycle.Event.ON_PAUSE -> {
+                    audio.pause()
+                    narration.stop()
+                }
                 else -> Unit
             }
         }
@@ -53,17 +60,42 @@ fun GameRoot(modifier: Modifier = Modifier) {
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             audio.release()
+            narration.release()
         }
     }
 
-    LaunchedEffect(vm.scene, vm.currentPlace) {
-        val mood = when {
-            vm.scene == Scene.VILLAGE -> MusicMood.VILLAGE
-            vm.currentPlace in setOf(PlaceId.HOME, PlaceId.INN, PlaceId.PUB) -> MusicMood.COZY
-            vm.currentPlace.isExplorePlace() || vm.currentPlace == PlaceId.ARENA -> MusicMood.TENSE
-            else -> MusicMood.VILLAGE
+    LaunchedEffect(vm.player.bgmVolume, vm.player.sfxVolume) {
+        audio.setUserVolume(vm.player.bgmVolume, vm.player.sfxVolume)
+        narration.setVolume(vm.player.sfxVolume)
+    }
+
+    LaunchedEffect(vm.awaitingPrologue, vm.prologuePage, vm.player.sfxVolume) {
+        narration.setVolume(vm.player.sfxVolume)
+        if (vm.awaitingPrologue) {
+            val slide = Prologue.slides.getOrNull(vm.prologuePage)
+            if (slide != null) narration.speak(slide.spoken)
+        } else {
+            narration.stop()
         }
-        audio.playMusic(mood)
+    }
+
+    LaunchedEffect(
+        vm.scene,
+        vm.currentPlace,
+        vm.currentSettlement,
+        vm.player.castleCleared,
+        vm.player.iglooCleared,
+        vm.player.seasideCleared,
+        vm.player.winterCleared,
+    ) {
+        audio.playMusic(
+            resolveMusicMood(
+                inVillage = vm.scene == Scene.VILLAGE,
+                place = vm.currentPlace,
+                settlement = vm.currentSettlement,
+                flags = vm.player.worldFlags,
+            )
+        )
     }
 
     LaunchedEffect(vm.walking, vm.pubWalking, vm.dungeonWalking) {
@@ -81,6 +113,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
             "hit" -> audio.playSfx(Sfx.HIT)
             "arrow_hit" -> audio.playSfx(Sfx.ARROW_HIT)
             "magic_hit" -> audio.playSfx(Sfx.MAGIC_HIT)
+            "magic_shot" -> audio.playSfx(Sfx.MAGIC_SHOT)
             "door" -> audio.playSfx(Sfx.DOOR)
             "click" -> audio.playSfx(Sfx.CLICK)
             "level_up" -> audio.playSfx(Sfx.LEVEL_UP)
@@ -118,12 +151,24 @@ fun GameRoot(modifier: Modifier = Modifier) {
     }
 
     BackHandler(
-        enabled = vm.levelUpSkillOffer != null ||
+        enabled = vm.awaitingTitle ||
+            vm.awaitingPrologue ||
+            vm.awaitingClassSelect ||
+            vm.pendingJobAdvance != null ||
+            vm.levelUpSkillOffer != null ||
+            vm.pendingExploreChoice != null ||
+            vm.debugPanelOpen ||
             vm.menuTab != MenuTab.NONE ||
             vm.scene == Scene.INTERIOR,
     ) {
         when {
+            vm.awaitingPrologue -> vm.retreatPrologue()
+            vm.awaitingTitle -> Unit
+            vm.awaitingClassSelect -> vm.cancelClassSelect()
+            vm.pendingJobAdvance != null -> vm.dismissJobAdvance()
             vm.levelUpSkillOffer != null -> vm.dismissLevelUpSkillOffer()
+            vm.pendingExploreChoice != null -> vm.cancelExploreFloorChoice()
+            vm.debugPanelOpen -> vm.closeDebugPanel()
             vm.menuTab != MenuTab.NONE -> vm.menuTab = MenuTab.NONE
             vm.interiorPanelOpen -> vm.closeInteriorPanel()
             vm.scene == Scene.INTERIOR && vm.currentPlace.isExplorePlace() -> vm.escapeDungeon()
@@ -131,27 +176,37 @@ fun GameRoot(modifier: Modifier = Modifier) {
         }
     }
 
-    Column(modifier = modifier.background(Palette.WoodDark)) {
-        // 메뉴·HP/MP는 씬 밖 고정 영역 — 던전 카메라 스크롤과 겹치지 않음
-        TopMenuBar(vm, Modifier.zIndex(2f))
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .clipToBounds()
-                .zIndex(1f)
-        ) {
-            when (vm.scene) {
-                Scene.VILLAGE -> VillageScene(vm, Modifier.fillMaxSize())
-                Scene.INTERIOR -> PlaceScreen(
-                    vm = vm,
-                    id = vm.currentPlace ?: PlaceId.HOME,
-                    modifier = Modifier.fillMaxSize()
-                )
+    Box(modifier = modifier.background(Palette.WoodDark)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 메뉴·HP/MP는 씬 밖 고정 영역 — 던전 카메라 스크롤과 겹치지 않음
+            if (!vm.awaitingTitle && !vm.awaitingPrologue) {
+                TopMenuBar(vm, Modifier.zIndex(2f))
             }
-            MenuOverlay(vm)
-            WorldMapOverlay(vm)
-            LevelUpSkillOverlay(vm)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .clipToBounds()
+                    .zIndex(1f)
+            ) {
+                when (vm.scene) {
+                    Scene.VILLAGE -> VillageScene(vm, Modifier.fillMaxSize())
+                    Scene.INTERIOR -> PlaceScreen(
+                        vm = vm,
+                        id = vm.currentPlace ?: PlaceId.HOME,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                MenuOverlay(vm)
+                WorldMapOverlay(vm)
+                LevelUpSkillOverlay(vm)
+                JobAdvanceOverlay(vm)
+                ExploreFloorChoiceOverlay(vm)
+            }
         }
+        BalanceDebugOverlay(vm, Modifier.fillMaxSize().zIndex(18f))
+        ClassSelectOverlay(vm, Modifier.fillMaxSize().zIndex(20f))
+        TitleOverlay(vm, Modifier.fillMaxSize().zIndex(22f))
+        PrologueOverlay(vm, Modifier.fillMaxSize().zIndex(24f))
     }
 }

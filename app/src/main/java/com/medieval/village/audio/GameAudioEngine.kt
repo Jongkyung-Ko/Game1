@@ -6,18 +6,14 @@ import android.media.MediaPlayer
 import android.media.SoundPool
 import com.medieval.village.R
 
-enum class MusicMood {
-    VILLAGE,
-    COZY,
-    TENSE
-}
-
 enum class Sfx {
     HIT,
     /** 화살 적중 */
     ARROW_HIT,
     /** 마법 적중 */
     MAGIC_HIT,
+    /** 기본 마력탄 발사 (MP 없음) */
+    MAGIC_SHOT,
     DOOR,
     CLICK,
     /** 레벨업 */
@@ -43,7 +39,7 @@ enum class Sfx {
 
 /**
  * CC0 무료 개발자용 MP3 리소스(res/raw)를 MediaPlayer / SoundPool로 재생한다.
- * 마을·실내·던전 BGM과 발소리·전투 효과음을 담당한다.
+ * 정착지·저주/해방 상태별 BGM과 발소리·전투 효과음을 담당한다.
  */
 class GameAudioEngine(context: Context) {
 
@@ -53,6 +49,8 @@ class GameAudioEngine(context: Context) {
     private var currentMood: MusicMood? = null
     private var released = false
     private var walking = false
+    private var bgmMul = 1f
+    private var sfxMul = 1f
 
     private val soundPool: SoundPool? = runCatching {
         SoundPool.Builder()
@@ -72,6 +70,7 @@ class GameAudioEngine(context: Context) {
             Sfx.HIT to hit,
             Sfx.ARROW_HIT to hit,
             Sfx.MAGIC_HIT to hit,
+            Sfx.MAGIC_SHOT to pool.load(appContext, R.raw.sfx_magic_shot, 1),
             Sfx.DOOR to pool.load(appContext, R.raw.sfx_door, 1),
             Sfx.CLICK to pool.load(appContext, R.raw.sfx_click, 1),
             Sfx.LEVEL_UP to pool.load(appContext, R.raw.sfx_level_up, 1),
@@ -97,28 +96,28 @@ class GameAudioEngine(context: Context) {
     fun playMusic(mood: MusicMood) {
         if (released || mood == currentMood) return
         currentMood = mood
+        android.util.Log.i("GameBgm", "play $mood")
         runCatching { musicPlayer?.release() }
         musicPlayer = null
         val resId = when (mood) {
-            MusicMood.VILLAGE -> R.raw.bgm_village
+            MusicMood.OAKHAVEN -> R.raw.bgm_village
+            MusicMood.ASHBROOK -> R.raw.bgm_ashbrook
+            MusicMood.GRAY_CURSED -> R.raw.bgm_gray_cursed
+            MusicMood.GRAY_LIBERATED -> R.raw.bgm_gray_liberated
+            MusicMood.IGLOO_CURSED -> R.raw.bgm_igloo_cursed
+            MusicMood.IGLOO_LIBERATED -> R.raw.bgm_igloo_liberated
+            MusicMood.SEASIDE_CURSED -> R.raw.bgm_seaside_cursed
+            MusicMood.SEASIDE_LIBERATED -> R.raw.bgm_seaside_liberated
+            MusicMood.WINTER_CURSED -> R.raw.bgm_winter_cursed
+            MusicMood.WINTER_LIBERATED -> R.raw.bgm_winter_liberated
             MusicMood.COZY -> R.raw.bgm_cozy
             MusicMood.TENSE -> R.raw.bgm_dungeon
         }
         musicPlayer = runCatching {
             MediaPlayer.create(appContext, resId)?.apply {
                 isLooping = true
-                setVolume(
-                    when (mood) {
-                        MusicMood.TENSE -> 0.42f
-                        MusicMood.COZY -> 0.34f
-                        MusicMood.VILLAGE -> 0.36f
-                    },
-                    when (mood) {
-                        MusicMood.TENSE -> 0.42f
-                        MusicMood.COZY -> 0.34f
-                        MusicMood.VILLAGE -> 0.36f
-                    }
-                )
+                val v = moodVolume(mood)
+                setVolume(v, v)
                 start()
             }
         }.getOrNull()
@@ -135,7 +134,7 @@ class GameAudioEngine(context: Context) {
             footstepPlayer = runCatching {
                 MediaPlayer.create(appContext, R.raw.sfx_footstep)?.apply {
                     isLooping = true
-                    setVolume(0.55f, 0.55f)
+                    setVolume(0.55f * sfxMul, 0.55f * sfxMul)
                 }
             }.getOrNull()
         }
@@ -151,6 +150,7 @@ class GameAudioEngine(context: Context) {
         val (vol, rate) = when (sfx) {
             Sfx.ARROW_HIT -> 0.75f to 1.35f
             Sfx.MAGIC_HIT -> 0.8f to 0.72f
+            Sfx.MAGIC_SHOT -> 0.78f to 1f
             Sfx.HIT -> 0.75f to 1f
             Sfx.LEVEL_UP -> 0.92f to 1f
             Sfx.SKILL_SMASH, Sfx.SKILL_CRIT, Sfx.SKILL_QUAKE, Sfx.SKILL_BASH -> 0.9f to 1f
@@ -161,7 +161,35 @@ class GameAudioEngine(context: Context) {
             Sfx.SKILL_EXECUTE, Sfx.SKILL_SMOKE -> 0.82f to 1f
             else -> 0.7f to 1f
         }
-        runCatching { pool.play(id, vol, vol, 1, 0, rate) }
+        val v = (vol * sfxMul).coerceIn(0f, 1f)
+        runCatching { pool.play(id, v, v, 1, 0, rate) }
+    }
+
+    fun setUserVolume(bgm: Float, sfx: Float) {
+        bgmMul = bgm.coerceIn(0f, 1f)
+        sfxMul = sfx.coerceIn(0f, 1f)
+        applyMusicVolume()
+        val step = 0.55f * sfxMul
+        runCatching { footstepPlayer?.setVolume(step, step) }
+    }
+
+    private fun moodVolume(mood: MusicMood): Float {
+        val base = when (mood) {
+            MusicMood.TENSE -> 0.42f
+            MusicMood.COZY -> 0.34f
+            MusicMood.GRAY_CURSED, MusicMood.IGLOO_CURSED,
+            MusicMood.SEASIDE_CURSED, MusicMood.WINTER_CURSED -> 0.38f
+            MusicMood.GRAY_LIBERATED, MusicMood.IGLOO_LIBERATED,
+            MusicMood.SEASIDE_LIBERATED, MusicMood.WINTER_LIBERATED -> 0.37f
+            MusicMood.OAKHAVEN, MusicMood.ASHBROOK -> 0.36f
+        }
+        return (base * bgmMul).coerceIn(0f, 1f)
+    }
+
+    private fun applyMusicVolume() {
+        val mood = currentMood ?: return
+        val v = moodVolume(mood)
+        runCatching { musicPlayer?.setVolume(v, v) }
     }
 
     fun pause() {

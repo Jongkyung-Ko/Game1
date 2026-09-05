@@ -46,6 +46,7 @@ object ForestFactory {
                     else -> 0
                 }
             },
+            zone = BalanceZone.FOREST,
             midBoss = "bear" to "숲의 수호자",
         )
 }

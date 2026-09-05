@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
 import com.medieval.village.model.ActorClass
+import com.medieval.village.model.CombatBalance
 import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.ItemType
 import com.medieval.village.model.SpecialSkillCatalog
@@ -118,7 +121,7 @@ fun MenuOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
 @Composable
 private fun ColumnScope.StatusTab(vm: GameViewModel) {
     val p = vm.player
-    Text("${p.name} · ${p.title}", color = Palette.Parchment, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+    Text("${p.name} · ${p.title} · ${p.heroJob.label}", color = Palette.Parchment, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     Text("Lv.${p.level}   ${p.day}일차", color = Palette.ParchmentDim, fontSize = 12.sp)
     Spacer(Modifier.height(10.dp))
 
@@ -150,13 +153,25 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     Spacer(Modifier.height(10.dp))
     SectionTitle("기록")
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip("좀비 둥지 ${p.dungeonDepth}층")
-        Chip("동쪽 숲 ${p.forestDepth}지대")
-        Chip("남쪽 사막 ${p.desertDepth}지대")
-        Chip("북쪽 빙하 ${p.glacierDepth}지대")
+        Chip("좀비 둥지 ${p.dungeonDepth}층" + if (p.dungeonCleared >= 10) " · 클리어 ${p.dungeonCleared}" else "")
+        Chip("동쪽 숲 ${p.forestDepth}지대" + if (p.forestCleared >= 10) " · 클리어 ${p.forestCleared}" else "")
+        Chip("남쪽 사막 ${p.desertDepth}지대" + if (p.desertCleared >= 10) " · 클리어 ${p.desertCleared}" else "")
+        Chip("북쪽 빙하 ${p.glacierDepth}지대" + if (p.glacierCleared >= 10) " · 클리어 ${p.glacierCleared}" else "")
         Chip(
             if (p.castleCleared) "White Castle 해방"
             else "Gray Castle ${p.castleDepth}층"
+        )
+        Chip(
+            if (p.iglooCleared) "이글루 마을 해방"
+            else "이글루 빙하 ${p.iglooDepth}지대"
+        )
+        Chip(
+            if (p.seasideCleared) "바닷가 마을 해방"
+            else "바다 동굴 ${p.seasideDepth}층"
+        )
+        Chip(
+            if (p.winterCleared) "겨울성 해방"
+            else "겨울성 지하 ${p.winterDepth}층"
         )
         Chip("대련 ${vm.arenaWins}승 ${vm.arenaLosses}패")
         Chip(if (p.blessing > 0) "축복 ${p.blessing}일 남음" else "축복 없음")
@@ -175,7 +190,7 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     Spacer(Modifier.height(10.dp))
     SectionTitle("직업 스킬맵 (전투)")
     Text(
-        "직군별로만 배울 수 있다. 레벨업으로 SP를 모아 스킬을 배우거나 강화한다.",
+        "레벨업으로 SP를 받는다. Status에서 스킬맵을 열어 배우거나 강화한다.",
         color = Palette.ParchmentDim,
         fontSize = 11.sp,
     )
@@ -183,8 +198,8 @@ private fun ColumnScope.StatusTab(vm: GameViewModel) {
     SpecialSkillSlotEditor(
         vm = vm,
         actorKey = GameViewModel.HERO_SKILL_KEY,
-        actorLabel = "${vm.player.name} · 모험가",
-        actorClass = ActorClass.ADVENTURER,
+        actorLabel = "${vm.player.name} · ${vm.player.title}",
+        actorClass = vm.player.heroJob.actorClass,
     )
     vm.activeParty.forEach { merc ->
         Spacer(Modifier.height(8.dp))
@@ -434,6 +449,39 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
         Spacer(Modifier.height(10.dp))
     }
 
+    SectionTitle("소리")
+    Text(
+        "배경음악  ${ (vm.player.bgmVolume * 100).toInt() }%",
+        color = Palette.Parchment,
+        fontSize = 12.sp,
+    )
+    Slider(
+        value = vm.player.bgmVolume,
+        onValueChange = { vm.setBgmVolume(it) },
+        valueRange = 0f..1f,
+        colors = SliderDefaults.colors(
+            thumbColor = Palette.Gold,
+            activeTrackColor = Palette.Gold,
+            inactiveTrackColor = Palette.WoodLight,
+        ),
+    )
+    Text(
+        "효과음  ${ (vm.player.sfxVolume * 100).toInt() }%",
+        color = Palette.Parchment,
+        fontSize = 12.sp,
+    )
+    Slider(
+        value = vm.player.sfxVolume,
+        onValueChange = { vm.setSfxVolume(it) },
+        valueRange = 0f..1f,
+        colors = SliderDefaults.colors(
+            thumbColor = Palette.Gold,
+            activeTrackColor = Palette.Gold,
+            inactiveTrackColor = Palette.WoodLight,
+        ),
+    )
+    Spacer(Modifier.height(12.dp))
+
     SectionTitle("조작 방법")
     Text(
         "· 마을 화면에서 건물을 누르면 그곳까지 걸어가 자동으로 들어갑니다.\n" +
@@ -447,9 +495,38 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
     )
 
     Spacer(Modifier.height(12.dp))
+    SectionTitle("시스템 디버그")
+    Text(
+        "마을별 난이도·적정 레벨·전투 수치 표를 엽니다. 켠 동안 세계지도 핀과 던전 두루마리에도 권장 레벨이 표시됩니다.",
+        color = Palette.ParchmentDim,
+        fontSize = 11.sp,
+        lineHeight = 15.sp,
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        WoodButton(
+            text = if (vm.debugMode) "디버그 켜짐" else "디버그 켜기",
+            highlight = vm.debugMode,
+        ) { vm.toggleDebugMode() }
+        WoodButton(
+            text = "밸런스 표",
+            highlight = true,
+        ) { vm.openDebugPanel() }
+    }
+    if (vm.debugMode) {
+        val row = CombatBalance.village(vm.currentSettlement)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "현재 마을 권장  Lv.${CombatBalance.enterLabel(row)} 입장 · Lv.${CombatBalance.clearLabel(row)} 클리어  ${row.stars}",
+            color = Palette.Gold,
+            fontSize = 11.sp,
+        )
+    }
+
+    Spacer(Modifier.height(12.dp))
     SectionTitle("게임 정보")
     Text(
-        "중세마을 이야기 v0.4.41\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
+        "중세마을 이야기 v0.4.55\nKotlin · Jetpack Compose 로 제작된 초안입니다.",
         color = Palette.ParchmentDim,
         fontSize = 12.sp,
         lineHeight = 17.sp
@@ -464,7 +541,7 @@ private fun ColumnScope.SystemTab(vm: GameViewModel) {
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             WoodButton("네, 초기화", highlight = true) {
-                vm.newGame()
+                vm.requestNewGame()
                 confirmNew = false
             }
             WoodButton("아니요") { confirmNew = false }

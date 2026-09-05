@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medieval.village.game.GameViewModel
 import com.medieval.village.game.MenuTab
+import com.medieval.village.game.isExplorePlace
 import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
 import com.medieval.village.model.Village
@@ -49,6 +50,7 @@ import kotlin.math.roundToInt
 @Composable
 fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
     if (vm.menuTab != MenuTab.WORLD_MAP) return
+    val debugMode = vm.debugMode
 
     val art = rememberCustomArtOrNull()
     val continent = art?.continentMap
@@ -70,15 +72,17 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
             val ox = (wPx - Village.W * s) / 2f
             val oy = (hPx - Village.H * s) / 2f
             val currentId = vm.currentSettlement
+            val canTravel = vm.canTravelWorldMap()
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(s, ox, oy) {
+                    .pointerInput(s, ox, oy, canTravel) {
                         detectTapGestures { tap ->
+                            if (!canTravel) return@detectTapGestures
                             val wx = (tap.x - ox) / s
                             val wy = (tap.y - oy) / s
-            val hit = Settlements.all(vm.player.castleCleared).minByOrNull { st ->
+                            val hit = Settlements.all(vm.player.worldFlags).minByOrNull { st ->
                                 hypot(wx - st.mapX, wy - st.mapY)
                             }
                             if (hit != null && hypot(wx - hit.mapX, wy - hit.mapY) < 70f) {
@@ -109,13 +113,21 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
                         )
                     }
 
-                    Settlements.all(vm.player.castleCleared).forEach { st ->
+                    Settlements.all(vm.player.worldFlags).forEach { st ->
                         val here = st.id == currentId
                         val pinColor = when {
                             st.id == SettlementId.GRAY_CASTLE && vm.player.castleCleared ->
                                 Color(0xFFE8F0FF)
+                            st.id == SettlementId.IGLOO && vm.player.iglooCleared ->
+                                Color(0xFFB8E0FF)
+                            st.id == SettlementId.SEASIDE && vm.player.seasideCleared ->
+                                Color(0xFF7EC8C8)
+                            st.id == SettlementId.WINTER_CASTLE && vm.player.winterCleared ->
+                                Color(0xFFF4E4C0)
                             here -> Color(0xFFFFD76A)
                             else -> Color(0xFFE85A3C)
+                        }.let { c ->
+                            if (!canTravel && !here) c.copy(alpha = 0.38f) else c
                         }
                         val r = if (here) 22f else 18f
                         drawCircle(pinColor, radius = r, center = Offset(st.mapX, st.mapY))
@@ -138,21 +150,40 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
                                 textAlign = Paint.Align.CENTER
                             }
                             val label = st.nameKo
+                            val ladder = if (debugMode) {
+                                com.medieval.village.model.CombatBalance.village(st.id)
+                            } else {
+                                null
+                            }
                             val tw = paint.measureText(label)
+                            val sub = ladder?.let { "권장 Lv.${com.medieval.village.model.CombatBalance.enterLabel(it)}–${it.clearHi}" }
+                            val subW = if (sub != null) {
+                                val sp = Paint(paint).apply { textSize = 18f }
+                                sp.measureText(sub)
+                            } else 0f
+                            val boxW = maxOf(tw, subW)
                             val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                                 color = android.graphics.Color.argb(0xDD, 0x1A, 0x12, 0x0C)
                             }
                             val ly = st.mapY + r + 36f
+                            val extra = if (sub != null) 22f else 0f
                             canvas.nativeCanvas.drawRoundRect(
-                                st.mapX - tw / 2f - 12f,
+                                st.mapX - boxW / 2f - 12f,
                                 ly - 28f,
-                                st.mapX + tw / 2f + 12f,
-                                ly + 8f,
+                                st.mapX + boxW / 2f + 12f,
+                                ly + 8f + extra,
                                 10f,
                                 10f,
                                 bg
                             )
                             canvas.nativeCanvas.drawText(label, st.mapX, ly, paint)
+                            if (sub != null) {
+                                val subPaint = Paint(paint).apply {
+                                    textSize = 18f
+                                    color = android.graphics.Color.parseColor("#D9A441")
+                                }
+                                canvas.nativeCanvas.drawText(sub, st.mapX, ly + 22f, subPaint)
+                            }
                         }
                     }
                 }
@@ -172,7 +203,11 @@ fun WorldMapOverlay(vm: GameViewModel, modifier: Modifier = Modifier) {
         )
 
         Text(
-            text = "마을을 눌러 이동 · 현재: ${vm.settlement.nameKo}",
+            text = if (vm.currentPlace.isExplorePlace()) {
+                "탐험 중 · 지도만 볼 수 있음 · 현재: ${vm.settlement.nameKo}"
+            } else {
+                "마을을 눌러 이동 · 현재: ${vm.settlement.nameKo}"
+            },
             color = Palette.ParchmentDim,
             fontSize = 12.sp,
             modifier = Modifier

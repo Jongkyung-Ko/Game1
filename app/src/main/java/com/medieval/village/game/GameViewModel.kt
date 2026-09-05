@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import com.medieval.village.model.CombatBalance
 import com.medieval.village.model.CastleFactory
 import com.medieval.village.model.DesertFactory
 import com.medieval.village.model.DungeonFactory
@@ -19,6 +20,9 @@ import com.medieval.village.model.EQUIP_SLOTS
 import com.medieval.village.model.EquippedItem
 import com.medieval.village.model.ForestFactory
 import com.medieval.village.model.GlacierFactory
+import com.medieval.village.model.IglooFactory
+import com.medieval.village.model.SeaCaveFactory
+import com.medieval.village.model.WinterKeepFactory
 import com.medieval.village.model.InteriorNpc
 import com.medieval.village.model.InteriorNpcCatalog
 import com.medieval.village.model.InteriorNpcKind
@@ -32,10 +36,14 @@ import com.medieval.village.model.MercenaryCatalog
 import com.medieval.village.model.Place
 import com.medieval.village.model.PlaceId
 import com.medieval.village.model.Player
+import com.medieval.village.model.Prologue
 import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.model.RegionDialogue
 import com.medieval.village.model.ActorClass
+import com.medieval.village.model.HeroJob
+import com.medieval.village.model.HeroAdvancement
+import com.medieval.village.model.JobAdvanceOffer
 import com.medieval.village.model.Settlement
 import com.medieval.village.model.SettlementId
 import com.medieval.village.model.Settlements
@@ -65,7 +73,7 @@ enum class Scene { VILLAGE, INTERIOR }
 enum class MenuTab { NONE, STATUS, INVENTORY, EQUIPMENT, SYSTEM, WORLD_MAP }
 
 /** 도보 탐험 바이옴 */
-enum class ExploreBiome { DUNGEON, FOREST, DESERT, GLACIER, CASTLE }
+enum class ExploreBiome { DUNGEON, FOREST, DESERT, GLACIER, CASTLE, IGLOO, SEA, WINTER_KEEP }
 
 private data class Waypoint(val x: Float, val y: Float)
 
@@ -75,11 +83,60 @@ fun PlaceId?.exploreBiome(): ExploreBiome? = when (this) {
     PlaceId.SOUTH_DESERT -> ExploreBiome.DESERT
     PlaceId.NORTH_GLACIER -> ExploreBiome.GLACIER
     PlaceId.GRAY_CASTLE -> ExploreBiome.CASTLE
+    PlaceId.IGLOO_GLACIER -> ExploreBiome.IGLOO
+    PlaceId.SEA_CAVE -> ExploreBiome.SEA
+    PlaceId.WINTER_KEEP -> ExploreBiome.WINTER_KEEP
+    else -> null
+}
+
+fun ExploreBiome.isWild(): Boolean = when (this) {
+    ExploreBiome.FOREST, ExploreBiome.DESERT, ExploreBiome.GLACIER, ExploreBiome.IGLOO -> true
+    else -> false
+}
+
+fun ExploreBiome.storyMaxFloor(): Int? = when (this) {
+    ExploreBiome.CASTLE -> CastleFactory.MAX_FLOOR
+    ExploreBiome.IGLOO -> IglooFactory.MAX_FLOOR
+    ExploreBiome.SEA -> SeaCaveFactory.MAX_FLOOR
+    ExploreBiome.WINTER_KEEP -> WinterKeepFactory.MAX_FLOOR
     else -> null
 }
 
 /** 도보 탐험 지역(던전·숲·사막·빙하) 여부 */
 fun PlaceId?.isExplorePlace(): Boolean = exploreBiome() != null
+
+/** 10층 단위 클리어 후 재진입 시 출발 층 선택 */
+data class ExploreFloorChoice(
+    val placeId: PlaceId,
+    val biome: ExploreBiome,
+    val checkpoint: Int,
+    val title: String,
+    val floorWord: String,
+)
+
+fun ExploreBiome.floorLabel(n: Int): String = when (this) {
+    ExploreBiome.FOREST, ExploreBiome.DESERT, ExploreBiome.GLACIER, ExploreBiome.IGLOO -> "${n}지대"
+    ExploreBiome.DUNGEON, ExploreBiome.CASTLE, ExploreBiome.SEA, ExploreBiome.WINTER_KEEP -> "${n}층"
+}
+
+/** 포털스톤으로 연 워프 — 집과 탐험지를 잇는다. */
+data class ParkedWarp(
+    val settlementId: SettlementId,
+    val placeId: PlaceId,
+    val floor: Int,
+    val heroX: Float,
+    val heroY: Float,
+    val facing: Facing,
+    val portalCol: Int,
+    val portalRow: Int,
+)
+
+/** 옛 세이브는 도달 깊이에서 10층 단위를 복원한다. */
+private fun checkpointOrDepth(stored: Int, depth: Int): Int {
+    val fromStored = (stored / 10) * 10
+    val fromDepth = (depth / 10) * 10
+    return maxOf(fromStored, fromDepth)
+}
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -90,7 +147,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private const val MELEE_CONE_DOT = 0.35f // ~70° 전방
         private const val ATTACK_COOLDOWN = 0.42f
         private const val SPECIAL_COOLDOWN = 2.15f
-        private const val MAGIC_MP_COST = 6
         private const val PROJECTILE_SPEED = 420f
         private const val KNOCKBACK_DISTANCE = 42f
         private const val MONSTER_AGGRO_RANGE = 175f
@@ -104,6 +160,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val saveStore = GameSaveStore(application)
 
     var player by mutableStateOf(Player())
+        private set
+
+    /** 타이틀(로고) 화면 — 시작하기/이어하기 */
+    var awaitingTitle by mutableStateOf(true)
+        private set
+    /** 새 게임 시작 시 다섯 장 인트로 */
+    var awaitingPrologue by mutableStateOf(false)
+        private set
+    var prologuePage by mutableIntStateOf(0)
+        private set
+    /** 첫 시작·새 게임 시 직업 선택 대기 */
+    var awaitingClassSelect by mutableStateOf(false)
+        private set
+    /** 한 번이라도 직업을 확정했으면 선택 화면에서 취소 가능 */
+    var hasStartedRun by mutableStateOf(false)
+        private set
+    var pendingJobAdvance by mutableStateOf<JobAdvanceOffer?>(null)
         private set
 
     val inventory = mutableStateListOf<InventoryEntry>()
@@ -155,11 +228,34 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var menuTab by mutableStateOf(MenuTab.NONE)
 
+    /** 시스템 디버그 — 마을 난이도·전투 밸런스 표 */
+    var debugMode by mutableStateOf(false)
+    var debugPanelOpen by mutableStateOf(false)
+        private set
+
+    fun toggleDebugMode() {
+        debugMode = !debugMode
+        if (!debugMode) debugPanelOpen = false
+    }
+
+    fun openDebugPanel() {
+        debugMode = true
+        debugPanelOpen = true
+    }
+
+    fun closeDebugPanel() {
+        debugPanelOpen = false
+    }
+
+    /** 탐험 입구에서 1층/클리어 층 선택 대기 */
+    var pendingExploreChoice by mutableStateOf<ExploreFloorChoice?>(null)
+        private set
+
     /** 현재 머무는 정착지(마을) */
     var currentSettlement by mutableStateOf(SettlementId.OAKHAVEN)
         private set
 
-    val settlement: Settlement get() = Settlements.of(currentSettlement, player.castleCleared)
+    val settlement: Settlement get() = Settlements.of(currentSettlement, player.worldFlags)
 
     fun placeOf(id: PlaceId): Place =
         settlement.ofOrNull(id) ?: Settlements.oakhaven.of(id)
@@ -214,6 +310,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var dungeonFloorNumber by mutableStateOf(1)
         private set
+    /** 집으로 이어 둔 워프 (탐험 맵은 유지) */
+    var parkedWarp by mutableStateOf<ParkedWarp?>(null)
+        private set
+    private var parkedDungeonFloor: DungeonFloor? = null
+    val hasHomeWarp: Boolean
+        get() = parkedWarp != null && currentPlace == PlaceId.HOME
     var dungeonHeroX by mutableFloatStateOf(0f)
         private set
     var dungeonHeroY by mutableFloatStateOf(0f)
@@ -222,6 +324,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var dungeonHint by mutableStateOf("")
         private set
+    /** 던전·탐험 지도를 확대한 채로 플레이 */
+    var dungeonMapEnlarged by mutableStateOf(false)
+
+    fun toggleDungeonMapEnlarge() {
+        dungeonMapEnlarged = !dungeonMapEnlarged
+    }
     /** UI에서 재생할 일회성 효과음 신호 */
     var sfxSignal by mutableStateOf(0)
         private set
@@ -288,7 +396,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val partyTrail = PartyTrail()
 
     init {
-        newGame()
+        // 직업을 고를 때까지 새 게임을 시작하지 않는다.
     }
 
     /** 현재 선두 기준 파티 그리기 슬롯 (궤적 추종 포함) */
@@ -371,7 +479,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun buildSaveJson(): JSONObject {
-        val settlement = Settlements.of(currentSettlement, player.castleCleared)
+        val settlement = Settlements.of(currentSettlement, player.worldFlags)
         return JSONObject().apply {
             put("version", 1)
             put("savedAtMs", System.currentTimeMillis())
@@ -391,6 +499,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             put("player", JSONObject().apply {
                 put("name", player.name)
                 put("title", player.title)
+                put("heroJob", player.heroJob.id)
                 put("level", player.level)
                 put("exp", player.exp)
                 put("hp", player.hp)
@@ -412,7 +521,37 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 put("glacierDepth", player.glacierDepth)
                 put("castleDepth", player.castleDepth)
                 put("castleCleared", player.castleCleared)
+                put("dungeonCleared", player.dungeonCleared)
+                put("forestCleared", player.forestCleared)
+                put("desertCleared", player.desertCleared)
+                put("glacierCleared", player.glacierCleared)
+                put("castleFloorCleared", player.castleFloorCleared)
+                put("iglooCleared", player.iglooCleared)
+                put("iglooDepth", player.iglooDepth)
+                put("iglooFloorCleared", player.iglooFloorCleared)
+                put("seasideCleared", player.seasideCleared)
+                put("seasideDepth", player.seasideDepth)
+                put("seasideFloorCleared", player.seasideFloorCleared)
+                put("winterCleared", player.winterCleared)
+                put("winterDepth", player.winterDepth)
+                put("winterFloorCleared", player.winterFloorCleared)
+                put("bgmVolume", player.bgmVolume.toDouble())
+                put("sfxVolume", player.sfxVolume.toDouble())
             })
+            put("debugMode", debugMode)
+            val warp = parkedWarp
+            if (warp != null) {
+                put("parkedWarp", JSONObject().apply {
+                    put("settlementId", warp.settlementId.name)
+                    put("placeId", warp.placeId.name)
+                    put("floor", warp.floor)
+                    put("heroX", warp.heroX.toDouble())
+                    put("heroY", warp.heroY.toDouble())
+                    put("facing", warp.facing.name)
+                    put("portalCol", warp.portalCol)
+                    put("portalRow", warp.portalRow)
+                })
+            }
             put("inventory", JSONArray().apply {
                 inventory.forEach { entry ->
                     put(JSONObject().apply {
@@ -494,12 +633,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         skillMapQueue.clear()
         specialCooldown = 0f
         specialReady = true
+        pendingExploreChoice = null
         log.clear()
 
         val p = json.getJSONObject("player")
         player = Player(
             name = p.optString("name", "아서"),
             title = p.optString("title", "견습 모험가"),
+            heroJob = HeroJob.fromId(p.optString("heroJob", HeroJob.WARRIOR.id)),
             level = p.optInt("level", 1),
             exp = p.optInt("exp", 0),
             hp = p.optInt("hp", 60),
@@ -521,7 +662,45 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             glacierDepth = p.optInt("glacierDepth", 0),
             castleDepth = p.optInt("castleDepth", 0),
             castleCleared = p.optBoolean("castleCleared", false),
+            dungeonCleared = checkpointOrDepth(p.optInt("dungeonCleared", 0), p.optInt("dungeonDepth", 0)),
+            forestCleared = checkpointOrDepth(p.optInt("forestCleared", 0), p.optInt("forestDepth", 0)),
+            desertCleared = checkpointOrDepth(p.optInt("desertCleared", 0), p.optInt("desertDepth", 0)),
+            glacierCleared = checkpointOrDepth(p.optInt("glacierCleared", 0), p.optInt("glacierDepth", 0)),
+            castleFloorCleared = checkpointOrDepth(
+                p.optInt("castleFloorCleared", 0),
+                p.optInt("castleDepth", 0),
+            ).let { if (p.optBoolean("castleCleared", false)) it.coerceAtLeast(10) else it },
+            iglooCleared = p.optBoolean("iglooCleared", false),
+            iglooDepth = p.optInt("iglooDepth", 0),
+            iglooFloorCleared = checkpointOrDepth(p.optInt("iglooFloorCleared", 0), p.optInt("iglooDepth", 0))
+                .let { if (p.optBoolean("iglooCleared", false)) it.coerceAtLeast(20) else it },
+            seasideCleared = p.optBoolean("seasideCleared", false),
+            seasideDepth = p.optInt("seasideDepth", 0),
+            seasideFloorCleared = checkpointOrDepth(p.optInt("seasideFloorCleared", 0), p.optInt("seasideDepth", 0))
+                .let { if (p.optBoolean("seasideCleared", false)) it.coerceAtLeast(20) else it },
+            winterCleared = p.optBoolean("winterCleared", false),
+            winterDepth = p.optInt("winterDepth", 0),
+            winterFloorCleared = checkpointOrDepth(p.optInt("winterFloorCleared", 0), p.optInt("winterDepth", 0))
+                .let { if (p.optBoolean("winterCleared", false)) it.coerceAtLeast(20) else it },
+            bgmVolume = p.optDouble("bgmVolume", 1.0).toFloat().coerceIn(0f, 1f),
+            sfxVolume = p.optDouble("sfxVolume", 1.0).toFloat().coerceIn(0f, 1f),
         )
+        debugMode = json.optBoolean("debugMode", debugMode)
+        parkedDungeonFloor = null
+        parkedWarp = json.optJSONObject("parkedWarp")?.let { w ->
+            runCatching {
+                ParkedWarp(
+                    settlementId = SettlementId.valueOf(w.getString("settlementId")),
+                    placeId = PlaceId.valueOf(w.getString("placeId")),
+                    floor = w.optInt("floor", 1),
+                    heroX = w.optDouble("heroX", 0.0).toFloat(),
+                    heroY = w.optDouble("heroY", 0.0).toFloat(),
+                    facing = Facing.valueOf(w.optString("facing", Facing.DOWN.name)),
+                    portalCol = w.optInt("portalCol", 0),
+                    portalRow = w.optInt("portalRow", 0),
+                )
+            }.getOrNull()
+        }
 
         inventory.clear()
         val inv = json.optJSONArray("inventory") ?: JSONArray()
@@ -630,10 +809,94 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             scene = Scene.VILLAGE
             resetPartyTrail(heroX, heroY)
         }
+        awaitingClassSelect = false
+        awaitingTitle = false
+        awaitingPrologue = false
+        hasStartedRun = true
+        pendingJobAdvance = null
+        player = player.copy(title = player.heroJob.titleAt(player.level))
     }
 
-    fun newGame() {
-        player = Player()
+    fun startFromTitle() {
+        awaitingTitle = false
+        beginPrologue()
+    }
+
+    fun continueFromTitle(slot: Int) {
+        if (loadGame(slot)) {
+            awaitingTitle = false
+            awaitingPrologue = false
+            awaitingClassSelect = false
+        }
+    }
+
+    fun requestNewGame() {
+        awaitingTitle = false
+        menuTab = MenuTab.NONE
+        beginPrologue()
+    }
+
+    fun cancelClassSelect() {
+        if (hasStartedRun) {
+            awaitingClassSelect = false
+        } else {
+            awaitingClassSelect = false
+            awaitingTitle = true
+        }
+    }
+
+    fun confirmHeroJob(job: HeroJob) {
+        awaitingClassSelect = false
+        awaitingTitle = false
+        awaitingPrologue = false
+        hasStartedRun = true
+        newGame(job)
+    }
+
+    private fun beginPrologue() {
+        awaitingClassSelect = false
+        prologuePage = 0
+        awaitingPrologue = true
+    }
+
+    fun advancePrologue() {
+        if (!awaitingPrologue) return
+        emitSfx("click")
+        if (prologuePage >= Prologue.slides.lastIndex) {
+            finishPrologue()
+        } else {
+            prologuePage++
+        }
+    }
+
+    fun skipPrologue() {
+        if (!awaitingPrologue) return
+        emitSfx("click")
+        finishPrologue()
+    }
+
+    fun retreatPrologue() {
+        if (!awaitingPrologue) return
+        if (prologuePage > 0) {
+            emitSfx("click")
+            prologuePage--
+        } else if (!hasStartedRun) {
+            awaitingPrologue = false
+            awaitingTitle = true
+        } else {
+            finishPrologue()
+        }
+    }
+
+    private fun finishPrologue() {
+        awaitingPrologue = false
+        awaitingClassSelect = true
+    }
+
+    fun newGame(job: HeroJob = HeroJob.WARRIOR) {
+        val bgm = player.bgmVolume
+        val sfx = player.sfxVolume
+        player = job.startingPlayer().copy(bgmVolume = bgm, sfxVolume = sfx)
         inventory.clear()
         equipment.clear()
         skills.clear()
@@ -646,10 +909,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         skillPoints.clear()
         specialSlots.clear()
         levelUpSkillOffer = null
+        pendingJobAdvance = null
         skillMapQueue.clear()
         specialCooldown = 0f
         specialReady = true
         specialSkillRevision = 0
+        pendingExploreChoice = null
         ensureActorSkillState(HERO_SKILL_KEY)
         log.clear()
         path.clear()
@@ -665,8 +930,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         addItem(ItemCatalog.potion, 3)
         addItem(ItemCatalog.bread, 2)
-        equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.rustySword)
-        equipment[ItemType.ARMOR] = EquippedItem(ItemCatalog.leatherArmor)
+        applyStartingGear(job)
 
         currentSettlement = SettlementId.OAKHAVEN
         val home = placeOf(PlaceId.HOME)
@@ -684,14 +948,40 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         currentPlace = PlaceId.HOME
         menuTab = MenuTab.NONE
         resetPartyTrail(pubHeroX, pubHeroY)
-        say("풍요의 마을… 한때 '신성한 포도주'로 번영했던 이곳에 눈을 떴다.")
-        say("몇 년 전 지하 최심부에서 검붉은 '좀비석'이 발굴된 뒤, 마을은 저주에 잠식되고 있다.")
-        say("문을 열고, 지상으로 스며드는 재앙의 근원을 마주하자. 실내에서는 화면을 눌러 걸어 다닐 수 있다.")
+        say("풍요의 마을… 저주의 근원을 찾아 이곳에 발을 들였다.")
+        say("문을 열고 밖으로 나서자. 실내에서는 화면을 눌러 걸어 다닐 수 있다.")
     }
 
-    /** 세계지도에서 정착지로 이동한다. */
+    private fun applyStartingGear(job: HeroJob) {
+        equipment.clear()
+        when (job) {
+            HeroJob.KNIGHT -> {
+                equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.rustySword)
+                equipment[ItemType.SHIELD] = EquippedItem(ItemCatalog.woodShield)
+                equipment[ItemType.ARMOR] = EquippedItem(ItemCatalog.leatherArmor)
+            }
+            HeroJob.WARRIOR -> {
+                equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.rustySword)
+                equipment[ItemType.ARMOR] = EquippedItem(ItemCatalog.leatherArmor)
+            }
+            HeroJob.MAGE -> {
+                equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.oakStaff)
+            }
+            HeroJob.ARCHER -> {
+                equipment[ItemType.WEAPON] = EquippedItem(ItemCatalog.shortBow)
+                equipment[ItemType.ARMOR] = EquippedItem(ItemCatalog.leatherArmor)
+            }
+        }
+    }
+
+    /** 세계지도에서 정착지로 이동한다. 탐험 중에는 보기만 가능하다. */
+    fun canTravelWorldMap(): Boolean = !currentPlace.isExplorePlace()
+
     fun travelToSettlement(id: SettlementId) {
-        if (currentPlace.isExplorePlace()) clearDungeonState()
+        if (!canTravelWorldMap()) {
+            say("탐험 중에는 다른 마을로 떠날 수 없다. 세계지도는 살펴볼 수만 있다.")
+            return
+        }
         path.clear()
         pendingEnter = null
         pubTarget = null
@@ -714,7 +1004,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         menuTab = MenuTab.NONE
         resetPartyTrail(heroX, heroY)
         emitSfx("door")
-        val s = Settlements.of(id, player.castleCleared)
+        val s = Settlements.of(id, player.worldFlags)
         if (moved) {
             say("${s.nameKo}(${s.nameEn})에 도착했다. ${s.blurb}")
         } else {
@@ -723,6 +1013,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // ---------------------------------------------------------------- 스탯 계산
+
+    fun setBgmVolume(value: Float) {
+        player = player.copy(bgmVolume = value.coerceIn(0f, 1f))
+    }
+
+    fun setSfxVolume(value: Float) {
+        player = player.copy(sfxVolume = value.coerceIn(0f, 1f))
+    }
 
     val equipAtk: Int get() = equipment.values.sumOf { it.atk }
     val equipDef: Int get() = equipment.values.sumOf { it.def }
@@ -740,6 +1038,78 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         if (frontIndex <= 0) null else activeParty.getOrNull(frontIndex - 1)
 
     fun frontActorName(): String = frontMercenary()?.name ?: player.name
+
+    fun clearedCheckpoint(biome: ExploreBiome): Int = when (biome) {
+        ExploreBiome.DUNGEON -> player.dungeonCleared
+        ExploreBiome.FOREST -> player.forestCleared
+        ExploreBiome.DESERT -> player.desertCleared
+        ExploreBiome.GLACIER -> player.glacierCleared
+        ExploreBiome.CASTLE -> player.castleFloorCleared
+        ExploreBiome.IGLOO -> player.iglooFloorCleared
+        ExploreBiome.SEA -> player.seasideFloorCleared
+        ExploreBiome.WINTER_KEEP -> player.winterFloorCleared
+    }
+
+    private fun frontWeapon(): Item? {
+        val merc = frontMercenary()
+        return if (merc != null) merc.equipment[ItemType.WEAPON]?.item
+        else equipment[ItemType.WEAPON]?.item
+    }
+
+    private fun ownsItem(id: String): Boolean =
+        inventory.any { it.item.id == id } ||
+            equipment.values.any { it.item.id == id } ||
+            party.any { merc -> merc.equipment.values.any { it.item.id == id } }
+
+    private fun applyOnHitWeaponEffects() {
+        val weapon = frontWeapon() ?: return
+        if (weapon.lifestealHp > 0) {
+            healFront(weapon.lifestealHp)
+            say("${weapon.name}이(가) 생기를 빨아들인다! HP +${weapon.lifestealHp}")
+        }
+        if (weapon.onHitMpChance > 0 && weapon.onHitMp > 0 && Random.nextInt(100) < weapon.onHitMpChance) {
+            player = player.copy(mp = (player.mp + weapon.onHitMp).coerceAtMost(player.maxMp))
+            say("${weapon.name}에서 마력이 스며든다! MP +${weapon.onHitMp}")
+        }
+    }
+
+    private fun healFront(amount: Int) {
+        val merc = frontMercenary()
+        if (merc != null) {
+            val cur = mercHp[merc.id] ?: merc.maxHp
+            mercHp[merc.id] = (cur + amount).coerceAtMost(merc.maxHp)
+        } else {
+            player = player.copy(hp = (player.hp + amount).coerceAtMost(player.maxHp))
+        }
+    }
+
+    private fun markCheckpointCleared(biome: ExploreBiome, floor: Int) {
+        val checkpoint = (floor / 10) * 10
+        if (checkpoint < 10) return
+        player = when (biome) {
+            ExploreBiome.DUNGEON -> player.copy(dungeonCleared = maxOf(player.dungeonCleared, checkpoint))
+            ExploreBiome.FOREST -> player.copy(forestCleared = maxOf(player.forestCleared, checkpoint))
+            ExploreBiome.DESERT -> player.copy(desertCleared = maxOf(player.desertCleared, checkpoint))
+            ExploreBiome.GLACIER -> player.copy(glacierCleared = maxOf(player.glacierCleared, checkpoint))
+            ExploreBiome.CASTLE -> player.copy(castleFloorCleared = maxOf(player.castleFloorCleared, checkpoint))
+            ExploreBiome.IGLOO -> player.copy(iglooFloorCleared = maxOf(player.iglooFloorCleared, checkpoint))
+            ExploreBiome.SEA -> player.copy(seasideFloorCleared = maxOf(player.seasideFloorCleared, checkpoint))
+            ExploreBiome.WINTER_KEEP -> player.copy(winterFloorCleared = maxOf(player.winterFloorCleared, checkpoint))
+        }
+    }
+
+    private fun grantMidBossRelic(monster: DungeonMonster, floor: Int) {
+        val relic = ItemCatalog.relicForBossKind(monster.kind) ?: return
+        if (ownsItem(relic.id)) {
+            val bonus = 140 + floor * 10
+            player = player.copy(gold = player.gold + bonus)
+            say("이미 ${relic.name}을(를) 가지고 있어 잔해를 금화로 바꿨다. (+${bonus}G)")
+            return
+        }
+        addItem(relic)
+        say("중간 보스의 정수에서 특수 무기 『${relic.name}』을(를) 손에 넣었다!")
+        say(relic.desc)
+    }
 
     fun mercCurrentHp(merc: Mercenary): Int = mercHp[merc.id] ?: merc.maxHp
 
@@ -796,6 +1166,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------- 이동
 
     fun tick(dt: Float) {
+        if (awaitingTitle || awaitingPrologue || awaitingClassSelect) return
         animTime += dt
         if (levelUpFxActorKey != null && animTime >= levelUpFxUntil) {
             levelUpFxActorKey = null
@@ -1034,8 +1405,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             pubSpeakerId = null
         }
         if (id.isExplorePlace()) {
-            enterExploreFloor(1)
+            clearParkedWarp()
+            val biome = id.exploreBiome()
+            val cleared = biome?.let { clearedCheckpoint(it) } ?: 0
+            if (biome != null && cleared >= 10) {
+                pendingExploreChoice = ExploreFloorChoice(
+                    placeId = id,
+                    biome = biome,
+                    checkpoint = cleared,
+                    title = placeOf(id).name,
+                    floorWord = biome.floorLabel(cleared),
+                )
+                dungeonFloor = null
+                dungeonFloorNumber = 0
+            } else {
+                pendingExploreChoice = null
+                enterExploreFloor(1)
+            }
         } else {
+            pendingExploreChoice = null
             resetPartyTrail(pubHeroX, pubHeroY)
         }
         emitSfx("door")
@@ -1043,6 +1431,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun leavePlace() {
+        pendingExploreChoice = null
         val id = currentPlace ?: return
         val place = placeOf(id)
         heroX = place.doorX
@@ -1068,7 +1457,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 실내 입장 시 NPC들이 번갈아 인사한다. */
     private fun greetInteriorNpcs(id: PlaceId) {
-        val npcs = InteriorNpcCatalog.forPlace(id, currentSettlement, player.castleCleared)
+        val npcs = InteriorNpcCatalog.forPlace(id, currentSettlement, player.worldFlags)
         if (npcs.isEmpty()) {
             say(greetingOf(id))
             return
@@ -1089,7 +1478,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val npc = InteriorNpcCatalog.forPlace(
             currentPlace ?: return,
             currentSettlement,
-            player.castleCleared,
+            player.worldFlags,
         ).firstOrNull { it.id == npcId }
             ?: InteriorNpcCatalog.all.firstOrNull { it.id == npcId }
             ?: return
@@ -1102,7 +1491,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun greetingOf(id: PlaceId): String {
-        RegionDialogue.placeGreeting(currentSettlement, player.castleCleared, id)?.let { return it }
+        RegionDialogue.placeGreeting(currentSettlement, player.worldFlags, id)?.let { return it }
         return when (id) {
             PlaceId.HOME -> "창문 너머로도 하수구 냄새가 스며든다. 그래도 여기는 나의 오두막이다."
             PlaceId.SHOP -> "\"어서 오세요… 횃불이랑 붕대는 늘 비치해 둡니다. 요즘엔 필수죠.\""
@@ -1114,6 +1503,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             PlaceId.ARENA -> "\"지상에서라도 칼날을 갈아야지. 지하에선 실수가 곧 죽음이야.\""
             PlaceId.DUNGEON -> "축축한 하수도 바람이 얼굴을 스친다. 저주의 둥지가 발밑에서 숨 쉰다."
             PlaceId.GRAY_CASTLE -> "회색 돌문이 열린다. 해골과 유령의 숨결이 성채 심층에서 흘러나온다."
+            PlaceId.IGLOO_GLACIER -> "하얀 빙벽이 열린다. 지하 깊숙이 얼음북극곰의 숨결이 얼어붙어 있다."
+            PlaceId.SEA_CAVE -> "짠 바람이 동굴을 훑는다. 해일 너머에서 대왕문어가 꿈틀거린다."
+            PlaceId.WINTER_KEEP -> "성 지하로 내려가는 돌계단. 납치된 아이들의 울음이 메아리친다."
             PlaceId.EAST_FOREST -> "나뭇잎 사이로 바람이 스친다. 동쪽으로 갈수록 짐승의 울음이 가까워진다."
             PlaceId.SOUTH_DESERT -> "뜨거운 모래바람이 얼굴을 때린다. 전갈과 낙타거미가 모래 아래 숨는다."
             PlaceId.NORTH_GLACIER -> "칼바람과 함께 하얀 침묵이 내려앉는다. 북극의 짐승들이 얼음 너머에서 지켜본다."
@@ -1215,8 +1607,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         dungeonHint = "portal"
         refreshDungeonFloor()
         emitSfx("door")
-        say("포털스톤이 갈라지며 집으로 이어지는 푸른 문이 열렸다.")
-        say("포털 위에서 ‘집으로’를 누르면 오두막으로 돌아간다. 탐험을 떠나면 문은 사라진다.")
+        say("포털스톤이 갈라지며 집과 이어지는 푸른 문이 열렸다.")
+        say("포털 위에서 ‘집으로’를 누르면 오두막으로 간다. 집의 워프로 언제든 이 자리로 돌아올 수 있다.")
         return true
     }
 
@@ -1522,7 +1914,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
             party[idx] = m
             if (levelsGained.isNotEmpty()) {
-                onActorLevelUp(id, m.name, SpecialSkillCatalog.actorClassOf(m), levelsGained)
+                onActorLevelUp(id, m.name, levelsGained)
             }
         }
     }
@@ -1559,6 +1951,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------- 던전 (라그나로크식 도보 탐험)
 
     private fun clearDungeonState() {
+        clearParkedWarp()
+        hideLiveDungeon()
+    }
+
+    private fun clearParkedWarp() {
+        parkedWarp = null
+        parkedDungeonFloor = null
+    }
+
+    private fun hideLiveDungeon() {
         dungeonFloor = null
         dungeonFloorNumber = 1
         dungeonHeroX = 0f
@@ -1626,9 +2028,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun canDungeonAttack(): Boolean = attackReady && dungeonFloor != null && !dungeonCombatLock
 
     private fun refreshAttackReady() {
-        val style = currentWeaponStyle()
-        val needsHeroMp = style == WeaponStyle.MAGIC && frontMercenary() == null
-        attackReady = attackCooldown <= 0f && (!needsHeroMp || player.mp >= MAGIC_MP_COST)
+        attackReady = attackCooldown <= 0f
     }
 
     /** 공격 버튼 — 선두가 근접 참격 또는 화살/마법 발사 */
@@ -1641,12 +2041,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             frontIndex = 0
         }
         val style = currentWeaponStyle()
-        val heroCasting = style == WeaponStyle.MAGIC && frontMercenary() == null
-        if (heroCasting && player.mp < MAGIC_MP_COST) {
-            say("마나가 부족하다.")
-            refreshAttackReady()
-            return
-        }
         attackCooldown = ATTACK_COOLDOWN
         refreshAttackReady()
         val dmg = if (frontMercenary() != null) {
@@ -1673,11 +2067,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 spawnProjectile(WeaponStyle.BOW, dmg, life = 1.15f)
             }
             WeaponStyle.MAGIC -> {
-                if (heroCasting) {
-                    player = player.copy(mp = player.mp - MAGIC_MP_COST)
-                }
-                emitSfx("click")
-                spawnProjectile(WeaponStyle.MAGIC, dmg + 3, life = 1.25f)
+                emitSfx(MagicBoltKind.BASIC.shotSfx())
+                spawnProjectile(
+                    style = WeaponStyle.MAGIC,
+                    damage = dmg + 3,
+                    life = 1.15f,
+                    radius = 14f,
+                    magicKind = MagicBoltKind.BASIC,
+                )
             }
         }
         refreshAttackReady()
@@ -1695,7 +2092,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun frontActorKey(): String = frontMercenary()?.id ?: HERO_SKILL_KEY
 
-    private fun frontActorClass(): ActorClass = SpecialSkillCatalog.actorClassOf(frontMercenary())
+    private fun frontActorClass(): ActorClass =
+        frontMercenary()?.let { SpecialSkillCatalog.actorClassOf(it) }
+            ?: player.heroJob.actorClass
 
     private fun actorLevelOf(actorKey: String): Int {
         if (actorKey == HERO_SKILL_KEY) return player.level
@@ -1703,7 +2102,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun actorClassOfKey(actorKey: String): ActorClass {
-        if (actorKey == HERO_SKILL_KEY) return ActorClass.ADVENTURER
+        if (actorKey == HERO_SKILL_KEY) return player.heroJob.actorClass
         return SpecialSkillCatalog.actorClassOf(party.firstOrNull { it.id == actorKey })
     }
 
@@ -1824,11 +2223,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun onActorLevelUp(
         actorKey: String,
         actorName: String,
-        cls: ActorClass,
         levelsGained: List<Int>,
     ) {
         if (levelsGained.isEmpty()) return
-        val newLevel = levelsGained.last()
         ensureActorSkillState(actorKey)
         val gained = levelsGained.size
         skillPoints[actorKey] = (skillPoints[actorKey] ?: 0) + gained
@@ -1837,14 +2234,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         levelUpFxActorKey = actorKey
         levelUpFxUntil = animTime + 2.0f
         say("$actorName 스킬포인트 +$gained (보유 ${skillPoints[actorKey]})")
-        openSkillMap(
-            actorKey = actorKey,
-            actorName = actorName,
-            actorClass = cls,
-            actorLevel = newLevel,
-            pointsGranted = gained,
-            fromLevelUp = true,
-        )
+        say("Status에서 스킬맵을 열어 배우거나 강화할 수 있다.")
     }
 
     fun openSkillMap(
@@ -1910,6 +2300,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         setSpecialSlot(actorKey, slotIndex, null)
     }
 
+    fun dismissJobAdvance() {
+        pendingJobAdvance = null
+    }
+
     fun dismissLevelUpSkillOffer() {
         levelUpSkillOffer = skillMapQueue.removeFirstOrNull()
     }
@@ -1926,7 +2320,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun dungeonSpecialAttack(slotIndex: Int) {
         val map = dungeonFloor ?: return
         if (dungeonCombatLock || attackCooldown > 0f || specialCooldown > 0f) return
-        if (levelUpSkillOffer != null) return
+        if (levelUpSkillOffer != null || pendingJobAdvance != null) return
         clampFrontIndex()
         val frontMerc = frontMercenary()
         if (frontMerc != null && !isMercAlive(frontMerc)) {
@@ -1975,41 +2369,39 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             duration = vfx?.animDuration ?: 0.52f,
             specialSet = if (heroFront) vfx?.animSet else null,
         )
-        if (heroFront && vfx != null) {
-            spawnSpecialMeleeFx(vfx)
-        }
+        spawnSpecialSkillBurst(skill.id, vfx)
         when (skill.style) {
             WeaponStyle.MELEE -> {
-                if (skill.id == "adv_charge" && heroFront) {
-                    lungeForward(map, 36f)
+                if ((skill.id == "adv_charge" || skill.id == "war_rush") && heroFront) {
+                    lungeForward(map, 48f)
+                }
+                val wide = skill.actorClass == ActorClass.ADVENTURER ||
+                    skill.actorClass == ActorClass.WARRIOR ||
+                    skill.actorClass == ActorClass.PALADIN
+                val rangeMult = when (skill.id) {
+                    "war_spin", "war_quake", "pal_holy", "adv_finisher" -> 2.1f
+                    "war_rush", "adv_charge", "war_rage" -> 1.9f
+                    else -> if (wide) 1.72f else 1.28f
+                }
+                val cone = when (skill.id) {
+                    "war_spin", "war_quake", "pal_holy" -> -1f
+                    else -> if (wide) 0.02f else MELEE_CONE_DOT
                 }
                 performMeleeSlash(
                     map = map,
                     damage = dmg,
-                    emitCrescent = vfx?.meleeFxKey == null,
-                    slashPower = if (vfx?.meleeFxKey == null) 1.45f else 1f,
-                    slashDuration = if (vfx?.meleeFxKey == null) 0.48f else 0.34f,
+                    emitCrescent = true,
+                    slashPower = if (wide) 1.85f else 1.4f,
+                    slashDuration = 0.52f,
+                    rangeMult = rangeMult,
+                    coneDot = cone,
+                    skillId = skill.id,
                 )
             }
-            WeaponStyle.BOW -> {
-                spawnProjectile(
-                    style = WeaponStyle.BOW,
-                    damage = dmg,
-                    life = 1.25f,
-                    fxSpriteKey = vfx?.projectileFxKey,
-                    impactSpriteKey = vfx?.impactFxKey,
-                    radius = if (vfx?.projectileFxKey != null) 22f else 18f,
-                )
-            }
+            WeaponStyle.BOW -> spawnBowSpecial(skill.id, dmg, vfx)
             WeaponStyle.MAGIC -> {
-                spawnProjectile(
-                    style = WeaponStyle.MAGIC,
-                    damage = dmg + 4,
-                    life = 1.35f,
-                    fxSpriteKey = vfx?.projectileFxKey,
-                    impactSpriteKey = vfx?.impactFxKey,
-                    radius = if (vfx?.projectileFxKey != null) 24f else 20f,
-                )
+                val kind = magicKindForSkill(skill.id)
+                spawnMagicSpecial(skill.id, dmg + 4, kind, vfx)
             }
         }
         refreshAttackReady()
@@ -2064,14 +2456,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             else -> {
                 val base = totalAtk / 2 + skill.power + player.intel * 2 + blessBonus() / 2
                 val dmg = (base + Random.nextInt(0, 6)).coerceAtLeast(6)
-                emitSfx(if (skill.id == "thunder") "skill_lightning" else "skill_fire")
+                val kind = magicKindForSkill(skill.id)
+                emitSfx(kind.shotSfx())
                 startAttackAnim(HeroAnimKind.MAGIC, 0.52f)
                 say("『${skill.name}』 시전! (피해 $dmg)")
                 spawnProjectile(
                     style = WeaponStyle.MAGIC,
                     damage = dmg,
                     life = 1.35f,
+                    fxSpriteKey = kind.projectileFxKey(),
+                    impactSpriteKey = kind.impactFxKey(),
                     radius = 22f,
+                    magicKind = kind,
+                    announce = false,
                 )
             }
         }
@@ -2124,26 +2521,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun spawnSpecialMeleeFx(vfx: SpecialVfxSpec) {
-        val key = vfx.meleeFxKey ?: return
+    private fun spawnSpecialSkillBurst(skillId: String, vfx: SpecialVfxSpec?) {
         val origin = slashFxOrigin()
+        val fwdX = facing.dirX()
+        val fwdY = facing.dirY()
         specialSkillFx += SpecialSkillFx(
-            x = origin.first,
-            y = origin.second,
+            x = origin.first + fwdX * 16f,
+            y = origin.second + fwdY * 10f,
             facing = facing,
-            spriteKey = key,
-            duration = vfx.meleeFxDuration,
-            scale = vfx.meleeFxScale,
+            spriteKey = vfx?.meleeFxKey.orEmpty(),
+            duration = (vfx?.meleeFxDuration ?: 0.62f) + 0.12f,
+            scale = (vfx?.meleeFxScale ?: 1.7f) + 0.25f,
+            skillId = skillId,
         )
-        // 필살은 빔을 한 줄 더
-        if (key == "adv_fx_finisher") {
+        if (skillId == "adv_finisher" || skillId == "war_quake" || skillId == "pal_holy") {
             specialSkillFx += SpecialSkillFx(
-                x = origin.first + facing.dirX() * 40f,
-                y = origin.second + facing.dirY() * 28f,
+                x = origin.first + fwdX * 54f,
+                y = origin.second + fwdY * 36f,
                 facing = facing,
-                spriteKey = "adv_fx_beam",
-                duration = 0.48f,
-                scale = 1.2f,
+                spriteKey = if (skillId == "adv_finisher") "adv_fx_beam" else "",
+                duration = 0.55f,
+                scale = 1.45f,
+                skillId = skillId,
             )
         }
         dungeonCombatFrame++
@@ -2161,6 +2560,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         emitCrescent: Boolean = true,
         slashPower: Float = 1f,
         slashDuration: Float = 0.34f,
+        rangeMult: Float = 1f,
+        coneDot: Float = MELEE_CONE_DOT,
+        skillId: String = "",
     ) {
         val origin = slashFxOrigin()
         if (emitCrescent) {
@@ -2172,7 +2574,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 power = slashPower,
             )
         }
-        val range = MELEE_RANGE * (0.92f + 0.18f * slashPower)
+        val range = MELEE_RANGE * (0.92f + 0.18f * slashPower) * rangeMult
         val fx = facing.dirX()
         val fy = facing.dirY()
         val hits = map.monsters.filter { monster ->
@@ -2181,8 +2583,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val dy = monster.y - dungeonHeroY
             val dist = hypot(dx, dy)
             if (dist > range || dist < 1f) return@filter false
+            if (coneDot < 0f) return@filter true
             val dot = (dx * fx + dy * fy) / dist
-            dot >= MELEE_CONE_DOT
+            dot >= coneDot
         }
         if (hits.isEmpty()) {
             say("칼날이 허공을 가른다.")
@@ -2193,11 +2596,92 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val kdy = monster.y - dungeonHeroY
             // 휘두르기 효과음은 이미 재생됨 — 여기서는 넉백만
             damageMonster(monster, damage, knockDx = kdx, knockDy = kdy, hitSfx = null)
+            if (skillId.isNotEmpty()) {
+                specialSkillFx += SpecialSkillFx(
+                    x = monster.x,
+                    y = monster.y - 22f,
+                    facing = facing,
+                    duration = 0.42f,
+                    scale = 1.15f,
+                    skillId = skillId,
+                )
+            }
         }
     }
 
     private fun slashFxOrigin(): Pair<Float, Float> =
         dungeonHeroX + facing.dirX() * 18f to dungeonHeroY + facing.dirY() * 10f - 28f
+
+    private fun spawnBowSpecial(skillId: String, damage: Int, vfx: SpecialVfxSpec?) {
+        when (skillId) {
+            "arc_double" -> {
+                spawnProjectile(WeaponStyle.BOW, (damage * 0.72f).roundToInt(), 1.2f, vfx?.projectileFxKey, skillLook = skillId, angleOffsetDeg = -11f, announce = false)
+                spawnProjectile(WeaponStyle.BOW, (damage * 0.72f).roundToInt(), 1.2f, vfx?.projectileFxKey, skillLook = skillId, angleOffsetDeg = 11f, announce = false)
+            }
+            "arc_snipe" -> spawnProjectile(
+                WeaponStyle.BOW, (damage * 1.15f).roundToInt(), 1.55f, vfx?.projectileFxKey,
+                radius = 16f, skillLook = skillId, speedMult = 1.45f, announce = false,
+            )
+            "arc_pierce" -> spawnProjectile(
+                WeaponStyle.BOW, damage, 1.4f, vfx?.projectileFxKey,
+                radius = 24f, skillLook = skillId, pierceLeft = 3, announce = false,
+            )
+            "arc_rain" -> {
+                repeat(5) { i ->
+                    val side = (i - 2) * 26f
+                    spawnProjectile(
+                        WeaponStyle.BOW, (damage * 0.42f).roundToInt(), 1.15f, vfx?.projectileFxKey,
+                        skillLook = skillId, announce = false,
+                        originX = dungeonHeroX + facing.dirY() * side + facing.dirX() * (30f + i * 8f),
+                        originY = dungeonHeroY - 110f + i * 6f,
+                        vxOverride = facing.dirX() * 90f,
+                        vyOverride = PROJECTILE_SPEED * 0.95f,
+                    )
+                }
+            }
+            "arc_storm" -> {
+                listOf(-24f, -12f, 0f, 12f, 24f, -8f, 8f).forEach { deg ->
+                    spawnProjectile(
+                        WeaponStyle.BOW, (damage * 0.38f).roundToInt(), 1.2f, vfx?.projectileFxKey,
+                        skillLook = skillId, angleOffsetDeg = deg, speedMult = 1.1f, announce = false,
+                    )
+                }
+            }
+            else -> spawnProjectile(
+                WeaponStyle.BOW, damage, 1.25f, vfx?.projectileFxKey,
+                radius = 22f, skillLook = skillId, announce = false,
+            )
+        }
+    }
+
+    private fun spawnMagicSpecial(skillId: String, damage: Int, kind: MagicBoltKind, vfx: SpecialVfxSpec?) {
+        when (skillId) {
+            "mag_meteor" -> {
+                spawnProjectile(
+                    WeaponStyle.MAGIC, damage, 1.2f, vfx?.projectileFxKey, vfx?.impactFxKey,
+                    radius = 30f, magicKind = kind, skillLook = skillId, announce = false,
+                    originX = dungeonHeroX + facing.dirX() * 20f,
+                    originY = dungeonHeroY - 130f,
+                    vxOverride = facing.dirX() * 140f,
+                    vyOverride = PROJECTILE_SPEED * 0.85f,
+                )
+            }
+            "mag_chain" -> {
+                spawnProjectile(WeaponStyle.MAGIC, damage, 1.3f, vfx?.projectileFxKey, vfx?.impactFxKey, 22f, kind, false, 2, skillId, speedMult = 1.2f)
+            }
+            "mag_ice" -> spawnProjectile(WeaponStyle.MAGIC, damage, 1.35f, vfx?.projectileFxKey, vfx?.impactFxKey, 24f, kind, false, skillLook = skillId)
+            "mag_orb" -> spawnProjectile(WeaponStyle.MAGIC, damage, 1.4f, vfx?.projectileFxKey, vfx?.impactFxKey, 26f, kind, false, skillLook = skillId, speedMult = 0.85f)
+            "mag_ruin" -> {
+                spawnProjectile(WeaponStyle.MAGIC, damage, 1.4f, vfx?.projectileFxKey, vfx?.impactFxKey, 28f, kind, false, skillLook = skillId)
+                spawnProjectile(WeaponStyle.MAGIC, (damage * 0.5f).roundToInt(), 1.2f, null, null, 20f, kind, false, skillLook = skillId, angleOffsetDeg = -16f)
+                spawnProjectile(WeaponStyle.MAGIC, (damage * 0.5f).roundToInt(), 1.2f, null, null, 20f, kind, false, skillLook = skillId, angleOffsetDeg = 16f)
+            }
+            else -> spawnProjectile(
+                WeaponStyle.MAGIC, damage, 1.35f, vfx?.projectileFxKey ?: kind.projectileFxKey(),
+                vfx?.impactFxKey ?: kind.impactFxKey(), 24f, kind, false, skillLook = skillId,
+            )
+        }
+    }
 
     private fun spawnProjectile(
         style: WeaponStyle,
@@ -2206,33 +2690,62 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         fxSpriteKey: String? = null,
         impactSpriteKey: String? = null,
         radius: Float = 18f,
+        magicKind: MagicBoltKind? = null,
+        announce: Boolean = true,
+        pierceLeft: Int = 0,
+        skillLook: String? = null,
+        angleOffsetDeg: Float = 0f,
+        speedMult: Float = 1f,
+        originX: Float? = null,
+        originY: Float? = null,
+        vxOverride: Float? = null,
+        vyOverride: Float? = null,
     ) {
         val fx = facing.dirX()
         val fy = facing.dirY()
-        // 대각 패드 입력 중이면 그 방향으로도 보정
         val px = if (abs(dungeonPadX) + abs(dungeonPadY) > 0.2f) dungeonPadX else fx
         val py = if (abs(dungeonPadX) + abs(dungeonPadY) > 0.2f) dungeonPadY else fy
         val len = hypot(px, py).coerceAtLeast(0.01f)
-        val nx = px / len
-        val ny = py / len
+        var nx = px / len
+        var ny = py / len
+        if (angleOffsetDeg != 0f) {
+            val rad = Math.toRadians(angleOffsetDeg.toDouble())
+            val c = kotlin.math.cos(rad).toFloat()
+            val s = kotlin.math.sin(rad).toFloat()
+            val rx = nx * c - ny * s
+            val ry = nx * s + ny * c
+            nx = rx
+            ny = ry
+        }
         facing = if (abs(nx) > abs(ny)) {
             if (nx > 0) Facing.RIGHT else Facing.LEFT
         } else {
             if (ny > 0) Facing.DOWN else Facing.UP
         }
         dungeonProjectiles += DungeonProjectile(
-            x = dungeonHeroX + nx * 22f,
-            y = dungeonHeroY + ny * 10f - 30f,
-            vx = nx * PROJECTILE_SPEED,
-            vy = ny * PROJECTILE_SPEED,
+            x = originX ?: (dungeonHeroX + nx * 22f),
+            y = originY ?: (dungeonHeroY + ny * 10f - 30f),
+            vx = vxOverride ?: (nx * PROJECTILE_SPEED * speedMult),
+            vy = vyOverride ?: (ny * PROJECTILE_SPEED * speedMult),
             style = style,
             damage = damage,
             life = life,
             radius = radius,
             fxSpriteKey = fxSpriteKey,
             impactSpriteKey = impactSpriteKey,
+            magicKind = magicKind,
+            pierceLeft = pierceLeft,
+            skillLook = skillLook,
         )
-        say(if (style == WeaponStyle.BOW) "화살을 날렸다!" else "마력을 쏘아냈다!")
+        if (announce) {
+            say(
+                when {
+                    style == WeaponStyle.BOW -> "화살을 날렸다!"
+                    magicKind == MagicBoltKind.BASIC -> "마력탄을 쏘아냈다!"
+                    else -> "마력을 쏘아냈다!"
+                }
+            )
+        }
     }
 
     private fun damageMonster(
@@ -2247,8 +2760,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         // 한 번 맞은 적은 끝까지 추격한다
         monster.enraged = true
         applyKnockback(monster, knockDx, knockDy)
-        val mitigated = (damage - monster.armor).coerceAtLeast(1)
+        val bonus = frontWeapon()?.onHitBonusDamage ?: 0
+        val mitigated = (damage + bonus - monster.armor).coerceAtLeast(1)
         monster.hp -= mitigated
+        applyOnHitWeaponEffects()
         if (monster.hp > 0) {
             val armorNote = if (monster.armor > 0) " · 방어 -${monster.armor}" else ""
             say("${monster.name}에게 ${mitigated} 피해! (HP ${monster.hp}/${monster.maxHp}$armorNote)")
@@ -2283,12 +2798,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun rewardMonsterKill(monster: DungeonMonster) {
         val floor = dungeonFloorNumber
         val biome = currentBiome()
-        val wild = biome != ExploreBiome.DUNGEON && biome != ExploreBiome.CASTLE
+        val wild = biome.isWild()
         val bossMult = if (monster.isBoss) 3 else 1
         val gold = ((if (wild) 14 else 18) + floor * (if (wild) 11 else 14) + Random.nextInt(0, 16)) * bossMult
         val exp = ((if (wild) 16 else 20) + floor * (if (wild) 10 else 12)) * bossMult
         if (monster.isBoss) {
             say("보스 ${monster.name}을(를) 쓰러뜨렸다! (+${gold}G, EXP +$exp)")
+            markCheckpointCleared(biome, floor)
+            grantMidBossRelic(monster, floor)
         } else {
             say("${monster.name}을(를) 쓰러뜨렸다! (+${gold}G, EXP +$exp)")
         }
@@ -2299,6 +2816,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             ExploreBiome.GLACIER -> if (floor > player.glacierDepth) player = player.copy(glacierDepth = floor)
             ExploreBiome.DUNGEON -> if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
             ExploreBiome.CASTLE -> if (floor > player.castleDepth) player = player.copy(castleDepth = floor)
+            ExploreBiome.IGLOO -> if (floor > player.iglooDepth) player = player.copy(iglooDepth = floor)
+            ExploreBiome.SEA -> if (floor > player.seasideDepth) player = player.copy(seasideDepth = floor)
+            ExploreBiome.WINTER_KEEP -> if (floor > player.winterDepth) player = player.copy(winterDepth = floor)
         }
         gainExp(exp)
         gainMercExp(exp)
@@ -2310,8 +2830,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val loot = when (biome) {
                 ExploreBiome.FOREST -> ItemCatalog.forestLoot.random()
                 ExploreBiome.DESERT -> ItemCatalog.desertLoot.random()
-                ExploreBiome.GLACIER -> ItemCatalog.glacierLoot.random()
-                ExploreBiome.DUNGEON, ExploreBiome.CASTLE -> ItemCatalog.dungeonLoot.random()
+                ExploreBiome.GLACIER, ExploreBiome.IGLOO -> ItemCatalog.glacierLoot.random()
+                ExploreBiome.DUNGEON, ExploreBiome.CASTLE, ExploreBiome.SEA, ExploreBiome.WINTER_KEEP ->
+                    ItemCatalog.dungeonLoot.random()
             }
             addItem(loot)
             say(
@@ -2319,8 +2840,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     monster.isBoss -> "보스의 잔해에서 ${loot.name}을(를) 챙겼다."
                     biome == ExploreBiome.FOREST -> "쓰러진 짐승 곁에서 ${loot.name}을(를) 챙겼다."
                     biome == ExploreBiome.DESERT -> "모래 속에서 ${loot.name}을(를) 주웠다."
-                    biome == ExploreBiome.GLACIER -> "얼음 틈에서 ${loot.name}을(를) 챙겼다."
+                    biome == ExploreBiome.GLACIER || biome == ExploreBiome.IGLOO ->
+                        "얼음 틈에서 ${loot.name}을(를) 챙겼다."
                     biome == ExploreBiome.CASTLE -> "해골 더미에서 ${loot.name}을(를) 챙겼다."
+                    biome == ExploreBiome.SEA -> "바닷물 사이에서 ${loot.name}을(를) 건졌다."
+                    biome == ExploreBiome.WINTER_KEEP -> "차가운 감방에서 ${loot.name}을(를) 챙겼다."
                     else -> "썩은 옷자락에서 ${loot.name}을(를) 챙겼다."
                 }
             )
@@ -2338,31 +2862,125 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         } else {
                             "이 층의 언데드가 잠잠해졌다. 더 높은 성채로 올라가 보자."
                         }
+                    ExploreBiome.IGLOO ->
+                        if (floor >= IglooFactory.MAX_FLOOR) {
+                            "얼음북극곰이 쓰러지자 빙벽이 녹기 시작한다…"
+                        } else {
+                            "이 지대의 극지 짐승이 잠잠해졌다. 더 깊은 빙하를 찾아보자."
+                        }
+                    ExploreBiome.SEA ->
+                        if (floor >= SeaCaveFactory.MAX_FLOOR) {
+                            "대왕문어가 쓰러지자 해일이 잦아든다…"
+                        } else {
+                            "이 층의 바다 괴물이 잠잠해졌다. 더 깊은 동굴로 내려가자."
+                        }
+                    ExploreBiome.WINTER_KEEP ->
+                        if (floor >= WinterKeepFactory.MAX_FLOOR) {
+                            "납치범 두목이 쓰러지자 아이들의 목소리가 성으로 돌아온다…"
+                        } else {
+                            "이 층의 납치범이 잠잠해졌다. 더 깊은 지하로 내려가자."
+                        }
                 }
             )
-            maybeLiberateCastle()
+            maybeLiberateStory()
         }
     }
 
-    /** Gray Castle 10층을 모두 정리하면 White Castle로 해방한다. */
-    private fun maybeLiberateCastle() {
-        if (currentBiome() != ExploreBiome.CASTLE) return
-        if (dungeonFloorNumber < CastleFactory.MAX_FLOOR) return
+    /** 스토리 던전 최심층을 정리하면 해당 정착지를 해방한다. */
+    private fun maybeLiberateStory() {
         if (!mapCleared()) return
-        if (player.castleCleared) return
-        liberateCastle()
+        when (currentBiome()) {
+            ExploreBiome.CASTLE -> {
+                if (dungeonFloorNumber >= CastleFactory.MAX_FLOOR && !player.castleCleared) {
+                    finishLiberation(
+                        dest = SettlementId.GRAY_CASTLE,
+                        update = {
+                            it.copy(
+                                castleCleared = true,
+                                castleDepth = CastleFactory.MAX_FLOOR,
+                                castleFloorCleared = maxOf(it.castleFloorCleared, CastleFactory.MAX_FLOOR),
+                            )
+                        },
+                        lines = listOf(
+                            "해골 왕의 왕관이 빛과 함께 산산이 부서진다!",
+                            "저주가 풀렸다 — Gray Castle이 White Castle로 되살아난다.",
+                            "해방된 사람들이 성으로 돌아와 다시 삶을 시작한다.",
+                        ),
+                    )
+                }
+            }
+            ExploreBiome.IGLOO -> {
+                if (dungeonFloorNumber >= IglooFactory.MAX_FLOOR && !player.iglooCleared) {
+                    finishLiberation(
+                        dest = SettlementId.IGLOO,
+                        update = {
+                            it.copy(
+                                iglooCleared = true,
+                                iglooDepth = IglooFactory.MAX_FLOOR,
+                                iglooFloorCleared = maxOf(it.iglooFloorCleared, IglooFactory.MAX_FLOOR),
+                            )
+                        },
+                        lines = listOf(
+                            "얼음북극곰이 쓰러지자 북녘의 얼음 별이 빛을 잃는다!",
+                            "이글루 마을에 온기가 돌아온다. 눈밭이 녹고 풀이 돋는다.",
+                            "한때 따뜻했던 북녘이 다시 봄을 맞는다.",
+                        ),
+                    )
+                }
+            }
+            ExploreBiome.SEA -> {
+                if (dungeonFloorNumber >= SeaCaveFactory.MAX_FLOOR && !player.seasideCleared) {
+                    finishLiberation(
+                        dest = SettlementId.SEASIDE,
+                        update = {
+                            it.copy(
+                                seasideCleared = true,
+                                seasideDepth = SeaCaveFactory.MAX_FLOOR,
+                                seasideFloorCleared = maxOf(it.seasideFloorCleared, SeaCaveFactory.MAX_FLOOR),
+                            )
+                        },
+                        lines = listOf(
+                            "대왕문어가 바다 깊은 곳으로 가라앉는다!",
+                            "해일이 걷히고 바닷가 폐허가 다시 어촌의 모습을 되찾는다.",
+                            "배가 항구에 닿고, 사람들이 집으로 돌아온다.",
+                        ),
+                    )
+                }
+            }
+            ExploreBiome.WINTER_KEEP -> {
+                if (dungeonFloorNumber >= WinterKeepFactory.MAX_FLOOR && !player.winterCleared) {
+                    finishLiberation(
+                        dest = SettlementId.WINTER_CASTLE,
+                        update = {
+                            it.copy(
+                                winterCleared = true,
+                                winterDepth = WinterKeepFactory.MAX_FLOOR,
+                                winterFloorCleared = maxOf(it.winterFloorCleared, WinterKeepFactory.MAX_FLOOR),
+                            )
+                        },
+                        lines = listOf(
+                            "납치범 두목이 쓰러지자 감방의 자물쇠가 한꺼번에 풀린다!",
+                            "아이들이 성으로 돌아오고, 영원한 겨울이 녹아내린다.",
+                            "겨울성이 본디 모습으로 되살아난다.",
+                        ),
+                    )
+                }
+            }
+            else -> Unit
+        }
     }
 
-    private fun liberateCastle() {
-        player = player.copy(
-            castleCleared = true,
-            castleDepth = CastleFactory.MAX_FLOOR,
-        )
+    private fun finishLiberation(
+        dest: SettlementId,
+        update: (Player) -> Player,
+        lines: List<String>,
+    ) {
+        player = update(player)
         clearDungeonState()
         path.clear()
         pendingEnter = null
         walking = false
-        currentSettlement = SettlementId.GRAY_CASTLE
+        currentSettlement = dest
         currentPlace = null
         scene = Scene.VILLAGE
         menuTab = MenuTab.NONE
@@ -2372,9 +2990,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         facing = Facing.DOWN
         resetPartyTrail(heroX, heroY)
         emitSfx("door")
-        say("해골 왕의 왕관이 빛과 함께 산산이 부서진다!")
-        say("저주가 풀렸다 — Gray Castle이 White Castle로 되살아난다.")
-        say("해방된 사람들이 성으로 돌아와 다시 삶을 시작한다.")
+        lines.forEach { say(it) }
     }
 
     /** 몬스터 위치/사망 등 내부 변이 후 Compose 재구성을 유도한다. */
@@ -2383,7 +2999,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         dungeonFloor = map.copy(monsters = map.monsters.toMutableList())
     }
 
-    private fun enterExploreFloor(floor: Int) {
+    private fun enterExploreFloor(floor: Int, skipClearedBoss: Boolean = false) {
         val biome = currentBiome()
         val map = when (biome) {
             ExploreBiome.FOREST -> ForestFactory.generate(floor)
@@ -2391,11 +3007,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             ExploreBiome.GLACIER -> GlacierFactory.generate(floor)
             ExploreBiome.DUNGEON -> DungeonFactory.generate(floor)
             ExploreBiome.CASTLE -> CastleFactory.generate(floor)
+            ExploreBiome.IGLOO -> IglooFactory.generate(floor)
+            ExploreBiome.SEA -> SeaCaveFactory.generate(floor)
+            ExploreBiome.WINTER_KEEP -> WinterKeepFactory.generate(floor)
+        }
+        if (skipClearedBoss) {
+            map.monsters.removeAll { it.isBoss }
         }
         dungeonFloor = map
         dungeonFloorNumber = floor
-        dungeonHeroX = map.spawnX
-        dungeonHeroY = map.spawnY
+        dungeonHeroX = if (skipClearedBoss) map.stairsDownX else map.spawnX
+        dungeonHeroY = if (skipClearedBoss) map.stairsDownY else map.spawnY
         dungeonWalking = false
         dungeonTarget = null
         pendingDungeonMonster = null
@@ -2450,9 +3072,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 if (floor > player.dungeonDepth) player = player.copy(dungeonDepth = floor)
                 say("─── 지하 ${floor}층 · 오염된 통로 ───")
                 when {
-                    DungeonFactory.isBossFloor(floor) -> {
+                    DungeonFactory.isBossFloor(floor) && !skipClearedBoss -> {
                         val bossName = DungeonFactory.bossForFloor(floor).second
                         say("이 층의 주인이 깨어 있다 — 보스 『$bossName』. 하층 계단 근처를 경계하라.")
+                    }
+                    DungeonFactory.isBossFloor(floor) && skipClearedBoss -> {
+                        say("이미 쓰러뜨린 층의 심층 계단 앞에 섰다.")
                     }
                     floor == 1 -> say("한때 포도주 보관소와 하수도였던 길이 좀비의 숨결로 가득하다.")
                     else -> say("더 깊은 곳에서 검붉은 기운이 피부를 찌른다. 좀비석이 가까워지는 기분이다.")
@@ -2470,12 +3095,64 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         say("성채가 더 깊어진다. 해골궁수의 시위 소리가 복도를 훑는다.")
                 }
             }
+            ExploreBiome.IGLOO -> {
+                if (floor > player.iglooDepth) player = player.copy(iglooDepth = floor)
+                say("─── 이글루 빙하지대 · ${floor}지대 ───")
+                when {
+                    IglooFactory.isFinalFloor(floor) ->
+                        say("지하 20층. 얼음북극곰이 얼음 별의 한기를 지키고 있다. 쓰러뜨리면 마을이 다시 따뜻해진다.")
+                    floor == 1 ->
+                        say("한때 따뜻했던 북녘. 얼음 별이 떨어진 뒤 하얀 침묵만이 남았다.")
+                    else ->
+                        say("칼바람이 더 매서워진다. 더 깊은 빙하에 얼음북극곰이 웅크리고 있다.")
+                }
+            }
+            ExploreBiome.SEA -> {
+                if (floor > player.seasideDepth) player = player.copy(seasideDepth = floor)
+                say("─── 바다 동굴 · ${floor}층 ───")
+                when {
+                    SeaCaveFactory.isFinalFloor(floor) ->
+                        say("해저 20층. 대왕문어가 해일의 핵을 움켜쥐고 있다. 쓰러뜨리면 마을이 회복된다.")
+                    floor == 1 ->
+                        say("짠 물이 발목까지 찬다. 해일로 무너진 동굴이 아래로 이어진다.")
+                    else ->
+                        say("파도 소리가 돌벽을 때린다. 대왕문어의 촉수가 더 깊숙이 꿈틀거린다.")
+                }
+            }
+            ExploreBiome.WINTER_KEEP -> {
+                if (floor > player.winterDepth) player = player.copy(winterDepth = floor)
+                say("─── 겨울성 지하 · ${floor}층 ───")
+                when {
+                    WinterKeepFactory.isFinalFloor(floor) ->
+                        say("지하 20층. 납치범 두목이 아이들을 가두고 있다. 쓰러뜨리면 성이 봄을 되찾는다.")
+                    floor == 1 ->
+                        say("성 지하의 차가운 감방. 아이들이 사라진 뒤 겨울이 내렸다.")
+                    else ->
+                        say("납치범들의 발소리가 복도를 훑는다. 더 깊은 곳에 두목이 있다.")
+                }
+            }
         }
     }
 
     /** 탐험 화면 진입 시 맵이 없으면 즉시 생성한다. */
     fun ensureDungeonLoaded() {
+        if (pendingExploreChoice != null) return
         if (dungeonFloor == null) enterExploreFloor(1)
+    }
+
+    fun chooseExploreFloor(startFromOne: Boolean) {
+        val choice = pendingExploreChoice ?: return
+        pendingExploreChoice = null
+        val dest = if (startFromOne) 1 else choice.checkpoint.coerceAtLeast(1)
+        enterExploreFloor(dest, skipClearedBoss = dest > 1)
+        if (dest > 1) {
+            say("이전에 쓰러뜨린 ${choice.floorWord}으로 바로 내려왔다. 심층 계단에서 더 들어갈 수 있다.")
+        }
+    }
+
+    fun cancelExploreFloorChoice() {
+        if (pendingExploreChoice == null) return
+        leavePlace()
     }
 
     fun walkInDungeon(x: Float, y: Float) {
@@ -2503,9 +3180,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 when (currentBiome()) {
                     ExploreBiome.FOREST -> "더 깊은 숲길로 이어지는 표식 위에 서야 한다."
                     ExploreBiome.DESERT -> "더 깊은 사막길로 이어지는 표식 위에 서야 한다."
-                    ExploreBiome.GLACIER -> "더 깊은 빙하로 이어지는 표식 위에 서야 한다."
+                    ExploreBiome.GLACIER, ExploreBiome.IGLOO -> "더 깊은 빙하로 이어지는 표식 위에 서야 한다."
                     ExploreBiome.DUNGEON -> "아래층으로 이어지는 계단 위에 서야 한다."
                     ExploreBiome.CASTLE -> "더 높은 성채로 이어지는 계단 위에 서야 한다."
+                    ExploreBiome.SEA -> "더 깊은 바다 동굴로 이어지는 계단 위에 서야 한다."
+                    ExploreBiome.WINTER_KEEP -> "더 깊은 지하로 이어지는 계단 위에 서야 한다."
                 }
             )
             return
@@ -2514,10 +3193,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             say("몸 상태로는 더 들어갈 수 없다. 물약을 쓰거나 마을로 돌아가자.")
             return
         }
-        if (currentBiome() == ExploreBiome.CASTLE &&
-            dungeonFloorNumber >= CastleFactory.MAX_FLOOR
-        ) {
-            say("이곳이 Gray Castle의 최심층이다. 언데드를 모두 처치해 저주를 끊어라.")
+        val cap = currentBiome().storyMaxFloor()
+        if (cap != null && dungeonFloorNumber >= cap) {
+            say(
+                when (currentBiome()) {
+                    ExploreBiome.CASTLE -> "이곳이 Gray Castle의 최심층이다. 언데드를 모두 처치해 저주를 끊어라."
+                    ExploreBiome.IGLOO -> "이곳이 빙하지대의 최심층이다. 얼음북극곰을 쓰러뜨려 온기를 되찾아라."
+                    ExploreBiome.SEA -> "이곳이 바다 동굴의 최심층이다. 대왕문어를 쓰러뜨려 해일을 멈춰라."
+                    ExploreBiome.WINTER_KEEP -> "이곳이 겨울성 지하의 최심층이다. 납치범 두목을 쓰러뜨려 아이들을 구하라."
+                    else -> "이곳이 최심층이다. 보스를 쓰러뜨려 저주를 끊어라."
+                }
+            )
             return
         }
         emitSfx("door")
@@ -2534,9 +3220,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             when (currentBiome()) {
                 ExploreBiome.FOREST -> "마을 쪽 바람이 폐를 채운다. 숲속 짐승들은 여전히 깊은 곳에서 숨 쉰다."
                 ExploreBiome.DESERT -> "마을 쪽 공기가 폐를 채운다. 모래 아래 괴물들은 여전히 숨 쉰다."
-                ExploreBiome.GLACIER -> "마을 쪽 온기가 손을 녹인다. 극지의 짐승들은 여전히 얼음 너머에 있다."
+                ExploreBiome.GLACIER, ExploreBiome.IGLOO ->
+                    "마을 쪽 온기가 손을 녹인다. 극지의 짐승들은 여전히 얼음 너머에 있다."
                 ExploreBiome.DUNGEON -> "지상의 공기가 폐를 채운다. 저주는 아직 지하에 웅크리고 있다."
                 ExploreBiome.CASTLE -> "성문 밖 바람이 폐를 채운다. 고성의 저주는 아직 심층에 남았다."
+                ExploreBiome.SEA -> "물기 찬 바람이 폐를 채운다. 대왕문어는 아직 해저에 남았다."
+                ExploreBiome.WINTER_KEEP -> "성문 밖 눈이 얼굴을 때린다. 납치범들은 아직 지하에 있다."
             }
         )
         emitSfx("door")
@@ -2586,8 +3275,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val base = when (currentBiome()) {
             ExploreBiome.FOREST -> ItemCatalog.forestLoot
             ExploreBiome.DESERT -> ItemCatalog.desertLoot
-            ExploreBiome.GLACIER -> ItemCatalog.glacierLoot
-            ExploreBiome.DUNGEON, ExploreBiome.CASTLE -> ItemCatalog.dungeonLoot
+            ExploreBiome.GLACIER, ExploreBiome.IGLOO -> ItemCatalog.glacierLoot
+            ExploreBiome.DUNGEON, ExploreBiome.CASTLE, ExploreBiome.SEA, ExploreBiome.WINTER_KEEP ->
+                ItemCatalog.dungeonLoot
         }
         val deep = listOf(
             ItemCatalog.hiPotion,
@@ -2602,16 +3292,30 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         return pool.random()
     }
 
-    /** 포털스톤으로 연 문을 타고 주인공 집(HOME)으로 귀환한다. */
+    /** 포털스톤으로 연 문을 타고 주인공 집(HOME)으로 귀환한다. 워프는 남는다. */
     fun enterHomePortal() {
         val map = dungeonFloor ?: return
         if (map.tileKindAt(dungeonHeroX, dungeonHeroY) != DungeonTile.PORTAL) {
             say("집으로 이어지는 포털 위에 서야 한다.")
             return
         }
+        val col = (dungeonHeroX / map.tileSize).toInt()
+        val row = (dungeonHeroY / map.tileSize).toInt()
+        val place = currentPlace ?: return
+        parkedWarp = ParkedWarp(
+            settlementId = currentSettlement,
+            placeId = place,
+            floor = dungeonFloorNumber,
+            heroX = dungeonHeroX,
+            heroY = dungeonHeroY,
+            facing = facing,
+            portalCol = col,
+            portalRow = row,
+        )
+        parkedDungeonFloor = map
         say("포털이 빛나며 오두막으로 당신을 끌어당긴다.")
         emitSfx("door")
-        clearDungeonState()
+        hideLiveDungeon()
         path.clear()
         pendingEnter = null
         pubTarget = null
@@ -2620,14 +3324,50 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         pubWalking = false
         interiorSpeech = null
         interiorSpeakerId = null
-        val home = placeOf(PlaceId.HOME)
-        heroX = home.doorX
-        heroY = home.doorY
+        interiorPanelOpen = false
+        pubHeroX = InteriorRoom.WARP_X
+        pubHeroY = InteriorRoom.WARP_Y
         facing = Facing.DOWN
         currentPlace = PlaceId.HOME
         scene = Scene.INTERIOR
         menuTab = MenuTab.NONE
-        say("익숙한 오두막의 공기가 폐를 채운다. 던전으로 돌아가면 그 포털은 이미 닫혀 있을 것이다.")
+        resetPartyTrail(pubHeroX, pubHeroY)
+        say("익숙한 오두막. 푸른 워프가 아직 열려 있다. 그 문으로 탐험 지점에 다시 설 수 있다.")
+    }
+
+    /** 집의 워프를 타고 포털을 연 자리로 돌아간다. */
+    fun resumeHomeWarp() {
+        val warp = parkedWarp ?: run {
+            say("열려 있는 워프가 없다.")
+            return
+        }
+        if (currentPlace != PlaceId.HOME) {
+            say("집의 워프 앞에서만 돌아갈 수 있다.")
+            return
+        }
+        currentSettlement = warp.settlementId
+        currentPlace = warp.placeId
+        scene = Scene.INTERIOR
+        menuTab = MenuTab.NONE
+        interiorPanelOpen = false
+        val live = parkedDungeonFloor
+        if (live != null && live.floor == warp.floor) {
+            dungeonFloor = live
+            dungeonFloorNumber = warp.floor
+        } else {
+            enterExploreFloor(warp.floor)
+            dungeonFloor?.setTile(warp.portalCol, warp.portalRow, DungeonTile.PORTAL)
+            parkedDungeonFloor = dungeonFloor
+        }
+        dungeonHeroX = warp.heroX
+        dungeonHeroY = warp.heroY
+        facing = warp.facing
+        dungeonWalking = false
+        dungeonTarget = null
+        dungeonHint = "portal"
+        resetPartyTrail(dungeonHeroX, dungeonHeroY)
+        emitSfx("door")
+        say("워프가 당신을 포털을 열었던 자리로 되돌린다. 문은 그대로 남아 있다.")
     }
 
     private fun tickDungeon(dt: Float) {
@@ -2783,12 +3523,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 return@forEach
             }
             val hit = map.monsters.firstOrNull {
-                it.alive && hypot(it.x - p.x, it.y - p.y) < p.radius + 30f
+                it.alive &&
+                    it.id !in p.alreadyHit &&
+                    hypot(it.x - p.x, it.y - p.y) < p.radius + 30f
             }
             if (hit != null) {
-                val hitSfx = when (p.style) {
-                    WeaponStyle.BOW -> "arrow_hit"
-                    WeaponStyle.MAGIC -> "magic_hit"
+                val hitSfx = when {
+                    p.style == WeaponStyle.BOW -> "arrow_hit"
+                    p.magicKind != null -> p.magicKind.hitSfx()
+                    p.style == WeaponStyle.MAGIC -> "magic_hit"
                     else -> "hit"
                 }
                 damageMonster(
@@ -2798,17 +3541,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     knockDy = p.vy,
                     hitSfx = hitSfx,
                 )
-                p.impactSpriteKey?.let { key ->
-                    specialSkillFx += SpecialSkillFx(
-                        x = hit.x,
-                        y = hit.y - 24f,
-                        facing = facing,
-                        spriteKey = key,
-                        duration = 0.42f,
-                        scale = 1.35f,
-                    )
+                p.alreadyHit += hit.id
+                specialSkillFx += SpecialSkillFx(
+                    x = hit.x,
+                    y = hit.y - 24f,
+                    facing = facing,
+                    spriteKey = p.impactSpriteKey.orEmpty(),
+                    duration = 0.42f,
+                    scale = 1.35f,
+                    skillId = p.skillLook.orEmpty(),
+                )
+                if (p.pierceLeft > 0) {
+                    p.pierceLeft -= 1
+                } else {
+                    doomed += p
                 }
-                doomed += p
             }
         }
         if (doomed.isNotEmpty()) {
@@ -3032,14 +3779,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val ny = dy / len
         val speed = PROJECTILE_SPEED * 0.72f
         val style = if (monsterUsesMagicShot(monster)) WeaponStyle.MAGIC else WeaponStyle.BOW
-        val base = (monster.power - totalDef / 2).coerceAtLeast(3)
+        val damage = CombatBalance.rangedHit(monster.power, totalDef)
         dungeonProjectiles += DungeonProjectile(
             x = monster.x + nx * 20f,
             y = monster.y - 26f + ny * 12f,
             vx = nx * speed,
             vy = ny * speed,
             style = style,
-            damage = (base * 0.8f).roundToInt().coerceAtLeast(3),
+            damage = damage,
             life = 2.1f,
             radius = 16f,
             hostile = true,
@@ -3074,20 +3821,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun resolveMonsterAttackHit(monster: DungeonMonster) {
-        val base = (monster.power - totalDef).coerceAtLeast(3) + Random.nextInt(0, 4)
-        val dmg = if (monster.isBoss) {
-            (base * 1.55f).toInt().coerceAtLeast(base + 8)
-        } else {
-            base
-        }
+        val dmg = CombatBalance.meleeHit(monster.power, totalDef, monster.isBoss) + Random.nextInt(0, 4)
         val biome = currentBiome()
         say(
             when {
                 monster.isBoss -> "보스 ${monster.name}의 일격! (HP -$dmg)"
                 biome == ExploreBiome.FOREST -> "${monster.name}이(가) 덮친다! (HP -$dmg)"
                 biome == ExploreBiome.DESERT -> "${monster.name}이(가) 찌른다! (HP -$dmg)"
-                biome == ExploreBiome.GLACIER -> "${monster.name}이(가) 할퀸다! (HP -$dmg)"
+                biome == ExploreBiome.GLACIER || biome == ExploreBiome.IGLOO ->
+                    "${monster.name}이(가) 할퀸다! (HP -$dmg)"
                 biome == ExploreBiome.CASTLE -> "${monster.name}이(가) 덮쳐온다! (HP -$dmg)"
+                biome == ExploreBiome.SEA -> "${monster.name}이(가) 휘감는다! (HP -$dmg)"
+                biome == ExploreBiome.WINTER_KEEP -> "${monster.name}이(가) 덮쳐온다! (HP -$dmg)"
                 else -> "${monster.name}이(가) 물어뜯는다! (HP -$dmg)"
             }
         )
@@ -3184,27 +3929,54 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun gainExp(amount: Int) {
         var p = player.copy(exp = player.exp + amount)
         val levelsGained = mutableListOf<Int>()
+        var lastAdvance: JobAdvanceOffer? = null
         while (p.exp >= p.expToNext) {
             val rest = p.exp - p.expToNext
+            val newLevel = p.level + 1
+            val fromTitle = p.title
+            val fromRank = HeroAdvancement.rankIndexAt(p.level)
+            val toRank = HeroAdvancement.rankIndexAt(newLevel)
+            val mult = HeroAdvancement.growthMultAt(newLevel)
+            val hpGain = 12 * mult
+            val mpGain = 4 * mult
+            val newTitle = p.heroJob.titleAt(newLevel)
             p = p.copy(
-                level = p.level + 1,
+                level = newLevel,
                 exp = rest,
-                maxHp = p.maxHp + 12,
-                hp = p.maxHp + 12,
-                maxMp = p.maxMp + 4,
-                mp = p.maxMp + 4,
-                baseAtk = p.baseAtk + 2,
-                baseDef = p.baseDef + 1,
-                str = p.str + 1,
-                agi = p.agi + 1,
-                intel = p.intel + 1
+                title = newTitle,
+                maxHp = p.maxHp + hpGain,
+                hp = p.maxHp + hpGain,
+                maxMp = p.maxMp + mpGain,
+                mp = p.maxMp + mpGain,
+                baseAtk = p.baseAtk + 2 * mult,
+                baseDef = p.baseDef + 1 * mult,
+                str = p.str + 1 * mult,
+                agi = p.agi + 1 * mult,
+                intel = p.intel + 1 * mult,
             )
-            levelsGained += p.level
-            log.add("레벨 업! Lv.${p.level} 이(가) 되었다. 몸이 가벼워졌다.")
+            levelsGained += newLevel
+            log.add("레벨 업! Lv.$newLevel 이(가) 되었다. 성장 ×$mult")
+            if (toRank > fromRank) {
+                lastAdvance = JobAdvanceOffer(
+                    job = p.heroJob,
+                    fromTitle = fromTitle,
+                    toTitle = newTitle,
+                    newLevel = newLevel,
+                    spriteRank = HeroAdvancement.spriteRankAt(newLevel),
+                    growthMult = mult,
+                    awakening = newLevel >= 20,
+                )
+                if (newLevel >= 20) {
+                    log.add("각성! 『$newTitle』의 힘이 세 배로 깨어났다.")
+                } else {
+                    log.add("전직! 『$newTitle』이(가) 되었다.")
+                }
+            }
         }
         player = p
+        if (lastAdvance != null) pendingJobAdvance = lastAdvance
         if (levelsGained.isNotEmpty()) {
-            onActorLevelUp(HERO_SKILL_KEY, p.name, ActorClass.ADVENTURER, levelsGained)
+            onActorLevelUp(HERO_SKILL_KEY, p.name, levelsGained)
         }
     }
 

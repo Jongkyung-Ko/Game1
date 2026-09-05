@@ -28,9 +28,9 @@ object InteriorNpcCatalog {
     fun forPlace(
         placeId: PlaceId,
         settlementId: SettlementId = SettlementId.OAKHAVEN,
-        castleCleared: Boolean = false,
+        flags: WorldFlags = WorldFlags(),
     ): List<InteriorNpc> = all.filter { it.placeId == placeId }.map { npc ->
-        val lines = RegionDialogue.interiorLines(settlementId, castleCleared, npc)
+        val lines = RegionDialogue.interiorLines(settlementId, flags, npc)
         if (lines === npc.lines) npc else npc.copy(lines = lines)
     }
 
