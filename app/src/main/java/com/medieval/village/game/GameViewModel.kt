@@ -36,6 +36,7 @@ import com.medieval.village.model.MercenaryCatalog
 import com.medieval.village.model.Place
 import com.medieval.village.model.PlaceId
 import com.medieval.village.model.Player
+import com.medieval.village.model.Prologue
 import com.medieval.village.model.PubNpc
 import com.medieval.village.model.PubNpcCatalog
 import com.medieval.village.model.RegionDialogue
@@ -163,6 +164,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 타이틀(로고) 화면 — 시작하기/이어하기 */
     var awaitingTitle by mutableStateOf(true)
+        private set
+    /** 새 게임 시작 시 다섯 장 인트로 */
+    var awaitingPrologue by mutableStateOf(false)
+        private set
+    var prologuePage by mutableIntStateOf(0)
         private set
     /** 첫 시작·새 게임 시 직업 선택 대기 */
     var awaitingClassSelect by mutableStateOf(false)
@@ -805,6 +811,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
         awaitingClassSelect = false
         awaitingTitle = false
+        awaitingPrologue = false
         hasStartedRun = true
         pendingJobAdvance = null
         player = player.copy(title = player.heroJob.titleAt(player.level))
@@ -812,20 +819,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startFromTitle() {
         awaitingTitle = false
-        awaitingClassSelect = true
+        beginPrologue()
     }
 
     fun continueFromTitle(slot: Int) {
         if (loadGame(slot)) {
             awaitingTitle = false
+            awaitingPrologue = false
             awaitingClassSelect = false
         }
     }
 
     fun requestNewGame() {
         awaitingTitle = false
-        awaitingClassSelect = true
         menuTab = MenuTab.NONE
+        beginPrologue()
     }
 
     fun cancelClassSelect() {
@@ -840,8 +848,49 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun confirmHeroJob(job: HeroJob) {
         awaitingClassSelect = false
         awaitingTitle = false
+        awaitingPrologue = false
         hasStartedRun = true
         newGame(job)
+    }
+
+    private fun beginPrologue() {
+        awaitingClassSelect = false
+        prologuePage = 0
+        awaitingPrologue = true
+    }
+
+    fun advancePrologue() {
+        if (!awaitingPrologue) return
+        emitSfx("click")
+        if (prologuePage >= Prologue.slides.lastIndex) {
+            finishPrologue()
+        } else {
+            prologuePage++
+        }
+    }
+
+    fun skipPrologue() {
+        if (!awaitingPrologue) return
+        emitSfx("click")
+        finishPrologue()
+    }
+
+    fun retreatPrologue() {
+        if (!awaitingPrologue) return
+        if (prologuePage > 0) {
+            emitSfx("click")
+            prologuePage--
+        } else if (!hasStartedRun) {
+            awaitingPrologue = false
+            awaitingTitle = true
+        } else {
+            finishPrologue()
+        }
+    }
+
+    private fun finishPrologue() {
+        awaitingPrologue = false
+        awaitingClassSelect = true
     }
 
     fun newGame(job: HeroJob = HeroJob.WARRIOR) {
@@ -899,9 +948,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         currentPlace = PlaceId.HOME
         menuTab = MenuTab.NONE
         resetPartyTrail(pubHeroX, pubHeroY)
-        say("풍요의 마을… 한때 '신성한 포도주'로 번영했던 이곳에 눈을 떴다.")
-        say("몇 년 전 지하 최심부에서 검붉은 '좀비석'이 발굴된 뒤, 마을은 저주에 잠식되고 있다.")
-        say("문을 열고, 지상으로 스며드는 재앙의 근원을 마주하자. 실내에서는 화면을 눌러 걸어 다닐 수 있다.")
+        say("풍요의 마을… 저주의 근원을 찾아 이곳에 발을 들였다.")
+        say("문을 열고 밖으로 나서자. 실내에서는 화면을 눌러 걸어 다닐 수 있다.")
     }
 
     private fun applyStartingGear(job: HeroJob) {
@@ -1118,7 +1166,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------- 이동
 
     fun tick(dt: Float) {
-        if (awaitingTitle || awaitingClassSelect) return
+        if (awaitingTitle || awaitingPrologue || awaitingClassSelect) return
         animTime += dt
         if (levelUpFxActorKey != null && animTime >= levelUpFxUntil) {
             levelUpFxActorKey = null

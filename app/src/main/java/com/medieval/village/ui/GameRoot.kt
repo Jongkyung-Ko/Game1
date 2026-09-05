@@ -20,9 +20,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.medieval.village.audio.GameAudioEngine
+import com.medieval.village.audio.GameNarrationEngine
 import com.medieval.village.audio.Sfx
 import com.medieval.village.audio.resolveMusicMood
 import com.medieval.village.game.GameViewModel
+import com.medieval.village.model.Prologue
 import com.medieval.village.game.MenuTab
 import com.medieval.village.game.Scene
 import com.medieval.village.game.isExplorePlace
@@ -39,6 +41,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
     val vm: GameViewModel = viewModel()
     val context = LocalContext.current
     val audio = remember(context) { GameAudioEngine(context) }
+    val narration = remember(context) { GameNarrationEngine(context) }
     val haptics = remember(context) { GameHaptics(context) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -46,7 +49,10 @@ fun GameRoot(modifier: Modifier = Modifier) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> audio.resume()
-                Lifecycle.Event.ON_PAUSE -> audio.pause()
+                Lifecycle.Event.ON_PAUSE -> {
+                    audio.pause()
+                    narration.stop()
+                }
                 else -> Unit
             }
         }
@@ -54,11 +60,23 @@ fun GameRoot(modifier: Modifier = Modifier) {
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             audio.release()
+            narration.release()
         }
     }
 
     LaunchedEffect(vm.player.bgmVolume, vm.player.sfxVolume) {
         audio.setUserVolume(vm.player.bgmVolume, vm.player.sfxVolume)
+        narration.setVolume(vm.player.sfxVolume)
+    }
+
+    LaunchedEffect(vm.awaitingPrologue, vm.prologuePage, vm.player.sfxVolume) {
+        narration.setVolume(vm.player.sfxVolume)
+        if (vm.awaitingPrologue) {
+            val slide = Prologue.slides.getOrNull(vm.prologuePage)
+            if (slide != null) narration.speak(slide.spoken)
+        } else {
+            narration.stop()
+        }
     }
 
     LaunchedEffect(
@@ -134,6 +152,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
 
     BackHandler(
         enabled = vm.awaitingTitle ||
+            vm.awaitingPrologue ||
             vm.awaitingClassSelect ||
             vm.pendingJobAdvance != null ||
             vm.levelUpSkillOffer != null ||
@@ -143,6 +162,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
             vm.scene == Scene.INTERIOR,
     ) {
         when {
+            vm.awaitingPrologue -> vm.retreatPrologue()
             vm.awaitingTitle -> Unit
             vm.awaitingClassSelect -> vm.cancelClassSelect()
             vm.pendingJobAdvance != null -> vm.dismissJobAdvance()
@@ -159,7 +179,7 @@ fun GameRoot(modifier: Modifier = Modifier) {
     Box(modifier = modifier.background(Palette.WoodDark)) {
         Column(modifier = Modifier.fillMaxSize()) {
             // 메뉴·HP/MP는 씬 밖 고정 영역 — 던전 카메라 스크롤과 겹치지 않음
-            if (!vm.awaitingTitle) {
+            if (!vm.awaitingTitle && !vm.awaitingPrologue) {
                 TopMenuBar(vm, Modifier.zIndex(2f))
             }
             Box(
@@ -187,5 +207,6 @@ fun GameRoot(modifier: Modifier = Modifier) {
         BalanceDebugOverlay(vm, Modifier.fillMaxSize().zIndex(18f))
         ClassSelectOverlay(vm, Modifier.fillMaxSize().zIndex(20f))
         TitleOverlay(vm, Modifier.fillMaxSize().zIndex(22f))
+        PrologueOverlay(vm, Modifier.fillMaxSize().zIndex(24f))
     }
 }
